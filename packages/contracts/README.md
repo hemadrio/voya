@@ -113,8 +113,49 @@ if (!result.success) {
 ## Scripts
 
 - `pnpm build` — emit declarations + JS to `dist/` (`tsc -p tsconfig.build.json`).
-- `pnpm test` — run the Vitest suite (unit, round-trip, dependency-boundary).
-- `pnpm typecheck` — strict `tsc --noEmit` over `src/` and `test/`.
+- `pnpm test` — run the Vitest suite (unit, round-trip, dependency-boundary,
+  registry completeness, baseline comparator, and compatibility classifier).
+- `pnpm typecheck` — strict `tsc --noEmit` over `src/`, `test/`, and `scripts/`.
 - `pnpm lint` — ESLint, including the `no-explicit-any` boundary rule.
 - `pnpm check:deps` — standalone dependency-boundary assertion (also run as
   part of `pnpm test`).
+- `pnpm generate:baselines` — regenerate the committed JSON Schema baselines
+  in `contract-baselines/` from the current registry.  Run after any schema
+  change, review the diff, and commit alongside the schema edit.  A breaking
+  change requires a major-version bump — see docs/contracts-versioning.md.
+
+## Contract compatibility harness (WO-005)
+
+### Schema registry and baselines
+
+Every public domain object schema is listed in `src/registry.ts` with a stable
+dot-notation identifier (`search.FlightSearchRequest`, `booking.CreateBookingRequest`,
+…).  `contract-baselines/{id}.json` holds the committed JSON Schema fingerprint
+for each.
+
+The `test/compatibility/comparator.test.ts` test regenerates each baseline in
+memory and fails if it diverges from the committed file — with the schema ID
+and regeneration instructions in the failure message.  The task is
+**non-cacheable** in turbo.json so a Turborepo remote cache hit cannot hide a
+real diff.
+
+### Additive-versus-breaking classifier
+
+`test/compatibility/classifier.ts` categorises any diff as **additive**,
+**breaking**, or **no-op**.  `test/compatibility/classifier.test.ts` proves
+each category against committed fixture files in
+`test/compatibility/fixtures/`.  The version gate rejects a breaking diff
+without a major-version bump.
+
+For the full versioning policy and the expand-and-contract rule see
+`docs/contracts-versioning.md`.
+
+### Test runner assumption (TA-001 — unratified)
+
+The harness currently uses **Vitest 1.x**.  Jest 29 is installed in some
+services but has not been evaluated for this package.  All assertion primitives
+are imported from `test/compatibility/test-helpers.ts`; only that file would
+need updating if the runner changes.
+
+**Ratification owner:** tech lead / @contracts-steward
+**Decision deadline:** prior to Phase 1 service scaffold (WO-006 milestone)

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "dietaryRestrictions": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "preferredAirlines": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "preferredCurrency": {
+      "type": "string"
+    },
+    "preferredSeatClass": {
+      "enum": [
+        "BUSINESS",
+        "ECONOMY",
+        "FIRST"
+      ],
+      "type": "string"
+    },
+    "userId": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "userId"
+  ],
+  "schemaId": "user.TravelPreferences",
+  "type": "object"
+}

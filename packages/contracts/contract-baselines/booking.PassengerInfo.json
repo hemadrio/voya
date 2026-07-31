@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "dateOfBirth": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "email": {
+      "format": "email",
+      "type": "string"
+    },
+    "firstName": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "lastName": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "passportNumber": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "dateOfBirth",
+    "firstName",
+    "lastName"
+  ],
+  "schemaId": "booking.PassengerInfo",
+  "type": "object"
+}

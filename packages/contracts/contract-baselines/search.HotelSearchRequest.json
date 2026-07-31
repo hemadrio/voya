@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "checkInDate": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "checkOutDate": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "guests": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "location": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "starRating": {
+      "oneOf": [
+        {
+          "const": 3
+        },
+        {
+          "const": 4
+        },
+        {
+          "const": 5
+        }
+      ]
+    }
+  },
+  "required": [
+    "checkInDate",
+    "checkOutDate",
+    "currency",
+    "guests",
+    "location"
+  ],
+  "schemaId": "search.HotelSearchRequest",
+  "type": "object"
+}

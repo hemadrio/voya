@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "email": {
+      "format": "email",
+      "type": "string"
+    },
+    "firstName": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "lastName": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "password": {
+      "minLength": 8,
+      "pattern": "(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)",
+      "type": "string"
+    }
+  },
+  "required": [
+    "email",
+    "firstName",
+    "lastName",
+    "password"
+  ],
+  "schemaId": "auth.RegisterRequest",
+  "type": "object"
+}

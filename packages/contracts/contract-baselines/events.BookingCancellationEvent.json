@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bookingId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "correlationId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "occurredAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "reason": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "userId": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "bookingId",
+    "correlationId",
+    "occurredAt",
+    "userId"
+  ],
+  "schemaId": "events.BookingCancellationEvent",
+  "type": "object"
+}

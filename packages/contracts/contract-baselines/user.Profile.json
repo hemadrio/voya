@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "createdAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "email": {
+      "format": "email",
+      "type": "string"
+    },
+    "firstName": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "lastName": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "role": {
+      "enum": [
+        "support_agent",
+        "system",
+        "traveler"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "createdAt",
+    "email",
+    "firstName",
+    "id",
+    "lastName",
+    "role"
+  ],
+  "schemaId": "user.Profile",
+  "type": "object"
+}

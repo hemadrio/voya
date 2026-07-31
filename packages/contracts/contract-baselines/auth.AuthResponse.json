@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "accessToken": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "expiresIn": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "role": {
+      "enum": [
+        "support_agent",
+        "system",
+        "traveler"
+      ],
+      "type": "string"
+    },
+    "userId": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "accessToken",
+    "expiresIn",
+    "role",
+    "userId"
+  ],
+  "schemaId": "auth.AuthResponse",
+  "type": "object"
+}

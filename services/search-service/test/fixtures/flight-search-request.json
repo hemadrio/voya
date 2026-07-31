@@ -1,0 +1,8 @@
+{
+  "departureAirport": "JFK",
+  "arrivalAirport": "LAX",
+  "departureDate": "2027-03-15T08:00:00.000Z",
+  "passengers": 2,
+  "seatClass": "ECONOMY",
+  "currency": "USD"
+}

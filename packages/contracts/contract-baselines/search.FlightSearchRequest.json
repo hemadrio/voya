@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "arrivalAirport": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "departureAirport": {
+      "type": "string"
+    },
+    "departureDate": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "passengers": {
+      "maximum": 9,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "returnDate": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "seatClass": {
+      "enum": [
+        "BUSINESS",
+        "ECONOMY",
+        "FIRST"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "arrivalAirport",
+    "currency",
+    "departureAirport",
+    "departureDate",
+    "passengers",
+    "seatClass"
+  ],
+  "schemaId": "search.FlightSearchRequest",
+  "type": "object"
+}

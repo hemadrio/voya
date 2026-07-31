@@ -16,6 +16,16 @@
     "typecheck": {
       "dependsOn": ["^build"],
       "outputs": []
+    },
+    "@travel/contracts#test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "cache": false
+    },
+    "contracts:check": {
+      "dependsOn": ["@travel/contracts#build"],
+      "cache": false,
+      "outputs": []
     }
   }
 }

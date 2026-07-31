@@ -1,0 +1,27 @@
+{
+  "description": "Breaking change: required property removed and enum value narrowed",
+  "schemaKind": "request",
+  "before": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "schemaId": "fixture.BreakingExample",
+    "additionalProperties": false,
+    "properties": {
+      "bookingType": { "enum": ["CAR", "FLIGHT", "HOTEL"], "type": "string" },
+      "currency": { "type": "string" },
+      "offerId": { "minLength": 1, "type": "string" }
+    },
+    "required": ["bookingType", "currency", "offerId"],
+    "type": "object"
+  },
+  "after": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "schemaId": "fixture.BreakingExample",
+    "additionalProperties": false,
+    "properties": {
+      "bookingType": { "enum": ["FLIGHT", "HOTEL"], "type": "string" },
+      "offerId": { "minLength": 1, "type": "string" }
+    },
+    "required": ["bookingType", "offerId"],
+    "type": "object"
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bookingType": {
+      "enum": [
+        "CAR",
+        "FLIGHT",
+        "HOTEL"
+      ],
+      "type": "string"
+    },
+    "createdAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "offerId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "passengers": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "dateOfBirth": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "firstName": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "lastName": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "passportNumber": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "dateOfBirth",
+          "firstName",
+          "lastName"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "CANCELLED",
+        "CONFIRMED",
+        "EXPIRED",
+        "FAILED",
+        "PENDING",
+        "REFUNDED"
+      ],
+      "type": "string"
+    },
+    "totalPrice": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "updatedAt": {
+      "format": "date-time",
+      "type": "string"
+    }
+  },
+  "required": [
+    "bookingType",
+    "createdAt",
+    "currency",
+    "id",
+    "offerId",
+    "passengers",
+    "status",
+    "totalPrice",
+    "updatedAt"
+  ],
+  "schemaId": "booking.BookingResponse",
+  "type": "object"
+}

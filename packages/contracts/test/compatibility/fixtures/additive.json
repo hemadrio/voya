@@ -1,0 +1,27 @@
+{
+  "description": "Additive change: new optional property added to response schema",
+  "schemaKind": "response",
+  "before": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "schemaId": "fixture.AdditiveExample",
+    "additionalProperties": false,
+    "properties": {
+      "id": { "minLength": 1, "type": "string" },
+      "status": { "enum": ["PENDING", "CONFIRMED"], "type": "string" }
+    },
+    "required": ["id", "status"],
+    "type": "object"
+  },
+  "after": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "schemaId": "fixture.AdditiveExample",
+    "additionalProperties": false,
+    "properties": {
+      "cancelledAt": { "format": "date-time", "type": "string" },
+      "id": { "minLength": 1, "type": "string" },
+      "status": { "enum": ["CANCELLED", "CONFIRMED", "PENDING"], "type": "string" }
+    },
+    "required": ["id", "status"],
+    "type": "object"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "email": {
+      "format": "email",
+      "type": "string"
+    },
+    "password": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "email",
+    "password"
+  ],
+  "schemaId": "auth.LoginRequest",
+  "type": "object"
+}

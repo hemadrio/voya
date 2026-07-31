@@ -1,0 +1,38 @@
+{
+  "description": "Phase 0 baseline metrics — recorded at the start of the contract harness work (WO-005).",
+  "recordedAt": "2026-07-31",
+  "priorTestCount": {
+    "contractsPackage": 0,
+    "acrossAllServices": 3,
+    "detail": "One test file (contracts.smoke.test.ts) with 3 assertions in booking-service. Zero contract tests in contracts package before WO-001."
+  },
+  "duplicatedDeclarationsRemoved": {
+    "count": 0,
+    "detail": "WO-001 established @travel/contracts as the single source of truth before any service scaffolding. WO-004 removed all locally declared platform payload types from the Next.js frontend (BookabilityState, FormErrorState, ApiResult retained as presentational-only types). No inter-service duplicates to count yet."
+  },
+  "validatedRouteBoundaries": {
+    "count": 1,
+    "detail": "booking-service/test/error-serialiser.integration.test.ts (from WO-002) validates the CreateBookingRequest → serialiseError route boundary end-to-end. The remaining eight service boundaries are scaffolded by WO-005 consumer fixture tests."
+  },
+  "registeredSchemas": 23,
+  "baselineFilesCommitted": 23,
+  "consumerTestsAdded": {
+    "bookingService": true,
+    "frontend": true,
+    "searchService": true,
+    "paymentService": true,
+    "authService": true,
+    "userService": true,
+    "notificationService": true,
+    "itineraryService": true,
+    "reportingService": true
+  },
+  "coverageGateTarget": "80% branch coverage on contracts package and shared/middleware",
+  "phaseExitCriteria": [
+    "All 23 schemas have committed baselines",
+    "Consumer fixture tests present for all 9 services + web app",
+    "Baseline comparator runs in CI and is non-cacheable",
+    "Version gate blocks breaking changes without major bump",
+    "contracts-versioning.md documenting expand-and-contract rule committed"
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "amount": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "bookingId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "clientSecret": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "FAILED",
+        "PROCESSING",
+        "REFUNDED",
+        "REQUIRES_PAYMENT_METHOD",
+        "SUCCEEDED"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "amount",
+    "bookingId",
+    "clientSecret",
+    "currency",
+    "id",
+    "status"
+  ],
+  "schemaId": "payment.PaymentIntentResponse",
+  "type": "object"
+}

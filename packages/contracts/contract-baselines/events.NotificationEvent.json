@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "correlationId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "data": {
+      "additionalProperties": {},
+      "type": "object"
+    },
+    "occurredAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "recipientEmail": {
+      "format": "email",
+      "type": "string"
+    },
+    "template": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "correlationId",
+    "data",
+    "occurredAt",
+    "recipientEmail",
+    "template"
+  ],
+  "schemaId": "events.NotificationEvent",
+  "type": "object"
+}

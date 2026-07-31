@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bookable": {
+      "type": "boolean"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "details": {
+      "additionalProperties": {},
+      "type": "object"
+    },
+    "expiresAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "freshness": {
+      "enum": [
+        "FRESH",
+        "STALE"
+      ],
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "price": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "provenance": {
+      "enum": [
+        "AMADEUS",
+        "ILLUSTRATIVE",
+        "RAPIDAPI"
+      ],
+      "type": "string"
+    },
+    "rating": {
+      "maximum": 5,
+      "minimum": 0,
+      "type": "number"
+    },
+    "reviews": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "title": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "bookable",
+    "currency",
+    "details",
+    "expiresAt",
+    "freshness",
+    "id",
+    "price",
+    "provenance",
+    "title"
+  ],
+  "schemaId": "search.Offer",
+  "type": "object"
+}

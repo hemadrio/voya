@@ -1,0 +1,14 @@
+{
+  "id": "offer_illustrative_001",
+  "provenance": "ILLUSTRATIVE",
+  "bookable": false,
+  "title": "Suggested: Nonstop JFK to CDG",
+  "price": "899.00",
+  "currency": "USD",
+  "details": {
+    "note": "AI-generated preview — not available for booking",
+    "estimatedDuration": "7h 30m"
+  },
+  "expiresAt": "2030-06-01T00:15:00.000Z",
+  "freshness": "FRESH"
+}

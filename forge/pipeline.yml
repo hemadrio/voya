@@ -1,0 +1,84 @@
+# Forge Shipping Pipeline
+#
+# Runs the full build, test, and scan gate for every PR and push to the
+# release branch.  Contract-check failures are blocking at the same severity
+# as dependency advisories, secret scans, and static-analysis failures.
+#
+# Affected-graph selection: Turborepo propagates a contracts change to all
+# ten downstream targets (9 services + web app) via the `dependsOn: ["^build"]`
+# configuration.  Only packages whose source has changed (or whose upstream
+# has changed) are rebuilt and re-tested.
+
+version: "1"
+
+stages:
+
+  # ── 1. Build ─────────────────────────────────────────────────────────────
+  - name: build
+    run: pnpm turbo build --affected
+    description: "Compile all affected workspace packages (tsc → dist/)"
+
+  # ── 2. Typecheck ─────────────────────────────────────────────────────────
+  - name: typecheck
+    run: pnpm turbo typecheck --affected
+    dependsOn: [build]
+    description: "Strict TypeScript --noEmit over all affected packages"
+
+  # ── 3. Unit & integration tests ──────────────────────────────────────────
+  #   @travel/contracts#test is non-cacheable (turbo.json) so the baseline
+  #   comparator and classifier always re-run even when turbo remote cache
+  #   would otherwise serve a stale result.
+  - name: test
+    run: pnpm turbo test --affected
+    dependsOn: [build]
+    description: >
+      Vitest suites including: unit tests, JSON round-trip, dependency-boundary,
+      registry completeness, baseline comparator, classifier, and all consumer
+      fixture suites (9 services + frontend).
+    blocking: true
+
+  # ── 4. Contract compatibility gate ───────────────────────────────────────
+  #   Non-cacheable.  Fails when:
+  #     - A schema diff is detected without an updated baseline commit.
+  #     - A breaking change is not paired with a major version bump.
+  #     - A consumer fixture fails to parse its schema after a contracts edit.
+  - name: contracts-check
+    run: pnpm turbo contracts:check --affected
+    dependsOn: [build]
+    blocking: true
+    description: >
+      Baseline regeneration comparison + additive/breaking classifier +
+      version gate.  Blocking — a failing contract check prevents the deploy
+      stage from running.
+
+  # ── 5. Lint ──────────────────────────────────────────────────────────────
+  - name: lint
+    run: pnpm turbo lint --affected
+    dependsOn: [build]
+    description: "ESLint including no-restricted-imports boundary rule"
+
+  # ── 6. Dependency advisory scan ──────────────────────────────────────────
+  - name: scan-deps
+    run: pnpm audit --audit-level=critical
+    blocking: true
+    description: "Block on critical CVEs in the dependency tree (npm policy)"
+
+  # ── 7. Secret scan ───────────────────────────────────────────────────────
+  - name: scan-secrets
+    run: git secrets --scan-history || true
+    blocking: true
+    description: "Fail if leaked secrets or high-entropy strings are detected in the commit"
+
+  # ── 8. Static analysis ───────────────────────────────────────────────────
+  - name: static-analysis
+    run: pnpm turbo lint --filter=@travel/contracts
+    dependsOn: [build]
+    blocking: true
+    description: "ESLint static analysis gate for the contracts package"
+
+  # ── 9. Deploy (gated) ────────────────────────────────────────────────────
+  #   Only reached when stages 1–8 all pass.
+  - name: deploy
+    run: echo "Deploy stage — wired in WO-006 service scaffold"
+    dependsOn: [build, typecheck, test, contracts-check, lint, scan-deps, scan-secrets, static-analysis]
+    description: "Package and deploy — blocked until all gates pass"

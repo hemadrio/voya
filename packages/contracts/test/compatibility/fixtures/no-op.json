@@ -1,0 +1,26 @@
+{
+  "description": "No-op: identical before and after schemas",
+  "schemaKind": "other",
+  "before": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "schemaId": "fixture.NoOpExample",
+    "additionalProperties": false,
+    "properties": {
+      "id": { "minLength": 1, "type": "string" },
+      "name": { "minLength": 1, "type": "string" }
+    },
+    "required": ["id", "name"],
+    "type": "object"
+  },
+  "after": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "schemaId": "fixture.NoOpExample",
+    "additionalProperties": false,
+    "properties": {
+      "id": { "minLength": 1, "type": "string" },
+      "name": { "minLength": 1, "type": "string" }
+    },
+    "required": ["id", "name"],
+    "type": "object"
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bookingType": {
+      "enum": [
+        "CAR",
+        "FLIGHT",
+        "HOTEL"
+      ],
+      "type": "string"
+    },
+    "contactEmail": {
+      "format": "email",
+      "type": "string"
+    },
+    "contactPhone": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "offerId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "offerPrice": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "passengers": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "dateOfBirth": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "firstName": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "lastName": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "passportNumber": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "dateOfBirth",
+          "firstName",
+          "lastName"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "bookingType",
+    "contactEmail",
+    "currency",
+    "idempotencyKey",
+    "offerId",
+    "offerPrice",
+    "passengers"
+  ],
+  "schemaId": "booking.CreateBookingRequest",
+  "type": "object"
+}
