@@ -15,6 +15,7 @@
     "express": "catalog:"
   },
   "devDependencies": {
+    "@travel/fixtures": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "@types/express": "catalog:",

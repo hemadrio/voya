@@ -19,10 +19,15 @@
     "contract:gen": "turbo run contract:gen",
     "dev": "turbo run dev",
     "clean": "turbo run clean",
-    "workspace:lint": "tsx tools/workspace-lint/src/index.ts"
+    "workspace:lint": "tsx tools/workspace-lint/src/index.ts",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "bash scripts/db-reset.sh"
   },
   "devDependencies": {
     "turbo": "2.1.3",
     "tsx": "^4.0.0"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

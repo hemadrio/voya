@@ -245,3 +245,10 @@
 - **Files:** 17 (+1602/-18)
 - **Duration:** 1022ss
 - **Approach:** Created database and cache modules from scratch. Extended the existing sqs module with per-domain FIFO queues (booking-events.fifo, payment-events.fifo) and a standard notifications queue, each with dedicated DLQs (maxReceiveCount=5) and CloudWatch depth alarms. Extended the secrets module to provision per-service Prisma DATABASE_URL secrets encoding connection_limit=5 against the RDS Proxy endpoint, with a new proxy_endpoint variable. Wired both new modules into both production and staging root modules with private-data subnet data sources. Created a Terratest file covering plan-time assertions for all key criteria and a pipeline guard script that fails CI if .env or credential files are committed.
+
+## WO-092: User Story: WO-092 - Synthetic Seed Data and Shared Test Fixture Package
+- **Status:** completed
+- **Commit:** `3a730b7`
+- **Files:** 27 (+2098/-1)
+- **Duration:** 1034ss
+- **Approach:** Created a new @travel/fixtures workspace package containing deterministic identifier helpers (stable UUIDs with f0000xxx- prefix, fixed reference instant 2026-01-15T12:00:00.000Z), typed factory functions with partial-override signatures for every domain entity, and static payload fixtures validated against @travel/contracts schemas. The seed entrypoint (prisma/seed.ts) upserts the full graph using stable IDs for idempotency. The db-reset.sh script enforces a hard-coded allow-list before executing. Four test files cover schema drift, factory determinism, pattern scanning for PII, and live integration assertions.

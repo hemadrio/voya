@@ -5,6 +5,7 @@
 ```bash
 docker compose up -d
 ./scripts/wait-for-stack.sh    # blocks until all deps healthy (~60s cold start)
+pnpm db:seed                   # populate the database with synthetic seed data
 ```
 
 Add the AWS emulation profile for SQS, SES, and Secrets Manager:
@@ -175,6 +176,75 @@ The CI smoke-test job boots the stack, waits for readiness, and runs protocol pr
 ```
 
 The `wait-for-stack.sh` script exits non-zero with per-container diagnostics if any dependency does not become healthy within 120 seconds, which fails the pipeline immediately rather than letting tests silently time out.
+
+---
+
+---
+
+## Synthetic seed data
+
+The platform uses a deterministic synthetic seed that produces a reproducible
+graph of users, itineraries, bookings, payments, events, and audit rows.
+All values use the `@synth.example` email domain and `SYNTH-` identifier
+prefixes — they are never real data.
+
+### Seed command
+
+```bash
+pnpm db:seed
+```
+
+Idempotent — upserts to the same state on re-run. Safe to call on every
+local stack start.
+
+### Full reset (drop schema, migrate, re-seed)
+
+```bash
+pnpm db:reset
+# or directly:
+./scripts/db-reset.sh
+```
+
+`db-reset.sh` refuses to run against any host that is not on the explicit
+allow-list (localhost, 127.0.0.1, staging internal hostnames). It fails
+closed on any ambiguity — if the host cannot be parsed, the script exits
+non-zero with a clear error.
+
+### Seed dataset summary
+
+| Persona | ID prefix | Notes |
+|---------|-----------|-------|
+| Alice Leisure | `f0000000-…-0001` | Multi-category itinerary (flight + hotel + car) |
+| Bob Business | `f0000000-…-0002` | Saved travel preferences, business seat class |
+| Charlie Guest | `f0000000-…-0003` | Guest-originated itinerary, erasure request pending |
+
+Booking lifecycle states covered: `PENDING` (active), `PENDING` (past expiry
+— exercises the expiry sweep), `CONFIRMED`, `CANCELLED`, `FAILED`,
+`REFUNDED`, `EXPIRED`, and one `ILLUSTRATIVE` offer rejection.
+
+### Fixtures package
+
+```typescript
+import { makeBooking, SEED_IDS, SYNTHETIC_FLIGHT_OFFER } from "@travel/fixtures";
+
+// Factory with partial override
+const booking = makeBooking({ status: "CANCELLED" });
+
+// Stable ID reference
+const aliceUserId = SEED_IDS.user.alice; // "f0000000-0000-4000-8000-000000000001"
+```
+
+Every exported payload is validated against its `@travel/contracts` schema
+at test time via `packages/fixtures/test/schema-drift.test.ts`. A contract
+change that invalidates a fixture fails immediately rather than silently
+passing.
+
+### Volume flag
+
+The default seed is small (3 users, 10 bookings). For load rehearsal,
+increase the loop count in `prisma/seed.ts` and run with the environment
+variable `SEED_VOLUME=large`. The default set is designed to complete in
+under 30 seconds on the local stack.
 
 ---
 
