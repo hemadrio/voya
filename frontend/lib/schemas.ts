@@ -37,3 +37,22 @@ export {
   LoginRequestSchema,
 } from "@travel/contracts/auth";
 export type { RegisterRequest, LoginRequest } from "@travel/contracts/auth";
+
+// ---------------------------------------------------------------------------
+// Error envelope — re-exported so form resolvers and error-boundary code
+// can import from one place without knowing the contracts subpath.
+// ---------------------------------------------------------------------------
+export { ErrorEnvelopeSchema, ErrorDetailSchema, ErrorCode } from "@travel/contracts/errors";
+export type { ErrorEnvelope, ErrorDetail } from "@travel/contracts/errors";
+
+// ---------------------------------------------------------------------------
+// User / profile
+// ---------------------------------------------------------------------------
+export { ProfileSchema, TravelPreferencesSchema } from "@travel/contracts/user";
+export type { Profile, TravelPreferences } from "@travel/contracts/user";
+
+// ---------------------------------------------------------------------------
+// Payment
+// ---------------------------------------------------------------------------
+export { PaymentIntentRequestSchema, PaymentIntentResponseSchema } from "@travel/contracts/payment";
+export type { PaymentIntentRequest, PaymentIntentResponse } from "@travel/contracts/payment";

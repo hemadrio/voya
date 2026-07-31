@@ -1,0 +1,51 @@
+{
+  "offers": [
+    {
+      "id": "offer_real_001",
+      "provenance": "AMADEUS",
+      "bookable": true,
+      "title": "Nonstop JFK → LAX — Delta DL123",
+      "price": "412.50",
+      "currency": "USD",
+      "rating": 4.5,
+      "reviews": 1280,
+      "details": {
+        "airline": "Delta",
+        "flightNumber": "DL123",
+        "durationMinutes": 330
+      },
+      "expiresAt": "2099-12-31T23:59:59.000Z",
+      "freshness": "FRESH"
+    },
+    {
+      "id": "offer_stale_002",
+      "provenance": "RAPIDAPI",
+      "bookable": true,
+      "title": "Hotel Sunset — 4★ — Los Angeles",
+      "price": "189.00",
+      "currency": "USD",
+      "rating": 4.1,
+      "reviews": 564,
+      "details": {
+        "hotelId": "h_sunset_la",
+        "checkIn": "2030-07-15",
+        "checkOut": "2030-07-18"
+      },
+      "expiresAt": "2099-12-31T23:59:59.000Z",
+      "freshness": "STALE"
+    },
+    {
+      "id": "offer_illustrative_003",
+      "provenance": "ILLUSTRATIVE",
+      "bookable": false,
+      "title": "Example Flight JFK → LAX (Illustrative)",
+      "price": "350.00",
+      "currency": "USD",
+      "details": {
+        "note": "Illustrative result — not available for booking"
+      },
+      "expiresAt": "2099-12-31T23:59:59.000Z",
+      "freshness": "FRESH"
+    }
+  ]
+}

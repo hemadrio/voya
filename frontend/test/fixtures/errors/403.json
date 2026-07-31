@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Access denied"
+  },
+  "reference": "frontend-fixture-403"
+}
