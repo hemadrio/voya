@@ -1,0 +1,14 @@
+{
+  "search_results": [
+    {
+      "vehicle_id": "car-999",
+      "vehicle_name": "Specialty Vehicle",
+      "vehicle_category": "Motorsport Cabriolet Turbo",
+      "sipp_code": "XZAR",
+      "price_per_day": 116,
+      "currency": "USD",
+      "pickup_location": "JFK",
+      "dropoff_location": "JFK"
+    }
+  ]
+}

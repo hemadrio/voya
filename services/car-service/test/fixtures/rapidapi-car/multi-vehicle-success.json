@@ -1,0 +1,37 @@
+{
+  "search_results": [
+    {
+      "vehicle_id": "car-001",
+      "vehicle_name": "Toyota Yaris or similar",
+      "vehicle_category": "Economy",
+      "sipp_code": "ECAR",
+      "total_price": 120,
+      "price_per_day": 40,
+      "currency": "USD",
+      "pickup_location": "JFK",
+      "dropoff_location": "JFK"
+    },
+    {
+      "vehicle_id": "car-002",
+      "vehicle_name": "Volkswagen Golf or similar",
+      "vehicle_category": "Compact",
+      "sipp_code": "CCAR",
+      "total_price": 150,
+      "price_per_day": 50,
+      "currency": "USD",
+      "pickup_location": "JFK",
+      "dropoff_location": "JFK"
+    },
+    {
+      "vehicle_id": "car-003",
+      "vehicle_name": "Ford Explorer or similar",
+      "vehicle_category": "Premium SUV",
+      "sipp_code": "PFAR",
+      "total_price": 270,
+      "price_per_day": 90,
+      "currency": "USD",
+      "pickup_location": "JFK",
+      "dropoff_location": "JFK"
+    }
+  ]
+}
