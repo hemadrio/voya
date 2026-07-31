@@ -1,49 +1,66 @@
-version: "3.9"
-
-# ---------------------------------------------------------------------------
-# Local development stack
+# Local development infrastructure stack
 #
-# Services:
-#   postgres  — PostgreSQL 16 for local development.
-#               DATABASE_URL includes connection_limit=5 so pool behaviour
-#               matches production (RDS Proxy enforces the same ceiling).
-#               Local dev uses sslmode=disable; production requires TLS.
-#               Connection: postgresql://postgres:postgres@localhost:5432/travel_dev
+# Starts PostgreSQL 16, Redis 7, and RabbitMQ 3.13 — the three stateful
+# dependencies needed by every service. All images are pinned to exact minor
+# tags; do NOT change to floating "latest" tags.
 #
-#   rabbitmq  — RabbitMQ 3.13 with management UI for local async event bus.
-#               The @travel/queue RabbitMqAdapter connects here when
-#               QUEUE_DRIVER=rabbitmq (set by default in .env.local).
-#               Management UI: http://localhost:15672 (guest/guest)
+# ── Quick start ─────────────────────────────────────────────────────────────
+#   docker compose up -d                     # all core services
+#   docker compose --profile aws up -d       # + LocalStack (SQS/SES/Secrets)
+#   docker compose ps                        # check health status
+#   ./scripts/wait-for-stack.sh              # block until all deps healthy
 #
-# Usage:
-#   docker compose up -d          # start all services
-#   docker compose down -v        # stop and remove volumes
+# ── Dependency-failure drills ────────────────────────────────────────────────
+#   docker compose stop postgres             # isolate DB failure
+#   docker compose stop redis                # isolate cache failure
+#   docker compose stop rabbitmq             # isolate queue failure
 #
-# Services connect to Postgres using:
+# ── Volume reset (clean slate) ───────────────────────────────────────────────
+#   docker compose down -v                   # remove containers AND volumes
+#
+# ── Port map ─────────────────────────────────────────────────────────────────
+#   PostgreSQL    5432    (AMQP driver uses connection_limit=5 per service)
+#   Redis         6379
+#   RabbitMQ      5672    AMQP
+#   RabbitMQ      15672   Management UI  http://localhost:15672 (guest/guest)
+#   LocalStack    4566    AWS edge port  (profile: aws)
+#
+# ── Connection strings ───────────────────────────────────────────────────────
 #   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/travel_dev?connection_limit=5&pool_timeout=10&sslmode=disable
+#   REDIS_URL=redis://localhost:6379
+#   RABBITMQ_URL=amqp://guest:guest@localhost:5672/
+#   AWS_ENDPOINT_URL=http://localhost:4566  (profile: aws only)
 #
-# Use packages/config buildLocalDatabaseUrl() to construct the URL in code —
-# do not hand-edit the connection string per service to avoid drift.
+# Use packages/config buildLocalDatabaseUrl() to construct the DATABASE_URL —
+# never hand-edit connection strings to avoid per-service drift.
 #
-# Production uses RDS Proxy (IAM auth, TLS required) provisioned by
-# infra/terraform/modules/rds-proxy/. See connection-budget.md.
+# ── Security notice ──────────────────────────────────────────────────────────
+# All credentials in this file are development-only placeholders.
+# No real API keys, supplier credentials, or production data may appear here.
 # ---------------------------------------------------------------------------
 
 services:
+  # ── PostgreSQL 16 ──────────────────────────────────────────────────────────
+  # max_connections=100: supports 9 services × connection_limit=5 = 45 pool
+  # connections, plus 10 for migration tasks, plus 45 headroom for psql/pgAdmin
+  # and integration tests. See connection-budget.md arithmetic below.
+  #
+  # Connection budget (local):
+  #   9 services × 5 connections = 45
+  #   migration task             = 10
+  #   dev tooling headroom       = 45
+  #   total                      = 100
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16.6-alpine
+    platform: linux/amd64
     container_name: travel-postgres
+    restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: travel_dev
-      # Align max_connections with RDS Proxy ceiling arithmetic in
-      # infra/terraform/modules/rds-proxy/connection-budget.md.
-      # Local dev: 100 is sufficient for the full service fleet at
-      # connection_limit=5 per service (20 services max × 5 = 100).
-      POSTGRES_MAX_CONNECTIONS: "100"
     command:
       - postgres
       - -c
@@ -52,36 +69,166 @@ services:
       - log_connections=on
       - -c
       - log_disconnections=on
+      - -c
+      - log_min_duration_statement=100
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./infra/local/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d travel_dev"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 30s
+    deploy:
+      resources:
+        reservations:
+          memory: 256m
+          cpus: "0.25"
+        limits:
+          memory: 512m
+          cpus: "1.0"
+    networks:
+      - travel-local
 
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    container_name: travel-rabbitmq
+  # ── Redis 7 ────────────────────────────────────────────────────────────────
+  # appendonly: persist writes across restarts (mirrors ElastiCache durability).
+  # maxmemory-policy allkeys-lru: mirrors ElastiCache eviction behaviour so
+  # cache-miss handling is exercised locally under memory pressure.
+  redis:
+    image: redis:7.4-alpine
+    platform: linux/amd64
+    container_name: travel-redis
+    restart: unless-stopped
     ports:
-      - "5672:5672"   # AMQP — used by @travel/queue RabbitMqAdapter
-      - "15672:15672" # Management UI
+      - "6379:6379"
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --loglevel
+      - notice
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        reservations:
+          memory: 128m
+          cpus: "0.1"
+        limits:
+          memory: 384m
+          cpus: "0.5"
+    networks:
+      - travel-local
+
+  # ── RabbitMQ 3.13 ──────────────────────────────────────────────────────────
+  # definitions.json pre-declares the travel.events exchange, per-topic queues,
+  # travel.events.dlq exchange, and dead-letter bindings, matching the topology
+  # assumed by the RabbitMqAdapter in @travel/queue.
+  # Management UI: http://localhost:15672 (guest / guest)
+  rabbitmq:
+    image: rabbitmq:3.13.7-management
+    platform: linux/amd64
+    container_name: travel-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
       RABBITMQ_DEFAULT_VHOST: /
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_data:/var/lib/rabbitmq/mnesia
+      - ./infra/local/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/local/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 15s
+      timeout: 10s
       retries: 5
-      start_period: 15s
+      start_period: 40s
+    deploy:
+      resources:
+        reservations:
+          memory: 256m
+          cpus: "0.25"
+        limits:
+          memory: 768m
+          cpus: "1.0"
+    networks:
+      - travel-local
 
+  # ── LocalStack (opt-in: --profile aws) ─────────────────────────────────────
+  # Emulates AWS SQS, SES, and Secrets Manager on a single edge port.
+  # Start with: docker compose --profile aws up -d
+  # The init scripts in infra/local/localstack/init/ create:
+  #   - travel-notification.fifo (FIFO queue)
+  #   - travel-notification-dlq.fifo (dead-letter FIFO)
+  #   - Secrets Manager entries with development-only placeholder values.
+  # AWS_ENDPOINT_URL=http://localhost:4566 in service environment to redirect calls.
+  localstack:
+    image: localstack/localstack:3.5.0
+    platform: linux/amd64
+    container_name: travel-localstack
+    restart: unless-stopped
+    profiles: ["aws"]
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: sqs,ses,secretsmanager
+      AWS_DEFAULT_REGION: eu-west-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      LOCALSTACK_INIT_AUTO_EXECUTE_SCRIPTS: 1
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./infra/local/localstack/init:/etc/localstack/init/ready.d:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal sqs list-queues --region eu-west-1 > /dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        reservations:
+          memory: 256m
+          cpus: "0.25"
+        limits:
+          memory: 1024m
+          cpus: "1.0"
+    networks:
+      - travel-local
+
+# ── Named volumes ──────────────────────────────────────────────────────────
+# State persists across "compose down" (without -v).
+# Reset with: docker compose down -v
 volumes:
   postgres_data:
     driver: local
+  redis_data:
+    driver: local
   rabbitmq_data:
     driver: local
+  localstack_data:
+    driver: local
+
+# ── Project-scoped bridge network ─────────────────────────────────────────
+# Service DNS names are stable (postgres, redis, rabbitmq, localstack).
+# Inter-service communication inside the stack uses these names directly.
+networks:
+  travel-local:
+    driver: bridge
+    name: travel-local
