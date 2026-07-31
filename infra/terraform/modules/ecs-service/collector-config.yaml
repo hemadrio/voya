@@ -1,0 +1,31 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 127.0.0.1:4317
+      http:
+        endpoint: 127.0.0.1:4318
+
+processors:
+  batch: {}
+  resourcedetection:
+    detectors: [ecs]
+    timeout: 2s
+
+exporters:
+  awsxray:
+    region: ${AWS_DEFAULT_REGION}
+  awsemf:
+    namespace: travel/platform
+    region: ${AWS_DEFAULT_REGION}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, batch]
+      exporters: [awsxray]
+    metrics:
+      receivers: [otlp]
+      processors: [resourcedetection, batch]
+      exporters: [awsemf]

@@ -45,3 +45,14 @@ variable "tags" {
   })
   description = "Mandatory tag contract applied via provider default_tags."
 }
+
+variable "domain_name" {
+  type        = string
+  description = "Primary domain name for the travel platform. ACM certificates are issued for this domain and *.domain_name."
+}
+
+variable "route53_zone_id" {
+  type        = string
+  description = "Route 53 hosted zone ID for automated ACM DNS validation. Leave empty for manual validation."
+  default     = ""
+}

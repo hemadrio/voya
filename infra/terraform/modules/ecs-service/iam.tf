@@ -111,3 +111,64 @@ resource "aws_iam_role_policy_attachment" "rds_connect" {
   role       = aws_iam_role.task_role.name
   policy_arn = each.value
 }
+
+# ── Telemetry policy ─────────────────────────────────────────────────────────
+# Least-privilege permissions for the ADOT collector sidecar running in the
+# task. X-Ray actions require resources = ["*"] (AWS does not support
+# resource-level restrictions on X-Ray write APIs). CloudWatch PutMetricData
+# is further restricted by a namespace condition. Log writes are scoped to
+# the service log group only.
+
+data "aws_iam_policy_document" "telemetry" {
+  statement {
+    sid    = "XRayWrite"
+    effect = "Allow"
+
+    actions = [
+      "xray:PutTraceSegments",
+      "xray:PutTelemetryRecords",
+      "xray:GetSamplingRules",
+      "xray:GetSamplingTargets",
+    ]
+
+    # X-Ray write APIs do not support resource-level restrictions.
+    resources = ["*"]
+  }
+
+  statement {
+    sid     = "CloudWatchMetricsWrite"
+    effect  = "Allow"
+    actions = ["cloudwatch:PutMetricData"]
+
+    # CloudWatch PutMetricData does not accept resource ARNs, but the
+    # namespace condition restricts writes to the platform namespace only.
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = [var.cloudwatch_namespace]
+    }
+  }
+
+  statement {
+    sid    = "CloudWatchLogsWrite"
+    effect = "Allow"
+
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+
+    # Scoped to this service's log group; no cross-service log writes.
+    resources = [
+      "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:${var.log_group_name}:*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "telemetry" {
+  name   = "telemetry"
+  role   = aws_iam_role.task_role.id
+  policy = data.aws_iam_policy_document.telemetry.json
+}

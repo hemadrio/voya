@@ -1,10 +1,10 @@
 variable "environment" {
   type        = string
-  description = "Deployment environment name (staging | production)"
+  description = "Deployment environment name (dev | staging | production)"
 
   validation {
-    condition     = contains(["staging", "production"], var.environment)
-    error_message = "environment must be 'staging' or 'production'."
+    condition     = contains(["dev", "staging", "production"], var.environment)
+    error_message = "environment must be 'dev', 'staging', or 'production'."
   }
 }
 
@@ -123,4 +123,44 @@ variable "rds_connect_policy_arns" {
     services that do not connect to the database (e.g. search services).
   EOT
   default     = []
+}
+
+# ── Telemetry / ADOT ─────────────────────────────────────────────────────────
+
+variable "adot_collector_image" {
+  type        = string
+  description = "ADOT collector container image URI (public.ecr.aws/aws-observability/aws-otel-collector)."
+  default     = "public.ecr.aws/aws-observability/aws-otel-collector:v0.40.0"
+}
+
+variable "cloudwatch_namespace" {
+  type        = string
+  description = "CloudWatch metrics namespace for the ADOT EMF exporter."
+  default     = "travel/platform"
+}
+
+variable "log_retention_days" {
+  type        = number
+  description = "CloudWatch Logs retention period in days."
+  default     = 30
+}
+
+variable "log_group_kms_key_arn" {
+  type        = string
+  description = "KMS key ARN for CloudWatch Logs server-side encryption. Leave empty to use AWS-managed keys."
+  default     = ""
+}
+
+variable "health_check_path" {
+  type        = string
+  description = "HTTP path for the container readiness health check."
+  default     = "/health/ready"
+}
+
+# ── ALB target group ──────────────────────────────────────────────────────────
+
+variable "target_group_arn" {
+  type        = string
+  description = "ARN of the ALB target group to attach the ECS service to. Leave empty to skip load balancer registration."
+  default     = ""
 }

@@ -345,5 +345,9 @@ module "ecs_service" {
     module.rds_proxy.service_rds_connect_policy_arns[each.key]
   ] : []
 
+  # Register the service with its ALB target group. Target groups are created
+  # by the edge module (WO-080) with /health/ready health checks.
+  target_group_arn = module.edge.target_group_arns[each.key]
+
   common_tags = local.common_tags
 }

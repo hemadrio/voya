@@ -6,6 +6,11 @@
  * plan time. All credentials are declared in var.secret_refs and rendered into
  * the container_definitions secrets array so ECS resolves them from Secrets
  * Manager before the container starts.
+ *
+ * Every task definition includes an ADOT collector sidecar (essential=false)
+ * that receives OTLP telemetry on the loopback interface and exports traces to
+ * X-Ray and metrics to CloudWatch EMF. Binding to 127.0.0.1 prevents external
+ * span injection from outside the task network namespace.
  */
 
 terraform {
@@ -27,6 +32,10 @@ locals {
   secrets_block = [
     for k, arn in var.secret_refs : { name = k, valueFrom = arn }
   ]
+
+  # Read collector config at plan time; the ADOT container substitutes
+  # ${AWS_DEFAULT_REGION} at runtime from the container environment.
+  collector_config = file("${path.module}/collector-config.yaml")
 }
 
 resource "aws_ecs_task_definition" "service" {
@@ -64,18 +73,51 @@ resource "aws_ecs_task_definition" "service" {
           "awslogs-group"         = var.log_group_name
           "awslogs-region"        = var.aws_region
           "awslogs-stream-prefix" = var.service_name
+          # awslogs-datetime-format intentionally omitted — Pino emits single-line
+          # JSON; adding a datetime format would cause CloudWatch to split on
+          # non-JSON lines and corrupt structured log records.
         }
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "wget -qO- http://localhost:${var.port}/health/live || exit 1"]
+        command     = ["CMD-SHELL", "wget -qO- http://localhost:${var.port}${var.health_check_path} || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
         startPeriod = 60
       }
+    },
+    {
+      name      = "adot-collector"
+      image     = var.adot_collector_image
+      essential = false
+
+      cpu    = 256
+      memory = 512
+
+      environment = [
+        { name = "AWS_DEFAULT_REGION", value = var.aws_region },
+        # Inline YAML config; the collector substitutes ${AWS_DEFAULT_REGION} at startup.
+        { name = "AOT_CONFIG_CONTENT", value = local.collector_config },
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = var.log_group_name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "adot-collector"
+        }
+      }
     }
   ])
+
+  # create_before_destroy ensures the previous task definition revision stays
+  # registered until the new revision is active, allowing ECS to roll back
+  # without capacity dip if the circuit breaker fires.
+  lifecycle {
+    create_before_destroy = true
+  }
 
   tags = merge(var.common_tags, {
     Name        = "${var.environment}-${var.service_name}-task"
@@ -97,6 +139,18 @@ resource "aws_ecs_service" "service" {
     security_groups  = var.security_group_ids
     assign_public_ip = false
   }
+
+  dynamic "load_balancer" {
+    for_each = var.target_group_arn != "" ? [1] : []
+    content {
+      target_group_arn = var.target_group_arn
+      container_name   = local.container_name
+      container_port   = var.port
+    }
+  }
+
+  deployment_minimum_healthy_percent = 100
+  deployment_maximum_percent         = 200
 
   deployment_circuit_breaker {
     enable   = true
