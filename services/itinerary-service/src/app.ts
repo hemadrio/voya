@@ -1,19 +1,15 @@
 /**
- * booking-service Express application factory.
+ * itinerary-service Express application factory.
+ *
+ * Exposes health endpoints only at this stage; itinerary routes are wired in
+ * subsequent work orders.
  */
 import express from "express";
-import { createBookingRouter } from "./routes/bookings.js";
-import { createErrorHandler } from "../../../shared/middleware/errorHandler.js";
-import type { BookingDomain } from "./routes/bookings.js";
 import type { HealthHandlers } from "@travel/observability";
 
-export function createApp(
-  domain: BookingDomain,
-  healthHandlers?: HealthHandlers,
-): express.Application {
+export function createApp(healthHandlers?: HealthHandlers): express.Application {
   const app = express();
   app.use(express.json({ limit: "64kb" }));
-  app.use("/bookings", createBookingRouter(domain));
 
   if (healthHandlers !== undefined) {
     app.get("/health/live", healthHandlers.liveHandler.bind(healthHandlers));
@@ -27,6 +23,5 @@ export function createApp(
     app.get("/health/ready", (_req, res) => res.json({ status: "ok" }));
   }
 
-  app.use(createErrorHandler());
   return app;
 }

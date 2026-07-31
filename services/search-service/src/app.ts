@@ -6,7 +6,8 @@
  *   POST /search/flights
  *   POST /search/hotels
  *   POST /search/cars
- *   GET  /health
+ *   GET  /health/live   — liveness (no dependency calls)
+ *   GET  /health/ready  — dependency-aware readiness
  *
  * Health is explicitly exempted from validation middleware (route-audit rule).
  */
@@ -16,8 +17,12 @@ import { createHotelRouter } from "./routes/hotels.js";
 import { createCarRouter } from "./routes/cars.js";
 import { createErrorHandler } from "../../../shared/middleware/errorHandler.js";
 import type { SearchAdapter } from "./adapters/SearchAdapter.js";
+import type { HealthHandlers } from "@travel/observability";
 
-export function createApp(adapter: SearchAdapter): express.Application {
+export function createApp(
+  adapter: SearchAdapter,
+  healthHandlers?: HealthHandlers,
+): express.Application {
   const app = express();
 
   // JSON body parser — applied to all routes except the Stripe webhook path
@@ -29,8 +34,18 @@ export function createApp(adapter: SearchAdapter): express.Application {
   app.use("/search/hotels", createHotelRouter(adapter));
   app.use("/search/cars", createCarRouter(adapter));
 
-  // Health endpoint — explicitly exempt from validation middleware.
-  app.get("/health", (_req, res) => res.json({ status: "ok" }));
+  // Health endpoints — explicitly exempt from validation middleware.
+  if (healthHandlers !== undefined) {
+    app.get("/health/live", healthHandlers.liveHandler.bind(healthHandlers));
+    app.get("/health/ready", (req, res, next) => {
+      healthHandlers.readyHandler(req, res).catch(next);
+    });
+  } else {
+    app.get("/health/live", (_req, res) =>
+      res.json({ status: "alive", uptimeSeconds: Math.floor(process.uptime()) }),
+    );
+    app.get("/health/ready", (_req, res) => res.json({ status: "ok" }));
+  }
 
   // Shared error handler (WO-002)
   app.use(createErrorHandler());

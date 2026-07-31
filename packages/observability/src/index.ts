@@ -31,3 +31,25 @@ export {
   recordAssistantBudget,
 } from './spanAttributes.js';
 export type { SupplierOutcome, BookingState } from './spanAttributes.js';
+
+export {
+  createHealthCheck,
+  createPrismaProbe,
+  createRedisProbe,
+  createQueueProbe,
+  createSecretsProbe,
+  _resetHealthCache,
+} from './health.js';
+export type {
+  Probe,
+  ProbeStatus,
+  HealthStatus,
+  ProbeResult,
+  ReadyBody,
+  LiveBody,
+  HealthHandlers,
+  HealthCheckConfig,
+  PrismaHealthClient,
+  RedisHealthClient,
+  QueueHealthClient,
+} from './health.js';

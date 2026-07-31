@@ -9,10 +9,17 @@
  * making the async queue hop fully traceable end-to-end.
  *
  * SES dispatch is stubbed — the concrete email transport is wired in WO-049.
+ *
+ * Health: a minimal HTTP server is created on HEALTH_PORT (default 8081) so ECS
+ * can health-check this non-request-serving process via /health/live and
+ * /health/ready.  The server is returned from startNotificationConsumer() so
+ * the caller can close it on graceful shutdown.
  */
 
+import * as http from "node:http";
 import type { QueuePort, MessageHandler } from "@travel/queue";
 import type { QueueMessageEnvelope } from "@travel/contracts";
+import type { HealthHandlers } from "@travel/observability";
 
 // ---------------------------------------------------------------------------
 // Minimal logger interface (duck-typed against pino.Logger)
@@ -74,16 +81,49 @@ export interface NotificationConsumerOptions {
   readonly topic: string;
   readonly dispatcher?: NotificationDispatcher | undefined;
   readonly logger: ConsumerLogger;
+  /** Health handlers for the side-channel HTTP health-check port. */
+  readonly healthHandlers?: HealthHandlers | undefined;
+  /** Port for the health HTTP server (default 8081). */
+  readonly healthPort?: number | undefined;
+}
+
+function startHealthServer(
+  handlers: HealthHandlers,
+  port: number,
+  logger: ConsumerLogger,
+): http.Server {
+  const server = http.createServer((req, res) => {
+    const url = req.url ?? '/';
+    if (url === '/health/live') {
+      handlers.liveHandler(req, res);
+    } else if (url === '/health/ready') {
+      handlers.readyHandler(req, res).catch((err: unknown) => {
+        if (!res.headersSent) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ status: 'unhealthy', error: 'internal' }));
+        }
+        logger.error({ err }, 'Health ready handler threw');
+      });
+    } else {
+      res.writeHead(404).end();
+    }
+  });
+
+  server.listen(port, () => {
+    logger.info({ port }, 'Health HTTP server listening');
+  });
+
+  return server;
 }
 
 /**
  * Start the notification consumer.  Returns a cleanup function that closes
- * the queue subscription gracefully on shutdown.
+ * the queue subscription and health server gracefully on shutdown.
  */
 export async function startNotificationConsumer(
   options: NotificationConsumerOptions,
 ): Promise<() => Promise<void>> {
-  const { queue, topic, dispatcher, logger } = options;
+  const { queue, topic, dispatcher, logger, healthHandlers, healthPort = 8081 } = options;
 
   const handler: MessageHandler = async (envelope, handle, traceContext) => {
     // Re-establish correlation context from message attributes.
@@ -124,7 +164,17 @@ export async function startNotificationConsumer(
   await queue.subscribe(topic, handler);
   logger.info({ topic }, "Notification consumer started");
 
+  // Start health side-channel server if handlers are provided.
+  const healthServer =
+    healthHandlers !== undefined
+      ? startHealthServer(healthHandlers, healthPort, logger)
+      : undefined;
+
   return async () => {
+    if (healthServer !== undefined) {
+      await new Promise<void>((resolve) => healthServer.close(() => resolve()));
+      logger.info({ healthPort }, "Health HTTP server stopped");
+    }
     await queue.close();
     logger.info({ topic }, "Notification consumer stopped");
   };
