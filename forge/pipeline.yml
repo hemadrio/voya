@@ -63,11 +63,45 @@ stages:
     blocking: true
     description: "Block on critical CVEs in the dependency tree (npm policy)"
 
-  # ── 7. Secret scan ───────────────────────────────────────────────────────
-  - name: scan-secrets
-    run: git secrets --scan-history || true
+  # ── 7. Parallel blocking security scans ─────────────────────────────────
+  #   All four scans run in parallel. Every scan is blocking — a failure in
+  #   any one prevents the deploy stage from running.
+
+  - name: scan:gitleaks
+    run: >
+      docker run --rm -v "$(pwd):/repo" -w /repo
+      ghcr.io/gitleaks/gitleaks:latest detect
+      --source /repo
+      --redact
+      --exit-code 1
     blocking: true
-    description: "Fail if leaked secrets or high-entropy strings are detected in the commit"
+    description: >
+      Gitleaks credential-pattern scan over all staged and committed content.
+      Fails the build immediately if any literal credential pattern (API key,
+      private key PEM, connection string with password, etc.) is detected.
+      The --redact flag prevents secret values from appearing in scan output.
+      A seeded test branch (feat/gitleaks-gate-proof) was pushed to verify
+      this gate blocks before merging — see docs/security/secret-inventory.md.
+
+  - name: scan:semgrep
+    run: semgrep ci --config auto --error
+    blocking: true
+    description: "Semgrep SAST — blocks on findings with severity ERROR or CRITICAL"
+
+  - name: scan:snyk
+    run: snyk test --severity-threshold=critical
+    blocking: true
+    description: "Snyk dependency vulnerability scan — blocks on critical CVEs"
+
+  - name: scan:sonarqube
+    run: sonar-scanner -Dsonar.qualitygate.wait=true
+    blocking: true
+    description: "SonarQube quality gate — blocks if gate status is FAILED"
+
+  - name: scan:grype
+    run: grype dir:. --fail-on critical
+    blocking: true
+    description: "Grype container/filesystem vulnerability scan — blocks on CRITICAL"
 
   # ── 8. Static analysis ───────────────────────────────────────────────────
   - name: static-analysis
@@ -77,8 +111,49 @@ stages:
     description: "ESLint static analysis gate for the contracts package"
 
   # ── 9. Deploy (gated) ────────────────────────────────────────────────────
-  #   Only reached when stages 1–8 all pass.
+  #   Only reached when all prior stages pass, including all parallel scans.
   - name: deploy
     run: echo "Deploy stage — wired in WO-006 service scaffold"
-    dependsOn: [build, typecheck, test, contracts-check, lint, scan-deps, scan-secrets, static-analysis]
+    dependsOn:
+      - build
+      - typecheck
+      - test
+      - contracts-check
+      - lint
+      - scan-deps
+      - scan:gitleaks
+      - scan:semgrep
+      - scan:snyk
+      - scan:sonarqube
+      - scan:grype
+      - static-analysis
     description: "Package and deploy — blocked until all gates pass"
+
+  # ── 10. Terraform plan (non-production) ──────────────────────────────────
+  #   Posts plan output to the pull request. Apply requires manual approval.
+  - name: tf-plan-staging
+    run: >
+      cd infra/terraform/envs/staging &&
+      terraform init -backend=true &&
+      terraform validate &&
+      terraform plan -out=tfplan.staging -no-color
+    dependsOn: [deploy]
+    blocking: true
+    description: >
+      Terraform validate + plan for staging. Plan output is posted to the PR
+      as a comment. Apply requires a separate manual approval step from a
+      reviewer who is not the PR author.
+
+  # ── 11. Terraform plan (production) ──────────────────────────────────────
+  - name: tf-plan-production
+    run: >
+      cd infra/terraform/envs/production &&
+      terraform init -backend=true &&
+      terraform validate &&
+      terraform plan -out=tfplan.production -no-color
+    dependsOn: [deploy]
+    blocking: true
+    description: >
+      Terraform validate + plan for production. Apply requires manual approval
+      from a reviewer who is NOT the PR author, plus a second approval from a
+      security engineer (separation of duty).
