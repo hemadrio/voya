@@ -301,3 +301,10 @@
 - **Files:** 7 (+1592/-0)
 - **Duration:** 581ss
 - **Approach:** Implemented CredentialService as a hexagonal-architecture domain service. hashPassword uses Node.js built-in crypto.scrypt (memory-hard, no extra dependency) with a PHC-inspired format encoding cost params inline: $scrypt$n=N,r=r,p=p,kl=kl$hex-salt$hex-hash. verifyPassword is constant-time via timingSafeEqual, handles null storedHash (unknown-user path) by running a dummy comparison against a precomputed hash for timing equalization, and detects needsRehash by comparing stored params against current config. Policy validation returns structured violations. Lockout uses atomic Prisma increment with exponential backoff. A separate config module provides production vs test cost parameters. All DB operations are injected via duck-typed interfaces.
+
+## WO-029: User Story: WO-029 - Add circuit breaker and parallel supplier fan-out
+- **Status:** completed
+- **Commit:** `601bb64`
+- **Files:** 16 (+1574/-0)
+- **Duration:** 1108ss
+- **Approach:** Created a new @travel/supplier-resilience package with three core modules. CircuitBreaker implements the CLOSED/OPEN/HALF_OPEN state machine with clock injection (no real timers), rolling-window failure tracking, and single-admission half-open probes. BreakerRegistry provides per-supplier breaker instances via constructor injection — no module-level mutable singletons. SupplierFanOutExecutor fans out to all adapters via Promise.allSettled, wrapping each adapter call in a raceWithTimeout() that registers the clock deadline synchronously before any async suspension (making fake-clock tests deterministic). Outcomes are attributed per supplier with enum values only (BR-13 compliance). OTel counters track breaker transitions and call outcomes; injectable SpyBreakerMetrics/SpyFanOutMetrics enable unit test assertion. FakeClock.advance() fires pending timer callbacks synchronously, enabling tests with zero real waiting.
