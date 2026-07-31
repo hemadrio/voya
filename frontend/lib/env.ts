@@ -16,12 +16,18 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
+  // SERVER-ONLY: used to sign session cookies. Never exposed to the browser.
+  SESSION_SECRET: z
+    .string({ required_error: "SESSION_SECRET is required" })
+    .min(32, { message: "SESSION_SECRET must be at least 32 characters" })
+    .optional(),
 });
 
 function parseEnv() {
   const result = envSchema.safeParse({
     NEXT_PUBLIC_API_BASE_URL: process.env["NEXT_PUBLIC_API_BASE_URL"],
     NODE_ENV: process.env["NODE_ENV"],
+    SESSION_SECRET: process.env["SESSION_SECRET"],
   });
 
   if (!result.success) {

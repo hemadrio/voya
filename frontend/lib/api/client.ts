@@ -26,16 +26,27 @@ import type { ApiErrorCode } from "./errors.js";
 
 type TokenProvider = () => string | null | undefined;
 
+/**
+ * on401 handler signature:
+ *   - return true  → tokens were refreshed; caller will retry the request once
+ *   - return false → refresh failed; caller will throw the original 401 error
+ */
+type On401Handler = () => Promise<boolean>;
+
 let _tokenProvider: TokenProvider = () => null;
-let _on401: (() => void) | null = null;
+let _on401: On401Handler | null = null;
 
 /** Register a function that returns the current access token. */
 export function setTokenProvider(provider: TokenProvider): void {
   _tokenProvider = provider;
 }
 
-/** Register a callback invoked on every 401 response. */
-export function setOn401(handler: () => void): void {
+/**
+ * Register an async callback invoked on every 401 response.
+ * Return true to signal that tokens were refreshed and the request should be
+ * retried once; return false to propagate the 401 error to the caller.
+ */
+export function setOn401(handler: On401Handler): void {
   _on401 = handler;
 }
 
@@ -86,10 +97,6 @@ interface BackendErrorBody {
 }
 
 async function parseError(res: Response): Promise<ApiError> {
-  if (res.status === 401 && _on401 !== null) {
-    _on401();
-  }
-
   const body = (await safeJson(res)) as BackendErrorBody | null;
   const message =
     body?.error?.message ?? body?.message ?? `Request failed with status ${res.status}`;
@@ -107,6 +114,7 @@ async function request<T>(
     signal?: AbortSignal;
     headers?: Record<string, string>;
   },
+  _retried = false,
 ): Promise<T> {
   const token = _tokenProvider();
   const authHeader: Record<string, string> =
@@ -145,6 +153,12 @@ async function request<T>(
   }
 
   if (!res.ok) {
+    if (res.status === 401 && !_retried && _on401 !== null) {
+      const refreshed = await _on401();
+      if (refreshed) {
+        return request<T>(method, path, options, true);
+      }
+    }
     throw await parseError(res);
   }
 

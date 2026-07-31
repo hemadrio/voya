@@ -19,6 +19,7 @@ import "@testing-library/jest-dom";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("next/link", () => ({
@@ -33,6 +34,16 @@ import { SiteHeader } from "../../components/layout/SiteHeader.js";
 import { SiteFooter } from "../../components/layout/SiteFooter.js";
 import { MobileNavDrawer } from "../../components/layout/MobileNavDrawer.js";
 import { ToastProvider } from "../../components/ui/Toast.js";
+import { SessionProvider } from "../../lib/auth/context.js";
+
+/** Wrap a component with all required providers for testing. */
+function withProviders(ui: React.ReactElement) {
+  return render(
+    <SessionProvider initialSession={null}>
+      {ui}
+    </SessionProvider>,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // SiteHeader
@@ -40,32 +51,32 @@ import { ToastProvider } from "../../components/ui/Toast.js";
 
 describe("SiteHeader", () => {
   it("renders the logo link", () => {
-    render(<SiteHeader />);
+    withProviders(<SiteHeader />);
     const logo = screen.getByRole("link", { name: /TravelPlatform home/i });
     expect(logo).toBeInTheDocument();
     expect(logo).toHaveAttribute("href", "/");
   });
 
   it("renders the primary navigation on desktop", () => {
-    render(<SiteHeader />);
+    withProviders(<SiteHeader />);
     const nav = screen.getByRole("navigation", { name: /Primary navigation/i });
     expect(nav).toBeInTheDocument();
   });
 
-  it("renders the sign-in link", () => {
-    render(<SiteHeader />);
+  it("renders the sign-in link when unauthenticated", () => {
+    withProviders(<SiteHeader />);
     expect(screen.getByRole("link", { name: /Sign in/i })).toBeInTheDocument();
   });
 
   it("renders hamburger menu button for mobile", () => {
-    render(<SiteHeader />);
+    withProviders(<SiteHeader />);
     const hamburger = screen.getByRole("button", { name: /Open navigation menu/i });
     expect(hamburger).toBeInTheDocument();
     expect(hamburger).toHaveAttribute("aria-expanded", "false");
   });
 
   it("opens mobile nav drawer when hamburger is clicked", async () => {
-    render(<SiteHeader />);
+    withProviders(<SiteHeader />);
     const hamburger = screen.getByRole("button", { name: /Open navigation menu/i });
     await userEvent.click(hamburger);
     expect(hamburger).toHaveAttribute("aria-expanded", "true");

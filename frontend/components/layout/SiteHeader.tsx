@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MobileNavDrawer } from "./MobileNavDrawer.js";
 import type { NavItem } from "./MobileNavDrawer.js";
+import { AccountMenu } from "./AccountMenu.js";
 
 const PRIMARY_NAV: ReadonlyArray<NavItem> = [
   { label: "Search Flights", href: "/search?tab=FLIGHT" },
@@ -69,12 +70,9 @@ function SiteHeader() {
           </button>
 
           {/* Auth entry point */}
-          <Link
-            href="/auth/login"
-            className="hidden sm:inline-flex items-center rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-          >
-            Sign in
-          </Link>
+          <div className="hidden sm:flex items-center">
+            <AccountMenu />
+          </div>
 
           {/* Mobile hamburger button */}
           <button
