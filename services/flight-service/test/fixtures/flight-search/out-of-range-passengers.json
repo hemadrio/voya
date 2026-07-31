@@ -1,0 +1,8 @@
+{
+  "departureAirport": "LHR",
+  "arrivalAirport": "JFK",
+  "departureDate": "2099-06-15",
+  "passengers": 10,
+  "seatClass": "ECONOMY",
+  "currency": "USD"
+}
