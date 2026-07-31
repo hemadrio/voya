@@ -1,23 +1,20 @@
 /**
- * SQS module — FIFO domain-event queue, DLQ, redrive policy, KMS encryption,
- * per-role IAM policies, and CloudWatch alarms.
+ * SQS module — domain-event queues, DLQs, KMS encryption, IAM policies, and alarms.
  *
- * Architecture:
- *   - One FIFO queue for ordered domain events (booking.confirmed, etc.).
- *     content-based deduplication DISABLED — the application supplies an
- *     explicit MessageDeduplicationId (envelope.eventId) so we keep full
- *     control over the dedup window.
- *   - One FIFO DLQ.  After maxReceiveCount (5) failed deliveries the SQS
- *     redrive policy moves the message here automatically.
- *   - KMS encryption using the shared "sqs" CMK from the kms module.
- *   - Least-privilege IAM:
- *       publisher role  → sqs:SendMessage on the main queue only.
- *       consumer role   → sqs:ReceiveMessage, sqs:DeleteMessage,
- *                          sqs:ChangeMessageVisibility on the main queue.
- *       dlq consumer    → sqs:ReceiveMessage, sqs:DeleteMessage on DLQ.
- *   - CloudWatch alarms wired to the existing SNS topic (var.alarm_sns_arn):
- *       main-queue depth > 100 (autoscaling trigger for the consumer).
- *       DLQ depth >= 1       (on-call alert — any DLQ message is actionable).
+ * Queue inventory (WO-083):
+ *   booking-events.fifo  — FIFO, explicit dedup ID, maxReceiveCount=5 → booking-events-dlq.fifo
+ *   payment-events.fifo  — FIFO, explicit dedup ID, maxReceiveCount=5 → payment-events-dlq.fifo
+ *   notifications         — Standard queue, maxReceiveCount=5 → notifications-dlq
+ *   travel-domain-events.fifo — Legacy generic FIFO queue (retained for compatibility)
+ *
+ * All queues are encrypted with the SQS KMS CMK.
+ * FIFO queues use deduplication_scope=messageGroup so the 5-minute dedup window
+ * is scoped per booking/payment ID message group rather than the entire queue —
+ * preventing silent dedup of legitimate retries with different message-group IDs.
+ *
+ * Publishers must supply an explicit MessageDeduplicationId derived from the
+ * domain entity ID (booking ID, payment ID) — content-based deduplication
+ * is DISABLED. Consumers must handle at-least-once delivery.
  */
 
 terraform {
@@ -234,4 +231,204 @@ resource "aws_cloudwatch_metric_alarm" "dlq_depth" {
   alarm_actions = [var.alarm_sns_arn]
 
   tags = var.common_tags
+}
+
+# =============================================================================
+# Per-domain queues (WO-083)
+# =============================================================================
+
+# ── booking-events.fifo ────────────────────────────────────────────────────────
+
+resource "aws_sqs_queue" "booking_events_dlq" {
+  name                        = "${var.environment}-booking-events-dlq.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = false
+  kms_master_key_id           = var.kms_key_arn
+  message_retention_seconds   = 1209600 # 14 days
+
+  tags = merge(var.common_tags, {
+    Name    = "${var.environment}-booking-events-dlq"
+    Purpose = "Dead-letter queue for failed booking event processing"
+  })
+}
+
+resource "aws_sqs_queue" "booking_events" {
+  name                        = "${var.environment}-booking-events.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = false
+  # deduplication_scope=messageGroup scopes the 5-minute dedup window per booking ID
+  # message group, preventing silent dedup of legitimate retries across groups.
+  deduplication_scope         = "messageGroup"
+  fifo_throughput_limit       = "perMessageGroupId"
+  kms_master_key_id           = var.kms_key_arn
+  visibility_timeout_seconds  = 300
+  message_retention_seconds   = 345600 # 4 days
+  receive_wait_time_seconds   = 20
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.booking_events_dlq.arn
+    maxReceiveCount     = var.max_receive_count
+  })
+
+  tags = merge(var.common_tags, {
+    Name    = "${var.environment}-booking-events"
+    Purpose = "FIFO queue for booking domain events (booking.created, booking.confirmed, etc.)"
+  })
+}
+
+resource "aws_sqs_queue_redrive_allow_policy" "booking_events_dlq" {
+  queue_url = aws_sqs_queue.booking_events_dlq.url
+
+  redrive_allow_policy = jsonencode({
+    redrivePermission = "byQueue"
+    sourceQueueArns   = [aws_sqs_queue.booking_events.arn]
+  })
+}
+
+# ── payment-events.fifo ────────────────────────────────────────────────────────
+
+resource "aws_sqs_queue" "payment_events_dlq" {
+  name                        = "${var.environment}-payment-events-dlq.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = false
+  kms_master_key_id           = var.kms_key_arn
+  message_retention_seconds   = 1209600
+
+  tags = merge(var.common_tags, {
+    Name    = "${var.environment}-payment-events-dlq"
+    Purpose = "Dead-letter queue for failed payment event processing"
+  })
+}
+
+resource "aws_sqs_queue" "payment_events" {
+  name                        = "${var.environment}-payment-events.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = false
+  deduplication_scope         = "messageGroup"
+  fifo_throughput_limit       = "perMessageGroupId"
+  kms_master_key_id           = var.kms_key_arn
+  visibility_timeout_seconds  = 300
+  message_retention_seconds   = 345600
+  receive_wait_time_seconds   = 20
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.payment_events_dlq.arn
+    maxReceiveCount     = var.max_receive_count
+  })
+
+  tags = merge(var.common_tags, {
+    Name    = "${var.environment}-payment-events"
+    Purpose = "FIFO queue for payment domain events (payment.initiated, payment.confirmed, etc.)"
+  })
+}
+
+resource "aws_sqs_queue_redrive_allow_policy" "payment_events_dlq" {
+  queue_url = aws_sqs_queue.payment_events_dlq.url
+
+  redrive_allow_policy = jsonencode({
+    redrivePermission = "byQueue"
+    sourceQueueArns   = [aws_sqs_queue.payment_events.arn]
+  })
+}
+
+# ── notifications (standard queue) ────────────────────────────────────────────
+
+resource "aws_sqs_queue" "notifications_dlq" {
+  name                      = "${var.environment}-notifications-dlq"
+  kms_master_key_id         = var.kms_key_arn
+  message_retention_seconds = 1209600
+
+  tags = merge(var.common_tags, {
+    Name    = "${var.environment}-notifications-dlq"
+    Purpose = "Dead-letter queue for failed notification deliveries"
+  })
+}
+
+resource "aws_sqs_queue" "notifications" {
+  name                       = "${var.environment}-notifications"
+  kms_master_key_id          = var.kms_key_arn
+  visibility_timeout_seconds = 60
+  message_retention_seconds  = 86400 # 1 day (notifications are time-sensitive)
+  receive_wait_time_seconds  = 20
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.notifications_dlq.arn
+    maxReceiveCount     = var.max_receive_count
+  })
+
+  tags = merge(var.common_tags, {
+    Name    = "${var.environment}-notifications"
+    Purpose = "Standard queue for email/push notification delivery"
+  })
+}
+
+resource "aws_sqs_queue_redrive_allow_policy" "notifications_dlq" {
+  queue_url = aws_sqs_queue.notifications_dlq.url
+
+  redrive_allow_policy = jsonencode({
+    redrivePermission = "byQueue"
+    sourceQueueArns   = [aws_sqs_queue.notifications.arn]
+  })
+}
+
+# ── CloudWatch alarms for new queues ──────────────────────────────────────────
+
+resource "aws_cloudwatch_metric_alarm" "booking_events_dlq_depth" {
+  alarm_name          = "${var.environment}-booking-events-dlq-depth"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = 1
+  alarm_description   = "Booking events DLQ has >= 1 message — a booking event failed all delivery attempts."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    QueueName = aws_sqs_queue.booking_events_dlq.name
+  }
+
+  alarm_actions = [var.alarm_sns_arn]
+  tags          = var.common_tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "payment_events_dlq_depth" {
+  alarm_name          = "${var.environment}-payment-events-dlq-depth"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = 1
+  alarm_description   = "Payment events DLQ has >= 1 message — a payment event failed all delivery attempts. Investigate immediately."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    QueueName = aws_sqs_queue.payment_events_dlq.name
+  }
+
+  alarm_actions = [var.alarm_sns_arn]
+  tags          = var.common_tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "notifications_dlq_depth" {
+  alarm_name          = "${var.environment}-notifications-dlq-depth"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = 1
+  alarm_description   = "Notifications DLQ has >= 1 message — notification delivery failed all attempts."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    QueueName = aws_sqs_queue.notifications_dlq.name
+  }
+
+  alarm_actions = [var.alarm_sns_arn]
+  tags          = var.common_tags
 }

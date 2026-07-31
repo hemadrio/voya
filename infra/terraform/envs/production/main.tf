@@ -245,6 +245,76 @@ module "edge" {
   common_tags            = local.common_tags
 }
 
+# ── Database data-tier subnets ───────────────────────────────────────────────
+
+data "aws_subnets" "private_data" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.main.id]
+  }
+  filter {
+    name   = "tag:Tier"
+    values = ["private-data"]
+  }
+}
+
+data "aws_security_group" "ecs_tasks_sg" {
+  vpc_id = data.aws_vpc.main.id
+  filter {
+    name   = "tag:Environment"
+    values = [local.environment]
+  }
+  filter {
+    name   = "tag:Purpose"
+    values = ["ecs-tasks"]
+  }
+}
+
+# ── Database module — RDS PostgreSQL 16 Multi-AZ (WO-083) ────────────────────
+
+module "database" {
+  source = "../../modules/database"
+
+  environment    = local.environment
+  aws_account_id = local.aws_account_id
+  aws_region     = local.aws_region
+
+  vpc_id                  = data.aws_vpc.main.id
+  private_data_subnet_ids = data.aws_subnets.private_data.ids
+  service_sg_id           = data.aws_security_group.ecs_tasks_sg.id
+
+  kms_key_arn = module.kms.key_arns["rds"]
+
+  instance_class             = "db.r6g.large"
+  allocated_storage_gb       = 100
+  max_allocated_storage_gb   = 500
+  backup_retention_days      = 35
+  deletion_protection        = true
+
+  alarm_sns_arn = data.aws_sns_topic.alarms.arn
+  common_tags   = local.common_tags
+}
+
+# ── Cache module — ElastiCache Redis 7 (WO-083) ───────────────────────────────
+
+module "cache" {
+  source = "../../modules/cache"
+
+  environment            = local.environment
+  vpc_id                 = data.aws_vpc.main.id
+  private_app_subnet_ids = data.aws_subnets.private_app.ids
+  service_sg_id          = data.aws_security_group.ecs_tasks_sg.id
+
+  kms_key_arn           = module.kms.key_arns["elasticache"]
+  redis_auth_secret_arn = module.secrets.secret_arns["redis-auth-token"]
+
+  node_type          = "cache.r7g.large"
+  num_cache_clusters = 2
+
+  alarm_sns_arn = data.aws_sns_topic.alarms.arn
+  common_tags   = local.common_tags
+}
+
 # ── ECS services ─────────────────────────────────────────────────────────────
 
 module "ecs_service" {

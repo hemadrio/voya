@@ -97,6 +97,25 @@ locals {
   rotatable_secrets = {
     for slug, cfg in local.secrets : slug => cfg if cfg.rotatable
   }
+
+  # Per-service PostgreSQL users that authenticate through RDS Proxy.
+  # Each service gets its own Secrets Manager secret so IAM policies can be
+  # scoped per-service and connection_limit=5 is enforced at the Prisma layer.
+  db_service_users = {
+    "auth-service"         = "auth_svc"
+    "booking-service"      = "booking_svc"
+    "payment-service"      = "payment_svc"
+    "user-service"         = "user_svc"
+    "itinerary-service"    = "itinerary_svc"
+    "reporting-service"    = "reporting_svc"
+    "notification-service" = "notification_svc"
+  }
+
+  # Connection string template. The proxy_endpoint is substituted when known;
+  # operators must replace the placeholder password with the real credential.
+  # connection_limit=5 caps Prisma's internal pool per task — critical for
+  # preventing connection exhaustion when multiple replicas run simultaneously.
+  proxy_host = var.proxy_endpoint != "" ? var.proxy_endpoint : "<proxy-endpoint>"
 }
 
 # ── Secret resources ─────────────────────────────────────────────────────────
@@ -122,6 +141,65 @@ resource "aws_secretsmanager_secret" "credential" {
   lifecycle {
     # Rotation and manual updates set the value out-of-band; Terraform must not
     # overwrite it on subsequent applies or treat a missing initial value as drift.
+    ignore_changes = [secret_string]
+  }
+}
+
+# ── Per-service Prisma connection strings ─────────────────────────────────────
+# One secret per DB-connected service so operators can scope IAM GetSecretValue
+# policies per service and so the connection_limit=5 is embedded in each value.
+#
+# Initial value uses a template with clear placeholders; operators (or the
+# rotation Lambda) replace it after the RDS Proxy endpoint is provisioned.
+# lifecycle.ignore_changes prevents Terraform from overwriting rotated values.
+
+resource "aws_secretsmanager_secret" "prisma_db_url" {
+  for_each = local.db_service_users
+
+  name        = "${var.environment}/travel-platform/${each.key}/db-url"
+  description = "Prisma DATABASE_URL for ${each.key}. Value must follow the template: postgresql://${each.value}:<password>@<proxy-endpoint>:5432/travel?connection_limit=5&pgbouncer=false&sslmode=require"
+  kms_key_id  = var.kms_key_arn
+
+  recovery_window_in_days = 30
+
+  tags = merge(var.common_tags, {
+    Name           = "${var.environment}-${each.key}-db-url"
+    Environment    = var.environment
+    OwningService  = each.key
+    Classification = "Restricted"
+    ManagedBy      = "terraform"
+    ConnectionLimit = "5"
+  })
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "prisma_db_url_placeholder" {
+  for_each = local.db_service_users
+
+  secret_id = aws_secretsmanager_secret.prisma_db_url[each.key].id
+
+  # Placeholder template. The proxy_endpoint variable is substituted when
+  # provided; otherwise the literal placeholder reminds operators what to set.
+  # connection_limit=5: caps the Prisma connection pool per ECS task replica,
+  # preventing exhaustion when db.r6g.large max_connections (~1802) is shared
+  # across services. pgbouncer=false: Prisma must NOT re-enable its built-in
+  # pgbouncer mode against RDS Proxy (double-pooling causes prepared statement
+  # incompatibility). sslmode=require: enforces TLS to the proxy.
+  secret_string = jsonencode({
+    username = each.value
+    password = "REPLACE_WITH_ACTUAL_PASSWORD"
+    host     = local.proxy_host
+    port     = 5432
+    database = "travel"
+    url      = "postgresql://${each.value}:REPLACE_WITH_ACTUAL_PASSWORD@${local.proxy_host}:5432/travel?connection_limit=5&pgbouncer=false&sslmode=require"
+  })
+
+  lifecycle {
+    # Operators and the rotation Lambda update the secret_string out-of-band;
+    # Terraform must not overwrite a live rotated value.
     ignore_changes = [secret_string]
   }
 }

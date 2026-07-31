@@ -42,3 +42,50 @@ output "dlq_depth_alarm_arn" {
   description = "ARN of the CloudWatch alarm for DLQ depth >= 1."
   value       = aws_cloudwatch_metric_alarm.dlq_depth.arn
 }
+
+# ── Per-domain queue outputs (WO-083) ─────────────────────────────────────────
+
+output "booking_events_queue_url" {
+  description = "URL of the booking-events FIFO queue."
+  value       = aws_sqs_queue.booking_events.url
+}
+
+output "booking_events_queue_arn" {
+  description = "ARN of the booking-events FIFO queue."
+  value       = aws_sqs_queue.booking_events.arn
+}
+
+output "booking_events_dlq_arn" {
+  description = "ARN of the booking-events DLQ."
+  value       = aws_sqs_queue.booking_events_dlq.arn
+}
+
+output "payment_events_queue_url" {
+  description = "URL of the payment-events FIFO queue."
+  value       = aws_sqs_queue.payment_events.url
+}
+
+output "payment_events_queue_arn" {
+  description = "ARN of the payment-events FIFO queue."
+  value       = aws_sqs_queue.payment_events.arn
+}
+
+output "payment_events_dlq_arn" {
+  description = "ARN of the payment-events DLQ."
+  value       = aws_sqs_queue.payment_events_dlq.arn
+}
+
+output "notifications_queue_url" {
+  description = "URL of the notifications standard queue."
+  value       = aws_sqs_queue.notifications.url
+}
+
+output "notifications_queue_arn" {
+  description = "ARN of the notifications standard queue."
+  value       = aws_sqs_queue.notifications.arn
+}
+
+output "notifications_dlq_arn" {
+  description = "ARN of the notifications DLQ."
+  value       = aws_sqs_queue.notifications_dlq.arn
+}

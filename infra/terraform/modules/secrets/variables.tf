@@ -30,6 +30,12 @@ variable "rotation_days" {
   }
 }
 
+variable "proxy_endpoint" {
+  type        = string
+  description = "RDS Proxy endpoint hostname. Used to render the per-service Prisma connection string template. Leave empty on initial bootstrap; operators update secret values after the proxy is created."
+  default     = ""
+}
+
 variable "common_tags" {
   type        = map(string)
   description = "Tags applied to all Secrets Manager resources."
