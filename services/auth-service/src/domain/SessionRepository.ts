@@ -87,6 +87,19 @@ export interface SessionForRefresh {
   userAgent: string | null;
 }
 
+/** Minimal session row for bearer-auth validity check (WO-023). */
+export interface SessionValidity {
+  id: string;
+  userId: string;
+  revokedAt: Date | null;
+  expiresAt: Date;
+}
+
+/** Session + owning user status fetched in one JOIN for the auth middleware (WO-023). */
+export interface SessionWithUserStatus extends SessionValidity {
+  userStatus: "active" | "pending" | "suspended" | "deleted";
+}
+
 /** Input for the atomic rotation operation. */
 export interface RotateSessionInput {
   /** The session being consumed (must have revokedAt IS NULL). */
@@ -135,6 +148,11 @@ export interface SessionDbClient {
       };
       select: { id: true; token: true; expiresAt: true; createdAt: true };
     }): Promise<CreatedSessionRow>;
+    findUnique(args: {
+      where: { id: string };
+      select: { id: true; userId: true; revokedAt: true; expiresAt: true } |
+        { id: true; userId: true; revokedAt: true; expiresAt: true; user: { select: { status: true } } };
+    }): Promise<SessionValidity | null | (SessionValidity & { user: { status: string } | null })>;
     findFirst(args: {
       where: { refreshTokenHash: string };
       select: {
@@ -196,6 +214,23 @@ export interface SessionRepository {
   listActiveForUser(userId: string): Promise<ActiveSessionRow[]>;
 
   // WO-022 additions ─────────────────────────────────────────────────────────
+
+  /**
+   * Find a session by its primary key for validity checks (WO-023).
+   * Returns null if the session does not exist.
+   * Used by the bearer-auth middleware to confirm the session is neither
+   * revoked nor idle-expired before accepting a token.
+   */
+  findById(sessionId: string): Promise<SessionValidity | null>;
+
+  /**
+   * Find a session with the owning user's status in a single JOIN query (WO-023).
+   * Used by the bearer-auth middleware so the session + user-status check is
+   * a single database round-trip on cache miss (satisfies the ≤1 query
+   * constraint from AC10).
+   * Returns null if the session does not exist.
+   */
+  findByIdWithUserStatus(sessionId: string): Promise<SessionWithUserStatus | null>;
 
   /**
    * Find a session by its refresh token hash (active or already revoked).
@@ -303,7 +338,29 @@ export function createSessionRepository(db: SessionDbClient): SessionRepository 
       });
     },
 
-    // WO-022 methods ──────────────────────────────────────────────────────────
+    // WO-022 / WO-023 methods ─────────────────────────────────────────────────
+
+    async findById(sessionId: string): Promise<SessionValidity | null> {
+      return db.session.findUnique({
+        where: { id: sessionId },
+        select: { id: true, userId: true, revokedAt: true, expiresAt: true },
+      }) as Promise<SessionValidity | null>;
+    },
+
+    async findByIdWithUserStatus(sessionId: string): Promise<SessionWithUserStatus | null> {
+      const row = await db.session.findUnique({
+        where: { id: sessionId },
+        select: { id: true, userId: true, revokedAt: true, expiresAt: true, user: { select: { status: true } } },
+      }) as (SessionValidity & { user: { status: string } | null }) | null;
+      if (!row) return null;
+      return {
+        id: row.id,
+        userId: row.userId,
+        revokedAt: row.revokedAt,
+        expiresAt: row.expiresAt,
+        userStatus: (row.user?.status ?? "deleted") as SessionWithUserStatus["userStatus"],
+      };
+    },
 
     async findByRefreshHash(hash: string): Promise<SessionForRefresh | null> {
       return db.session.findFirst({

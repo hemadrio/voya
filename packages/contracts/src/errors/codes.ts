@@ -74,6 +74,12 @@ export const ErrorCode = {
   SESSION_EXPIRED: "SESSION_EXPIRED",
   /** 401 — the presented refresh token is unknown, malformed, or does not match any session record. */
   INVALID_REFRESH_TOKEN: "INVALID_REFRESH_TOKEN",
+  /** 401 — the JWT signature, expiry, issuer, audience, or claims are invalid. Distinct from UNAUTHENTICATED (missing credentials). */
+  INVALID_TOKEN: "INVALID_TOKEN",
+  /** 401 — the token's referenced session has been revoked or has expired. */
+  SESSION_REVOKED: "SESSION_REVOKED",
+  /** 403 — the authenticated caller lacks the required role(s) or permission(s). */
+  INSUFFICIENT_PERMISSIONS: "INSUFFICIENT_PERMISSIONS",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -119,6 +125,9 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   REFRESH_TOKEN_REUSED: 401,
   SESSION_EXPIRED: 401,
   INVALID_REFRESH_TOKEN: 401,
+  INVALID_TOKEN: 401,
+  SESSION_REVOKED: 401,
+  INSUFFICIENT_PERMISSIONS: 403,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

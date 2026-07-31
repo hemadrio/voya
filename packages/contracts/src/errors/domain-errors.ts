@@ -204,3 +204,30 @@ export function invalidRefreshToken(
 ): DomainError {
   return new DomainErrorImpl("INVALID_REFRESH_TOKEN", message);
 }
+
+/** 401 — JWT signature, expiry, issuer, audience, or claims are invalid. */
+export function invalidToken(
+  message = "The provided token is invalid or has expired.",
+): DomainError {
+  return new DomainErrorImpl("INVALID_TOKEN", message);
+}
+
+/** 401 — the session referenced by the token has been revoked or expired. */
+export function sessionRevoked(
+  message = "Your session has been revoked. Please log in again.",
+): DomainError {
+  return new DomainErrorImpl("SESSION_REVOKED", message);
+}
+
+/**
+ * 403 — caller is authenticated but lacks the required roles or permissions.
+ * @param required - the roles or permissions that were missing.
+ */
+export function insufficientPermissions(
+  required: string[],
+  message = "You do not have permission to perform this action.",
+): DomainError & { required: string[] } {
+  const err = new DomainErrorImpl("INSUFFICIENT_PERMISSIONS", message) as DomainError & { required: string[] };
+  err.required = required;
+  return err;
+}

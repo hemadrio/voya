@@ -43,6 +43,9 @@ export {
   refreshTokenReused,
   sessionExpired,
   invalidRefreshToken,
+  invalidToken,
+  sessionRevoked,
+  insufficientPermissions,
 } from "./domain-errors.js";
 
 export { serialiseError, RESTRICTED_FIELDS } from "./serialise.js";

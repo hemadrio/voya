@@ -29,6 +29,23 @@ interface ActorContext {
   jti: string;
 }
 
+/**
+ * Typed principal attached by the Bearer-token authentication middleware
+ * (WO-023). Available on routes protected by requireAuth / optionalAuth.
+ */
+interface RequestPrincipal {
+  /** Authenticated user ID (JWT sub claim). */
+  userId: string;
+  /** Session ID (JWT sid claim). */
+  sessionId: string;
+  /** JWT ID (jti claim) — unique per issued token. */
+  tokenId: string;
+  /** Role names loaded from the token or the roles repository. */
+  roles: string[];
+  /** Permission strings resolved from the user's roles. */
+  permissions: string[];
+}
+
 declare global {
   namespace Express {
     interface Request {
@@ -40,6 +57,14 @@ declare global {
        * the x-internal-actor header forwarded by the api-gateway.
        */
       actor?: ActorContext;
+
+      /**
+       * Typed principal — set by the Bearer-token authentication middleware
+       * (WO-023). Available only on routes guarded by the bearerAuth middleware
+       * or optionalAuth. Undefined on unauthenticated requests (optionalAuth)
+       * or on routes that use requireAuth (x-internal-actor path) instead.
+       */
+      principal?: RequestPrincipal;
 
       /**
        * Resolved correlation identifier — set by correlationIdMiddleware.
