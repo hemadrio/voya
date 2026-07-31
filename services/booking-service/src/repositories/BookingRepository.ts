@@ -28,12 +28,18 @@ export interface BookingRow {
   idempotencyKey: string;
   createdAt: Date;
   updatedAt: Date;
+  /** WO-039: Immutable offer snapshot frozen at creation time. */
+  offerSnapshot: Record<string, unknown>;
+  /** WO-039: Supplier channel (AMADEUS | RAPIDAPI_HOTEL | RAPIDAPI_CAR). */
+  provenance?: string | null;
+  /** WO-039: Expiry timestamp for PENDING bookings (now + 30 min at create time). */
+  expiresAt?: Date | null;
 }
 
 export interface BookingPrismaClient {
   booking: {
     findFirst(args: {
-      where: { id: string; userId: string };
+      where: { id: string; userId: string } | { idempotencyKey: string };
     }): Promise<BookingRow | null>;
     findMany(args: {
       where: { userId: string };
@@ -52,6 +58,12 @@ export interface BookingPrismaClient {
         contactEmail: string;
         contactPhone?: string | null;
         idempotencyKey: string;
+        /** WO-039: Immutable offer snapshot frozen at creation time. */
+        offerSnapshot?: Record<string, unknown>;
+        /** WO-039: Supplier channel provenance. */
+        provenance?: string | null;
+        /** WO-039: PENDING expiry timestamp. */
+        expiresAt?: Date | null;
       };
     }): Promise<BookingRow>;
     update(args: {
@@ -129,5 +141,74 @@ export class BookingRepository {
       where: { id: bookingId, userId },
       data: { status: 'CANCELLED' },
     });
+  }
+
+  // WO-039 additions ──────────────────────────────────────────────────────────
+
+  /**
+   * Create a new PENDING booking with an immutable offer snapshot.
+   * Implements BookingRepositoryPort.createBooking.
+   *
+   * The offerSnapshot column is NOT NULL — callers must always supply the
+   * resolved offer snapshot so the commercial record is frozen at insert time.
+   * The update() method of BookingPrismaClient deliberately excludes
+   * offerSnapshot from its data type so the snapshot cannot be mutated after
+   * insertion (compile-time enforcement).
+   */
+  async createBooking(
+    input: import("../domain/BookingCreationService.js").CreateBookingInput,
+  ): Promise<import("../domain/BookingCreationService.js").CreatedBooking> {
+    const row = await this.db.booking.create({
+      data: {
+        userId: input.userId,
+        bookingType: input.bookingType,
+        status: input.status,
+        offerId: input.offerId,
+        totalPrice: input.totalPrice,
+        currency: input.currency,
+        contactEmail: input.contactEmail,
+        contactPhone: input.contactPhone ?? null,
+        idempotencyKey: input.idempotencyKey,
+        offerSnapshot: input.offerSnapshot as Record<string, unknown>,
+        provenance: input.provenance,
+        expiresAt: input.expiresAt,
+      },
+    });
+
+    return {
+      id: row.id,
+      idempotencyKey: row.idempotencyKey,
+      status: row.status,
+      totalPrice: row.totalPrice.toString(),
+      currency: row.currency,
+      expiresAt: row.expiresAt ?? null,
+      provenance: row.provenance ?? null,
+      offerSnapshot: row.offerSnapshot,
+    };
+  }
+
+  /**
+   * Look up a booking by its idempotency key for duplicate-create detection.
+   * Returns null if no booking was created with this key yet.
+   */
+  async findByIdempotencyKey(
+    idempotencyKey: string,
+  ): Promise<import("../domain/BookingCreationService.js").CreatedBooking | null> {
+    const row = await this.db.booking.findFirst({
+      where: { idempotencyKey },
+    });
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      idempotencyKey: row.idempotencyKey,
+      status: row.status,
+      totalPrice: row.totalPrice.toString(),
+      currency: row.currency,
+      expiresAt: row.expiresAt ?? null,
+      provenance: row.provenance ?? null,
+      offerSnapshot: row.offerSnapshot,
+    };
   }
 }

@@ -213,6 +213,12 @@ model Booking {
   idempotencyKey String @unique @map("idempotency_key")
   /// Snapshot of the offer as presented at selection time. Stored as JSONB.
   searchResultSnapshot Json? @map("search_result_snapshot") @db.Json
+  /// WO-039: Immutable offer snapshot frozen at booking creation time.
+  /// Contains provenance, price, currency, supplier and leg descriptors.
+  /// NOT NULL — every booking row written by the new service carries a real
+  /// snapshot. The default '{}'::jsonb allows old rows (and the previous
+  /// service revision) to pass NOT NULL validation during the expand phase.
+  offerSnapshot Json @default("{}") @map("offer_snapshot") @db.JsonB
 
   // WO-072 additions — nullable so previous-version rows without this
   // column stay valid until the application backfills them.

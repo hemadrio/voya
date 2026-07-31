@@ -25,3 +25,6 @@ export {
   toSanitisedPayload,
 } from "./audit.js";
 export type { SanitisedPayload } from "./audit.js";
+
+export { OfferSnapshotSchema, OfferLegSchema } from "./offer.js";
+export type { OfferSnapshot, OfferLeg } from "./offer.js";
