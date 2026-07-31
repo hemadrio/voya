@@ -1,0 +1,8 @@
+{
+  "pickupLocation": "LAX Airport",
+  "dropoffLocation": "LAX Airport",
+  "pickupDate": "2030-06-05T09:00:00.000Z",
+  "dropoffDate": "2030-06-01T09:00:00.000Z",
+  "carClass": "MIDSIZE",
+  "currency": "USD"
+}

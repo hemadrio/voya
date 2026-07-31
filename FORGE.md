@@ -105,3 +105,10 @@
 - **Files:** 34 (+1523/-103)
 - **Duration:** 833ss
 - **Approach:** Established pnpm 9.x workspaces as the single package topology with a 36-entry version catalog pinning every shared runtime and build-tool dependency. Layered Turborepo 2.x task definitions on the resulting dependency graph with correct dependsOn edges, narrowed inputs, declared outputs, and cacheability flags. Enforced the catalog with a TypeScript workspace-lint CLI (catalog-drift, workspace-protocol, engines-consistency checks) with fixture-backed unit tests. Pinned toolchain versions via packageManager, engines fields, and an install-time preinstall guard. Configured remote cache with signature-key injection via environment variables with graceful degradation when unavailable.
+
+## WO-003: User Story: WO-003 - Enforce Zod request validation at all service boundaries
+- **Status:** completed
+- **Commit:** `9d2f382`
+- **Files:** 43 (+2334/-12)
+- **Duration:** 1053ss
+- **Approach:** Built a single reusable schema-driven middleware factory (validateRequest) in shared/middleware/ that accepts optional body/query/params/headers Zod schemas, parses each location in one pass (single safeParse per location — coerced output cached, not re-parsed), attaches typed results to req.validated on success, and short-circuits with the WO-002 serialiseError 400 envelope on failure without calling next(). Applied it to all six active service boundaries: search-service (flights/hotels/cars), auth-service, user-service, booking-service, payment-service (intent + raw-body webhook), and ai-service (Claude tool registry with input_schema generated from @travel/contracts Zod schemas via an inline JSON Schema converter). Tests cover AC3/4/5 with spy assertions proving no adapter calls on invalid input, AC7 with raw Buffer preservation, AC8 with contracts schema correspondence, AC9 with an 8ms benchmark, AC10 with an import-boundary filesystem scan, and AC11 with 18 middleware unit tests.

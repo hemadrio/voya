@@ -9,11 +9,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@travel/contracts": "workspace:*"
+    "@travel/contracts": "workspace:*",
+    "express": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@types/express": "catalog:",
+    "@types/supertest": "catalog:",
+    "supertest": "catalog:"
   },
   "engines": {
     "node": ">=20.0.0 <21.0.0"
