@@ -1,0 +1,11 @@
+{
+  "type": "amadeusOAuth2Token",
+  "username": "TRAVEL_PLATFORM",
+  "application_name": "Travel Platform",
+  "client_id": "SANITISED_CLIENT_ID",
+  "token_type": "Bearer",
+  "access_token": "SANITISED_ACCESS_TOKEN_DO_NOT_USE_IN_LIVE_CALLS",
+  "expires_in": 1799,
+  "state": "approved",
+  "scope": ""
+}

@@ -1,0 +1,29 @@
+{
+  "name": "flight-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Flight search service — Amadeus GDS supplier adapter and flight offer search.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@travel/contracts": "workspace:*",
+    "@travel/observability": "workspace:*",
+    "@travel/supplier-port": "workspace:*",
+    "@travel/suppliers": "workspace:*",
+    "@opentelemetry/api": "catalog:",
+    "ioredis": "catalog:",
+    "pino": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "@types/node": "catalog:"
+  },
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "errors": [
+    {
+      "status": 500,
+      "code": 34100,
+      "title": "SYSTEM ERROR",
+      "detail": "An internal system error has occurred. Please retry in a few moments."
+    }
+  ]
+}

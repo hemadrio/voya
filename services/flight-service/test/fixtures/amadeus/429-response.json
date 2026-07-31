@@ -1,0 +1,10 @@
+{
+  "errors": [
+    {
+      "status": 429,
+      "code": 34901,
+      "title": "QUOTA LIMIT EXCEEDED",
+      "detail": "The maximum number of requests per second to the Amadeus API has been reached. Please retry your request after a brief pause."
+    }
+  ]
+}

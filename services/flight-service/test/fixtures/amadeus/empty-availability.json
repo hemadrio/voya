@@ -1,0 +1,13 @@
+{
+  "meta": {
+    "count": 0,
+    "links": {
+      "self": "https://test.api.amadeus.com/v2/shopping/flight-offers?originLocationCode=LHR&destinationLocationCode=SYD&departureDate=2028-12-25&adults=1&travelClass=ECONOMY&currencyCode=USD"
+    }
+  },
+  "data": [],
+  "dictionaries": {
+    "carriers": {},
+    "currencies": { "USD": "US Dollar" }
+  }
+}
