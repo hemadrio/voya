@@ -26,6 +26,7 @@ import {
   createRateLimitMiddleware,
   type RateLimiter,
 } from "../middleware/rateLimiter.js";
+import type { LoginAttemptGuard } from "../domain/LoginAttemptGuard.js";
 import type { Request, Response } from "express";
 import type { SessionInfo } from "../domain/types.js";
 
@@ -85,6 +86,11 @@ export interface AuthRouterOptions {
   forgotPasswordLimiter?: RateLimiter;
   /** Override default in-memory rate limiter for reset-password. */
   resetPasswordLimiter?: RateLimiter;
+  /**
+   * Login attempt guard enforcing per-account lockout (5 failures / 15 min).
+   * When omitted, account lockout is not enforced (unsafe outside tests).
+   */
+  loginAttemptGuard?: LoginAttemptGuard;
 }
 
 export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions): Router {
@@ -93,7 +99,7 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
       ? (domainOrOptions as AuthRouterOptions)
       : { domain: domainOrOptions as AuthDomain };
 
-  const { domain } = options;
+  const { domain, loginAttemptGuard } = options;
   const fpLimiter = options.forgotPasswordLimiter ?? defaultForgotPasswordLimiter;
   const rpLimiter = options.resetPasswordLimiter ?? defaultResetPasswordLimiter;
 
@@ -125,7 +131,43 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
   });
 
   router.post("/login", validateLogin, async (req: Request, res: Response): Promise<void> => {
-    const result = await domain.login(req.validated?.body);
+    const body = req.validated?.body as { email?: string } | undefined;
+    const email = typeof body?.email === "string" ? body.email : "";
+    const ipAddress =
+      ((req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim()) ??
+      req.socket?.remoteAddress ??
+      "unknown";
+
+    if (loginAttemptGuard && email) {
+      const check = await loginAttemptGuard.checkAllowed(email);
+      if (!check.allowed) {
+        const retryAfter = Math.max(1, check.retryAfterSeconds);
+        res.set("Retry-After", String(retryAfter));
+        res.status(429).json({
+          error: {
+            code: "ACCOUNT_TEMPORARILY_LOCKED",
+            message: `Account temporarily locked. Please try again in ${retryAfter} seconds.`,
+          },
+          reference: req.correlationId ?? "unknown",
+        });
+        return;
+      }
+    }
+
+    let result: unknown;
+    try {
+      result = await domain.login(req.validated?.body);
+    } catch (err) {
+      if (loginAttemptGuard && email) {
+        await loginAttemptGuard.recordFailure(email, ipAddress);
+      }
+      throw err;
+    }
+
+    if (loginAttemptGuard && email) {
+      await loginAttemptGuard.recordSuccess(email, ipAddress);
+    }
+
     res.json({ data: result });
   });
 

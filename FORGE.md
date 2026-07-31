@@ -280,3 +280,10 @@
 - **Files:** 28 (+1712/-50)
 - **Duration:** 1283ss
 - **Approach:** Implemented deny-by-default RBAC in four coordinated layers. (1) Contracts: added UserRole enum, InternalActorContextSchema, SecurityEventSchema, and ACTOR_CONTEXT_INVALID error code. (2) Gateway: replaced plain-JSON x-internal-actor header with HMAC-SHA256-signed format using mintActorContext(); services verify with createActorContextMiddleware(). (3) Authorization: @travel/auth now exports requireRole(), allowGuest(), denyByDefault(), a route guard registry, and assertAllRoutesGuarded() for startup validation; four-route guest allow-list is hardcoded as a ReadonlySet. (4) Data layer: BookingRepository.findOwnedBookingOrThrow always includes both id and userId predicates; OwnershipError always produces 403 (never 404); BookingTravelerRepository.findRedactedByBookingId never loads encrypted identity-document columns for support_agent; SecurityEventWriter is append-only with compliance-failure propagation semantics; ItineraryReparentRepository atomically transfers guest itineraries on account registration. Prisma migration 0008 creates UserRole enum, migrates users.role, and creates the security_events table with REVOKE UPDATE/DELETE + trigger guard.
+
+## WO-016: User Story: WO-016 - Tiered Rate Limiting With Retry-After at Gateway and Services
+- **Status:** completed
+- **Commit:** `8edd563`
+- **Files:** 23 (+1582/-17)
+- **Duration:** 1187ss
+- **Approach:** N/A

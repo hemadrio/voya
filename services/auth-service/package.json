@@ -11,6 +11,7 @@
   "dependencies": {
     "@travel/contracts": "workspace:*",
     "@travel/observability": "workspace:*",
+    "@travel/ratelimit": "workspace:*",
     "express": "catalog:",
     "@prisma/client": "catalog:"
   },

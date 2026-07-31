@@ -58,6 +58,8 @@ export const ErrorCode = {
   SESSION_NOT_FOUND: "SESSION_NOT_FOUND",
   /** 401 — the x-internal-actor header is absent, malformed, or has an invalid HMAC signature. */
   ACTOR_CONTEXT_INVALID: "ACTOR_CONTEXT_INVALID",
+  /** 429 — account temporarily locked after too many failed authentication attempts. */
+  ACCOUNT_TEMPORARILY_LOCKED: "ACCOUNT_TEMPORARILY_LOCKED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -95,6 +97,7 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   PASSWORD_REUSE_NOT_ALLOWED: 422,
   SESSION_NOT_FOUND: 404,
   ACTOR_CONTEXT_INVALID: 401,
+  ACCOUNT_TEMPORARILY_LOCKED: 429,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

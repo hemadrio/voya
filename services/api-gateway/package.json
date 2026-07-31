@@ -12,6 +12,7 @@
     "@travel/auth": "workspace:*",
     "@travel/contracts": "workspace:*",
     "@travel/observability": "workspace:*",
+    "@travel/ratelimit": "workspace:*",
     "express": "catalog:",
     "ioredis": "catalog:"
   },

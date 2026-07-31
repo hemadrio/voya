@@ -88,6 +88,14 @@ export function rateLimited(message = "Too many requests. Please try again later
   return new DomainErrorImpl("RATE_LIMITED", message);
 }
 
+/** 429 — account temporarily locked after too many failed authentication attempts. Does not disclose whether the account exists. */
+export function accountTemporarilyLocked(retryAfterSeconds: number): DomainError {
+  return new DomainErrorImpl(
+    "ACCOUNT_TEMPORARILY_LOCKED",
+    `Account temporarily locked. Please try again in ${retryAfterSeconds} seconds.`,
+  );
+}
+
 /** 502 — the upstream supplier returned an error or unreachable response. */
 export function supplierUnavailable(message = "Supplier is currently unavailable. Please try again."): DomainError {
   return new DomainErrorImpl("SUPPLIER_UNAVAILABLE", message);

@@ -1,0 +1,31 @@
+{
+  "name": "@travel/ratelimit",
+  "version": "0.1.0",
+  "description": "Tiered Redis sliding-window rate limiter with in-process fallback degradation",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "test": "node --experimental-vm-modules ../../node_modules/.bin/jest --config jest.config.cjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/jest": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "ts-jest": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {}
+}

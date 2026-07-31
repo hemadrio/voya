@@ -4,21 +4,63 @@
 import express from "express";
 import { createAuthRouter } from "./routes/auth.js";
 import { createErrorHandler } from "../../../shared/middleware/errorHandler.js";
-import type { AuthDomain } from "./routes/auth.js";
+import {
+  createRateLimiter,
+  createRateLimitMiddleware,
+  FLOOR_LIMIT,
+  WINDOW_MS,
+  type RedisClient,
+} from "@travel/ratelimit";
+import type { AuthDomain, AuthRouterOptions } from "./routes/auth.js";
 import type { HealthHandlers } from "@travel/observability";
+
+export interface AuthAppOptions {
+  /**
+   * Redis client for the per-service floor rate limiter.
+   * When omitted, floor rate limiting is disabled (only safe in tests).
+   */
+  floorLimitRedis?: RedisClient;
+  healthHandlers?: HealthHandlers;
+  /** Additional router options (loginAttemptGuard, etc.). */
+  routerOptions?: Omit<AuthRouterOptions, "domain">;
+}
 
 export function createApp(
   domain: AuthDomain,
-  healthHandlers?: HealthHandlers,
+  healthHandlersOrOptions?: HealthHandlers | AuthAppOptions,
 ): express.Application {
+  const options: AuthAppOptions =
+    healthHandlersOrOptions !== undefined && "liveHandler" in healthHandlersOrOptions
+      ? { healthHandlers: healthHandlersOrOptions as HealthHandlers }
+      : (healthHandlersOrOptions as AuthAppOptions) ?? {};
+  const { floorLimitRedis, healthHandlers, routerOptions } = options;
+
   const app = express();
   app.use(express.json({ limit: "64kb" }));
-  app.use("/auth", createAuthRouter(domain));
+
+  // Per-service floor rate limiter — throttles direct in-mesh requests even
+  // when the gateway is bypassed.
+  if (floorLimitRedis) {
+    const floorLimiter = createRateLimiter({
+      redis: floorLimitRedis,
+      windowMs: WINDOW_MS,
+      limit: FLOOR_LIMIT,
+    });
+    app.use(
+      createRateLimitMiddleware({
+        limiter: floorLimiter,
+        scope: "auth",
+        getCostClass: (_req) => "standard",
+      }),
+    );
+  }
+
+  app.use("/auth", createAuthRouter(routerOptions ? { domain, ...routerOptions } : domain));
 
   if (healthHandlers !== undefined) {
     app.get("/health/live", healthHandlers.liveHandler.bind(healthHandlers));
     app.get("/health/ready", (req, res, next) => {
-      healthHandlers.readyHandler(req, res).catch(next);
+      (healthHandlers.readyHandler(req, res) as Promise<unknown>).catch(next);
     });
   } else {
     app.get("/health/live", (_req, res) =>
