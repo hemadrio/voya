@@ -21,6 +21,27 @@ enum UserRole {
 }
 
 // ---------------------------------------------------------------------------
+// UserStatus — account lifecycle state (WO-018)
+// ---------------------------------------------------------------------------
+
+enum UserStatus {
+  active
+  pending
+  suspended
+  deleted
+}
+
+// ---------------------------------------------------------------------------
+// CredentialType — credential kind (WO-018)
+// ---------------------------------------------------------------------------
+
+enum CredentialType {
+  password
+  oauth
+  totp
+}
+
+// ---------------------------------------------------------------------------
 // SuppressionReason — email suppression source (WO-052)
 // ---------------------------------------------------------------------------
 
@@ -76,11 +97,18 @@ model User {
   /// Computed purge timestamp; null until an erasure request is fulfilled.
   purgeAfter         DateTime?  @map("purge_after") @db.Timestamptz
 
+  // WO-018 additions — identity schema
+  emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz
+  displayName     String?    @map("display_name") @db.VarChar(128)
+  status          UserStatus @default(pending) @map("status")
+
   bookings      Booking[]
   sessions      Session[]
   oneTimeTokens OneTimeToken[]
   preferences   TravelPreference?
   itineraries   Itinerary[]
+  credentials   Credential[]
+  userRoles     UserRoleEntry[]
 
   @@index([purgeAfter], map: "idx_users_purge_after")
   @@map("users")
@@ -101,13 +129,18 @@ model Session {
   userAgent        String?   @map("user_agent") @db.VarChar(512)
   lastSeenAt       DateTime? @map("last_seen_at") @db.Timestamptz
 
+  // WO-018 addition — nullable self-reference preserving refresh-token rotation chain
+  rotatedFromSessionId String?  @map("rotated_from_session_id") @db.Uuid
+
   // WO-074 additions
   /// Data classification tier (RESTRICTED — contains token hashes and IP).
   classification DataClassification @default(RESTRICTED) @map("classification")
   /// purge_after = expires_at + RETENTION_SESSION_DAYS days.
   purgeAfter     DateTime?          @map("purge_after") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user                User     @relation(fields: [userId], references: [id])
+  rotatedFromSession  Session? @relation("SessionRotation", fields: [rotatedFromSessionId], references: [id])
+  rotatedSessions     Session[] @relation("SessionRotation")
 
   @@index([userId, revokedAt], map: "idx_sessions_user_revoked")
   // WO-077: unique index on refresh_token_hash (WHERE refresh_token_hash IS NOT NULL
@@ -498,4 +531,88 @@ model SecurityEvent {
   @@index([actorId, occurredAt], map: "idx_security_events_actor_occurred")
   @@index([resourceType, resourceId], map: "idx_security_events_resource")
   @@map("security_events")
+}
+
+// ---------------------------------------------------------------------------
+// Credential — isolated credential store (WO-018)
+// ---------------------------------------------------------------------------
+
+/// Stores credential secrets (password hashes, OAuth tokens) separately from
+/// the users profile table so profile queries never load secret material.
+///
+/// secret_hash MUST contain only the output of an approved hashing algorithm
+/// (Argon2id for passwords).  Raw plaintext must never appear here.
+///
+/// Repository select lists must never return secret_hash unless the caller
+/// explicitly requests it for credential verification.
+model Credential {
+  id                  String         @id @default(uuid()) @db.Uuid
+  userId              String         @map("user_id") @db.Uuid
+  type                CredentialType @default(password)
+  secretHash          String         @map("secret_hash")
+  hashAlgorithm       String         @default("argon2id") @map("hash_algorithm") @db.VarChar(32)
+  failedAttemptCount  Int            @default(0) @map("failed_attempt_count")
+  lockedUntil         DateTime?      @map("locked_until") @db.Timestamptz
+  lastUsedAt          DateTime?      @map("last_used_at") @db.Timestamptz
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_credentials_user_id")
+  @@map("credentials")
+}
+
+// ---------------------------------------------------------------------------
+// Role / Permission / join tables — RBAC (WO-018)
+// ---------------------------------------------------------------------------
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(64)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  rolePermissions RolePermission[]
+  userRoles       UserRoleEntry[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(128)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  grantedAt    DateTime @default(now()) @map("granted_at") @db.Timestamptz
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// Join table mapping users to roles.  Named UserRoleEntry to avoid
+/// collision with the existing UserRole enum (authorization role values).
+model UserRoleEntry {
+  userId     String   @map("user_id") @db.Uuid
+  roleId     String   @map("role_id") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([userId], map: "idx_user_roles_user_id")
+  @@map("user_roles")
 }

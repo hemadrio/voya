@@ -287,3 +287,10 @@
 - **Files:** 23 (+1582/-17)
 - **Duration:** 1187ss
 - **Approach:** N/A
+
+## WO-018: User Story: WO-018 - Create user identity and session database schema
+- **Status:** completed
+- **Commit:** `3af7d10`
+- **Files:** 16 (+2713/-1)
+- **Duration:** 845ss
+- **Approach:** Implemented the identity schema as four additive migrations layers: (1) forward SQL migration 0009 adding UserStatus/CredentialType enums, credentials table, RBAC tables, email_verified_at/display_name/status columns on users, rotated_from_session_id on sessions, and a functional lower(email) unique index; (2) corresponding rollback migration using IF EXISTS guards throughout; (3) Prisma schema updated with five new models (Credential, Role, Permission, RolePermission, UserRoleEntry) and new enum types; (4) four typed repository modules following hexagonal architecture with duck-typed DB client interfaces, enforcing the security invariant that secret_hash is never returned by default selects.
