@@ -322,3 +322,10 @@
 - **Files:** 22 (+2666/-106)
 - **Duration:** 902ss
 - **Approach:** Implemented the full search results page using a two-tier architecture: an async Next.js 14 Server Component (page.tsx) fetches the first page server-side for SSR/SEO and passes initialData + parsed criteria to SearchPageClient. SearchPageClient is a 'use client' component that owns all subsequent interaction: it holds filter state via useReducer (filterReducer in lib/search/params.ts), syncs changes to the URL via debounced (300ms) router.replace inside useTransition, and refetches client-side with AbortController-backed fetch for stale-response discarding. The map (ResultsMapInner) is code-split via next/dynamic with ssr:false so it is absent from the initial bundle. All filter/sort/pagination state is encoded in the URL — no state lives only in components.
+
+## WO-075: User Story: WO-075 - Automated Retention Purge Job with Cryptographic Erasure
+- **Status:** completed
+- **Commit:** `63ffd8e`
+- **Files:** 22 (+3083/-1)
+- **Duration:** 1109ss
+- **Approach:** Implemented a strategy-per-category purge orchestrator with all dependencies injected (no DB or AWS in domain layer). PhysicalDeleteStrategy handles batched parameterized DELETEs, CryptoEraseStrategy nullifies wrapped_dek for expired traveler identity rows, PseudonymiseActorStrategy handles audit actor references, and ConversationSweepStrategy covers both Redis and durable conversation store. The PurgeOrchestrator enforces a run lease, load-aware defer, dry-run-as-default, and never-fail-open policy (A10). A Prisma-backed production repository uses an allowlisted table name approach with all WHERE/SET values parameterized (A05). Deployed as a scheduled Fargate task via EventBridge Scheduler with a dedicated least-privileged IAM task role and CloudWatch alarms for failures, zero-progress, overlong runs, and missed schedules.

@@ -22,7 +22,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@travel/contracts": "workspace:*"
+    "@travel/contracts": "workspace:*",
+    "@travel/crypto": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

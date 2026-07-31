@@ -134,3 +134,71 @@ resource "aws_cloudwatch_metric_alarm" "search_p95_regression" {
   treat_missing_data  = "notBreaching"
   alarm_actions       = local.alarm_actions
 }
+
+# ---------------------------------------------------------------------------
+# Retention Purge Worker Alarms (namespace: travel/purge)
+# ---------------------------------------------------------------------------
+
+locals {
+  purge_alarm_namespace = "travel/purge"
+}
+
+# Alarm: category-level failure (non-zero failures counter)
+resource "aws_cloudwatch_metric_alarm" "purge_category_failure" {
+  alarm_name          = "purge-category-failure"
+  alarm_description   = "One or more retention purge categories failed. Check /ecs/retention-worker logs. Non-zero exit means policy A10 triggered. Investigate immediately."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "purge_category_failures_total"
+  namespace           = local.purge_alarm_namespace
+  period              = 3600
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = local.alarm_actions
+}
+
+# Alarm: zero-progress — run completed but nothing was purged (possible configuration drift)
+resource "aws_cloudwatch_metric_alarm" "purge_zero_progress" {
+  alarm_name          = "purge-zero-progress"
+  alarm_description   = "Retention purge run completed with zero rows purged for 7 consecutive days. Possible configuration error, dead queue, or all data already purged. Verify."
+  comparison_operator = "LessThanOrEqualToThreshold"
+  evaluation_periods  = 7
+  metric_name         = "purge_rows_purged_total"
+  namespace           = local.purge_alarm_namespace
+  period              = 86400
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "breaching"
+  alarm_actions       = local.alarm_actions
+}
+
+# Alarm: overlong run — purge taking more than 4 hours signals a stuck sweep
+resource "aws_cloudwatch_metric_alarm" "purge_overlong_run" {
+  alarm_name          = "purge-overlong-run"
+  alarm_description   = "Retention purge category sweep exceeded 14400000 ms (4 hours). Possible runaway batch loop or DB issue. Investigate and terminate if needed."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "purge_category_duration_ms"
+  namespace           = local.purge_alarm_namespace
+  period              = 3600
+  extended_statistic  = "p99"
+  threshold           = 14400000 # 4 hours in ms
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = local.alarm_actions
+}
+
+# Alarm: run not started in 25 hours (EventBridge schedule missed)
+resource "aws_cloudwatch_metric_alarm" "purge_run_not_started" {
+  alarm_name          = "purge-run-not-started"
+  alarm_description   = "No purge run started in the last 25 hours. EventBridge schedule may have failed or the task is not starting. Check ECS events and scheduler logs."
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "purge_runs_started_total"
+  namespace           = local.purge_alarm_namespace
+  period              = 90000 # 25 hours
+  statistic           = "Sum"
+  threshold           = 1
+  treat_missing_data  = "breaching"
+  alarm_actions       = local.alarm_actions
+}

@@ -1,0 +1,28 @@
+{
+  "name": "retention-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scheduled retention purge worker — runs crypto-erasure and physical deletes per classification register.",
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-vm-modules dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@travel/contracts": "workspace:*",
+    "@travel/crypto": "workspace:*",
+    "@travel/observability": "workspace:*",
+    "@travel/retention": "workspace:*",
+    "@prisma/client": "catalog:"
+  },
+  "devDependencies": {
+    "@travel/test-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
+  }
+}
