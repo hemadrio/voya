@@ -366,3 +366,48 @@ export function createSecretsProbe(isValid: boolean): Probe {
     check: () => isValid,
   };
 }
+
+/**
+ * Create a secrets-validation probe that re-evaluates from process.env on
+ * every call, so runtime secret rotation to an invalid state is reflected
+ * in the next readiness check.
+ *
+ * Uses the formal SecretValidationResult from secretValidator rather than a
+ * static boolean, so the probe correctly catches placeholder values that are
+ * injected into the environment after the service has started.
+ *
+ * A short 10-second cache TTL is intentional: short enough to detect rotation
+ * within one ALB probe interval (10 s), long enough to avoid hammering the
+ * validation logic on every health probe at scale.
+ *
+ * Import note: dynamic import is used for secretValidator to avoid a circular
+ * dependency between health.ts and secretValidator.ts at module load time.
+ */
+export interface SecretDescriptorLike {
+  readonly envVar: string;
+  readonly description: string;
+  readonly minLength?: number | undefined;
+  readonly allowEmptyInDev?: boolean | undefined;
+}
+
+export function createValidatorProbe(
+  manifest: ReadonlyArray<SecretDescriptorLike>,
+): Probe {
+  return {
+    name: 'secrets',
+    required: true,
+    timeoutMs: 100,
+    cacheTtlMs: 10_000,
+    check: async () => {
+      // Dynamic import avoids circular module graph: health.ts ↔ secretValidator.ts
+      const { validate } = await import('./secretValidator.js');
+      const nodeEnv = process.env['NODE_ENV'] ?? '';
+      const result = validate(
+        manifest,
+        process.env as Record<string, string | undefined>,
+        { relaxed: nodeEnv === 'development' },
+      );
+      return result.ok;
+    },
+  };
+}

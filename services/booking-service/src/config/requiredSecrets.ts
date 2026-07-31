@@ -1,0 +1,23 @@
+import type { SecretDescriptor } from '@travel/observability';
+
+/**
+ * Required secrets for booking-service (saga orchestrator).
+ *
+ * booking-service verifies JWTs forwarded by the api-gateway and holds
+ * offer snapshots in PostgreSQL — both secrets are required at boot.
+ */
+export const REQUIRED_SECRETS: ReadonlyArray<SecretDescriptor> = [
+  {
+    envVar: 'JWT_PUBLIC_KEY',
+    description:
+      'RS256 public key PEM used to verify inbound JWTs from the api-gateway. ' +
+      'Must match the signing key held by auth-service.',
+    minLength: 50,
+  },
+  {
+    envVar: 'DATABASE_URL',
+    description:
+      'PostgreSQL connection string via RDS Proxy for the booking schema.',
+    minLength: 20,
+  },
+];

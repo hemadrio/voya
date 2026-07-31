@@ -133,3 +133,10 @@
 - **Files:** 16 (+1420/-16)
 - **Duration:** 1102ss
 - **Approach:** Built a generic probe-based health builder in @travel/observability with per-probe timeouts (Promise.race vs setTimeout), in-memory TTL cache keyed by probe name, and Promise.allSettled aggregation. Handlers are typed against node:http IncomingMessage/ServerResponse so they work in both Express (where Response extends ServerResponse) and raw http.createServer(). Required probe failures → 503 unhealthy; non-required failures → 200 degraded to prevent ECS deployment circuit-breaker rollbacks on cache/queue outages. Added a startup secrets validator with a placeholder deny-list that exits process.exit(1) before the HTTP listener binds, logging only the variable name (never the value). Wired /health/live and /health/ready into all 9 services with an optional HealthHandlers parameter to preserve backward compatibility with existing tests.
+
+## WO-012: User Story: WO-012 - Fail-Fast Startup Secret Validator Across All Services
+- **Status:** completed
+- **Commit:** `80b7639`
+- **Files:** 23 (+1001/-0)
+- **Duration:** 983ss
+- **Approach:** Built a pure, dependency-injectable SecretValidator module in @travel/observability with exact-match placeholder blocklist, per-field minLength rules, allowEmptyInDev exemptions, and relaxed-dev-mode support. The pure validate(manifest, env, opts) function is fully unit-testable with no process control; assertSecretsOrExit wraps it with process.env access, Pino-compatible logging (key names only — never values), and process.exit(1) in strict mode. Declarative per-service manifests enumerate each service's required secrets with typed SecretDescriptor. Added createValidatorProbe to the health builder using dynamic import to avoid circular graph. Extended Pino redaction paths to cover 20+ secret/token/key/password field patterns. Wired assertSecretsOrExit into all 9 service index.ts files after the tracing bootstrap, gated with NODE_ENV !== 'test' so unit test suites importing createApp continue to work.

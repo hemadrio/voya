@@ -26,6 +26,10 @@ const PII_REDACT_PATHS: ReadonlyArray<string> = [
   '*.*.*.passwordHash',
   '*.*.*.*.passwordHash',
   '[*].passwordHash',
+  // --- password (plain text, should never be logged) ---
+  'password',
+  '*.password',
+  '*.*.password',
   // --- dateOfBirth ---
   'dateOfBirth',
   '*.dateOfBirth',
@@ -52,6 +56,27 @@ const PII_REDACT_PATHS: ReadonlyArray<string> = [
   'req.headers["stripe-signature"]',
   '*.headers.authorization',
   '*.headers["stripe-signature"]',
+  // --- generic secret / key / token fields ---
+  // Catches secretKey, apiKey, accessToken, refreshToken, webhookSecret, etc.
+  // Top-level and one level deep; deeper nesting is uncommon in log bindings.
+  'secret',
+  '*.secret',
+  'secretKey',
+  '*.secretKey',
+  'webhookSecret',
+  '*.webhookSecret',
+  'apiKey',
+  '*.apiKey',
+  'accessToken',
+  '*.accessToken',
+  'refreshToken',
+  '*.refreshToken',
+  'token',
+  '*.token',
+  'privateKey',
+  '*.privateKey',
+  'signingKey',
+  '*.signingKey',
 ];
 
 // ---------------------------------------------------------------------------

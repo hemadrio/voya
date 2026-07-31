@@ -38,6 +38,7 @@ export {
   createRedisProbe,
   createQueueProbe,
   createSecretsProbe,
+  createValidatorProbe,
   _resetHealthCache,
 } from './health.js';
 export type {
@@ -53,3 +54,16 @@ export type {
   RedisHealthClient,
   QueueHealthClient,
 } from './health.js';
+
+export {
+  validate,
+  assertSecretsOrExit,
+  PLACEHOLDER_BLOCKLIST,
+} from './secretValidator.js';
+export type {
+  SecretDescriptor,
+  SecretViolation,
+  SecretViolationCode,
+  SecretValidationResult,
+  ValidateOptions,
+} from './secretValidator.js';
