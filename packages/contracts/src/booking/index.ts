@@ -10,3 +10,18 @@ export type { CreateBookingRequest } from "./request.js";
 
 export { BookingResponseSchema, ItinerarySchema } from "./response.js";
 export type { BookingResponse, Itinerary } from "./response.js";
+
+export {
+  SUPPLIER_PROVENANCES,
+  BookingProvenanceSchema,
+  AnyProvenanceSchema,
+  isSupplierProvenance,
+} from "./provenance.js";
+export type { SupplierProvenance, BookingProvenance } from "./provenance.js";
+
+export {
+  AUDIT_REDACT_KEYS,
+  sanitiseAuditPayload,
+  toSanitisedPayload,
+} from "./audit.js";
+export type { SanitisedPayload } from "./audit.js";

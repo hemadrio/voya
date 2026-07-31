@@ -1,0 +1,42 @@
+{
+  "bookable_amadeus": {
+    "id": "bk_01HXPAMADEUS01",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "status": "PENDING",
+    "userId": "usr_traveler_01",
+    "offerId": "off_amadeus_LHR_JFK_20240315",
+    "createdAt": "2024-01-15T10:00:00Z",
+    "updatedAt": "2024-01-15T10:00:00Z"
+  },
+  "bookable_rapidapi_hotel": {
+    "id": "bk_01HXPRAPIDHOTEL",
+    "provenance": "RAPIDAPI_HOTEL",
+    "bookable": true,
+    "status": "PENDING",
+    "userId": "usr_traveler_01",
+    "offerId": "off_hotel_hilton_london_20240315",
+    "createdAt": "2024-01-15T11:00:00Z",
+    "updatedAt": "2024-01-15T11:00:00Z"
+  },
+  "non_bookable_illustrative": {
+    "id": "bk_01HXPILLUSTRATE",
+    "provenance": "ILLUSTRATIVE",
+    "bookable": false,
+    "status": "DRAFT",
+    "userId": "usr_traveler_02",
+    "offerId": "off_illustrative_sample_01",
+    "createdAt": "2024-01-15T12:00:00Z",
+    "updatedAt": "2024-01-15T12:00:00Z"
+  },
+  "non_bookable_flag": {
+    "id": "bk_01HXPEXPIRED01",
+    "provenance": "AMADEUS",
+    "bookable": false,
+    "status": "DRAFT",
+    "userId": "usr_traveler_03",
+    "offerId": "off_amadeus_expired_price_frozen",
+    "createdAt": "2024-01-15T13:00:00Z",
+    "updatedAt": "2024-01-15T13:00:00Z"
+  }
+}

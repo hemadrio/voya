@@ -1,0 +1,68 @@
+{
+  "booking_created": {
+    "id": "alog_01HXPAUDIT001",
+    "bookingId": "bk_01HXPAMADEUS01",
+    "action": "BOOKING_CREATED",
+    "actorId": "usr_traveler_01",
+    "actorRole": "traveler",
+    "resourceType": "Booking",
+    "resourceId": "bk_01HXPAMADEUS01",
+    "occurredAt": "2024-01-15T10:00:00Z",
+    "payload": {
+      "status": "PENDING",
+      "provenance": "AMADEUS",
+      "offerId": "off_amadeus_LHR_JFK_20240315",
+      "amount": 34900
+    }
+  },
+  "booking_confirmed": {
+    "id": "alog_01HXPAUDIT002",
+    "bookingId": "bk_01HXPAMADEUS01",
+    "action": "BOOKING_CONFIRMED",
+    "actorId": "sys_payment_worker",
+    "actorRole": "system",
+    "resourceType": "Booking",
+    "resourceId": "bk_01HXPAMADEUS01",
+    "occurredAt": "2024-01-15T10:01:30Z",
+    "payload": {
+      "status": "CONFIRMED",
+      "paymentIntentId": "pi_3OaBcDEfGhIjKlMn",
+      "amount": 34900
+    }
+  },
+  "booking_cancelled_by_support": {
+    "id": "alog_01HXPAUDIT003",
+    "bookingId": "bk_01HXPAMADEUS01",
+    "action": "BOOKING_CANCELLED",
+    "actorId": "usr_support_01",
+    "actorRole": "support_agent",
+    "resourceType": "Booking",
+    "resourceId": "bk_01HXPAMADEUS01",
+    "occurredAt": "2024-01-16T09:00:00Z",
+    "payload": {
+      "status": "CANCELLED",
+      "reason": "Customer requested cancellation",
+      "refundAmount": 34900
+    }
+  },
+  "pii_scrubbed_row": {
+    "_comment": "Demonstrates that PII is never present in persisted audit rows.",
+    "id": "alog_01HXPAUDIT004",
+    "bookingId": "bk_01HXPRAPIDHOTEL",
+    "action": "BOOKING_CREATED",
+    "actorId": "usr_traveler_01",
+    "actorRole": "traveler",
+    "resourceType": "Booking",
+    "resourceId": "bk_01HXPRAPIDHOTEL",
+    "occurredAt": "2024-01-15T11:00:00Z",
+    "payload": {
+      "status": "PENDING",
+      "provenance": "RAPIDAPI_HOTEL",
+      "guests": [
+        { "name": "Alice Smith", "email": "[REDACTED]", "passportNumber": "[REDACTED]" }
+      ],
+      "hotelId": "hotel_hilton_london",
+      "roomType": "DOUBLE"
+    }
+  }
+}

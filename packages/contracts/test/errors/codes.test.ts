@@ -115,4 +115,12 @@ describe("httpStatusForCode", () => {
   it("returns 500 for INTERNAL_ERROR", () => {
     expect(httpStatusForCode("INTERNAL_ERROR")).toBe(500);
   });
+
+  it("returns 502 for EGRESS_DENIED", () => {
+    expect(httpStatusForCode("EGRESS_DENIED")).toBe(502);
+  });
+
+  it("returns 422 for OFFER_NOT_BOOKABLE", () => {
+    expect(httpStatusForCode("OFFER_NOT_BOOKABLE")).toBe(422);
+  });
 });

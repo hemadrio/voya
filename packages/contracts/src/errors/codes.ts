@@ -43,6 +43,9 @@ export const ErrorCode = {
   INTERNAL_ERROR: "INTERNAL_ERROR",
   /** 502 — outbound request denied by the SSRF egress allow-list policy. */
   EGRESS_DENIED: "EGRESS_DENIED",
+  /** 422 — the selected offer is not bookable (ILLUSTRATIVE, expired, or
+   *  from an unrecognised provenance channel). */
+  OFFER_NOT_BOOKABLE: "OFFER_NOT_BOOKABLE",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -73,6 +76,7 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   SUPPLIER_TIMEOUT: 504,
   INTERNAL_ERROR: 500,
   EGRESS_DENIED: 502,
+  OFFER_NOT_BOOKABLE: 422,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

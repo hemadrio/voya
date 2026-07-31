@@ -31,6 +31,8 @@ export {
   rateLimited,
   supplierUnavailable,
   supplierTimeout,
+  egressDenied,
+  offerNotBookable,
 } from "./domain-errors.js";
 
 export { serialiseError, RESTRICTED_FIELDS } from "./serialise.js";

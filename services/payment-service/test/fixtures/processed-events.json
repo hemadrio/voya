@@ -1,0 +1,23 @@
+{
+  "stripe_payment_intent_succeeded": {
+    "provider": "stripe",
+    "eventId": "evt_1OaBcDEfGhIjKlMn",
+    "receivedAt": "2024-01-15T10:01:29Z"
+  },
+  "stripe_payment_intent_failed": {
+    "provider": "stripe",
+    "eventId": "evt_1OaBcDEfGhIjKlMo",
+    "receivedAt": "2024-01-15T10:05:00Z"
+  },
+  "stripe_charge_refunded": {
+    "provider": "stripe",
+    "eventId": "evt_1OaBcDEfGhIjKlMp",
+    "receivedAt": "2024-01-16T09:01:00Z"
+  },
+  "_comment": "Same event_id from a different provider is NOT a duplicate — the unique key is (provider, event_id).",
+  "adyen_same_event_id": {
+    "provider": "adyen",
+    "eventId": "evt_1OaBcDEfGhIjKlMn",
+    "receivedAt": "2024-01-15T10:02:00Z"
+  }
+}

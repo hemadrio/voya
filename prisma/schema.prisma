@@ -1,0 +1,173 @@
+// Canonical Prisma schema — single source of truth for the travel platform.
+// All nine services reference this shared schema.
+//
+// Migration strategy: expand/contract — every change in this file must be
+// additive for one full release cycle (no column drop, rename or type
+// narrowing) so the previous service version keeps working against the
+// migrated database.
+//
+// Append-only enforcement, role-level REVOKE/GRANT and trigger functions
+// that Prisma cannot express are delivered as raw SQL appended to the
+// generated migration file.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// User
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         String   @default("traveler")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  bookings Booking[]
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Booking
+// ---------------------------------------------------------------------------
+
+/// Booking row — represents a single purchased travel segment.
+///
+/// WO-072 additions (additive, backward-compatible):
+///   provenance  — tracks which supplier channel produced the booked offer.
+///   bookable    — structural flag; defaults to false; must be true for
+///                 any offer that enters the PENDING state.
+model Booking {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  bookingType  String   @map("booking_type")
+  status       String   @default("PENDING")
+  offerId      String   @map("offer_id")
+  totalPrice   Decimal  @map("total_price") @db.Decimal(12, 2)
+  currency     String   @db.Char(3)
+  contactEmail String   @map("contact_email")
+  contactPhone String?  @map("contact_phone")
+  idempotencyKey String @unique @map("idempotency_key")
+  /// Snapshot of the offer as presented at selection time. Stored as JSONB.
+  searchResultSnapshot Json? @map("search_result_snapshot") @db.Json
+
+  // WO-072 additions — nullable so previous-version rows without this
+  // column stay valid until the application backfills them.
+  /// Supplier channel that produced the booked offer.
+  provenance String? @db.VarChar(64)
+  /// True only when the offer came from a real supplier (not ILLUSTRATIVE).
+  bookable   Boolean @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user       User              @relation(fields: [userId], references: [id])
+  auditLogs  BookingAuditLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("bookings")
+}
+
+// ---------------------------------------------------------------------------
+// BookingAuditLog — append-only via trigger (see migration SQL)
+// ---------------------------------------------------------------------------
+
+/// Append-only audit log for booking state transitions.
+///
+/// WO-072 additions (additive, backward-compatible):
+///   actorId, actorRole, resourceType, resourceId — who changed what.
+///   occurredAt — wall-clock time of the change.
+///   sequence   — BIGSERIAL identity column for deterministic ordering.
+///
+/// All new columns are nullable or defaulted so a previous-version service
+/// that omits them still produces valid INSERT rows.
+///
+/// Append-only enforcement is implemented as a database trigger + REVOKE:
+///   - The application role cannot execute UPDATE or DELETE.
+///   - A BEFORE UPDATE OR DELETE trigger RAISES EXCEPTION as a defence-in-depth
+///     guard even if the REVOKE is accidentally relaxed.
+///
+/// Audit payload minimisation: previous_state and new_state are written
+/// through sanitiseAuditPayload() before persistence so no PII ever enters
+/// this table (audit rows are excluded from GDPR erasure and retained ≥ 1 yr).
+model BookingAuditLog {
+  id       String @id @default(uuid()) @db.Uuid
+  bookingId String @map("booking_id") @db.Uuid
+
+  // Original columns (kept unchanged for backward compat)
+  action        String
+  previousState Json?  @map("previous_state") @db.JsonB
+  newState      Json?  @map("new_state") @db.JsonB
+  changedBy     String? @map("changed_by")
+  timestamp     DateTime @default(now()) @db.Timestamptz
+
+  // WO-072 additions
+  /// Authenticated user or system identity that caused the change.
+  actorId      String?  @map("actor_id") @db.VarChar(128)
+  /// Role of the actor (traveler | support_agent | ops | system).
+  actorRole    String?  @map("actor_role") @db.VarChar(32)
+  /// Domain resource type (e.g. "booking").
+  resourceType String?  @map("resource_type") @db.VarChar(64)
+  /// Domain resource identifier (booking UUID).
+  resourceId   String?  @map("resource_id") @db.VarChar(128)
+  /// Wall-clock time of the state transition.
+  occurredAt   DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  /// Monotonically ordered identity column for deterministic replay.
+  sequence     BigInt?  @map("sequence")
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([resourceId, occurredAt], map: "idx_audit_resource_occurred")
+  @@map("booking_audit_log")
+}
+
+// ---------------------------------------------------------------------------
+// ProcessedEvent — idempotency table for inbound webhook events (WO-072)
+// ---------------------------------------------------------------------------
+
+/// Durable idempotency store for Stripe (and future provider) webhooks.
+///
+/// The unique constraint on (provider, event_id) is the exactly-once
+/// authority for BR-03: an event that arrives twice (Stripe redelivery,
+/// concurrent tasks) is detected here before any side-effect is applied.
+///
+/// payload_digest stores the SHA-256 of the raw event body so a second
+/// delivery with a mutated body can be detected forensically without
+/// storing the full payload.
+model ProcessedEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  provider    String    @db.VarChar(64)
+  eventId     String    @map("event_id") @db.VarChar(256)
+  eventType   String    @map("event_type") @db.VarChar(128)
+  payloadDigest String  @map("payload_digest") @db.Char(64)
+  receivedAt  DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  processedAt DateTime? @map("processed_at") @db.Timestamptz
+
+  @@unique([provider, eventId], map: "uq_processed_events_provider_event")
+  @@index([receivedAt], map: "idx_processed_events_received_at")
+  @@map("processed_events")
+}

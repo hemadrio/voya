@@ -105,3 +105,17 @@ export function supplierTimeout(message = "Supplier request timed out. Please tr
 export function egressDenied(message = "Outbound request denied by security policy."): DomainError {
   return new DomainErrorImpl("EGRESS_DENIED", message);
 }
+
+/**
+ * 422 — the selected offer is not bookable.
+ *
+ * Raised when an offer's provenance is ILLUSTRATIVE, the provenance string is
+ * not in the approved supplier set, or the bookable flag is false.  The field
+ * parameter names the offending field so the API response can attach it.
+ */
+export function offerNotBookable(
+  message = "This offer cannot be booked.",
+  field = "provenance",
+): DomainError {
+  return new DomainErrorImpl("OFFER_NOT_BOOKABLE", message, field);
+}

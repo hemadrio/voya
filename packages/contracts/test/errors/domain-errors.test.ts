@@ -11,6 +11,8 @@ import {
   rateLimited,
   supplierUnavailable,
   supplierTimeout,
+  egressDenied,
+  offerNotBookable,
 } from "../../src/errors/domain-errors.js";
 import type { DomainError } from "../../src/errors/domain-errors.js";
 
@@ -119,6 +121,40 @@ describe("supplierTimeout", () => {
   });
 });
 
+describe("egressDenied", () => {
+  it("creates a DomainError with code EGRESS_DENIED", () => {
+    const err = egressDenied();
+    expect(err.code).toBe("EGRESS_DENIED");
+  });
+
+  it("uses the default message when none is provided", () => {
+    const err = egressDenied();
+    expect(err.message).toMatch(/denied/i);
+  });
+});
+
+describe("offerNotBookable", () => {
+  it("creates a DomainError with code OFFER_NOT_BOOKABLE", () => {
+    const err = offerNotBookable("Offer is illustrative.");
+    expect(err.code).toBe("OFFER_NOT_BOOKABLE");
+  });
+
+  it("defaults field to 'provenance'", () => {
+    const err = offerNotBookable("Offer is illustrative.");
+    expect(err.field).toBe("provenance");
+  });
+
+  it("accepts a custom field name", () => {
+    const err = offerNotBookable("Not bookable.", "bookable");
+    expect(err.field).toBe("bookable");
+  });
+
+  it("uses the default message when none is provided", () => {
+    const err = offerNotBookable();
+    expect(err.message).toBeTruthy();
+  });
+});
+
 describe("DomainError instanceof chain", () => {
   it("all factory results are instanceof Error", () => {
     const factories = [
@@ -133,6 +169,8 @@ describe("DomainError instanceof chain", () => {
       rateLimited(),
       supplierUnavailable(),
       supplierTimeout(),
+      egressDenied(),
+      offerNotBookable(),
     ];
     for (const err of factories) {
       expect(err instanceof Error).toBe(true);
