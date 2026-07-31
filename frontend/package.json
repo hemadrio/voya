@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Next.js 14 App Router traveler-facing web application. Design system, layout shell, and typed API client.",
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -18,23 +21,23 @@
     "@travel/contracts": "workspace:*",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "next": "^14.2.5",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
     "tailwind-merge": "^2.4.0",
-    "zod": "^3.23.8"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.6",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.5.2",
-    "@types/node": "^20.14.9",
+    "@types/node": "catalog:",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^1.6.0",
     "autoprefixer": "^10.4.19",
-    "eslint": "^8.57.0",
+    "eslint": "catalog:",
     "eslint-config-next": "^14.2.5",
     "husky": "^9.1.4",
     "jsdom": "^24.1.1",
@@ -43,8 +46,8 @@
     "postcss": "^8.4.40",
     "prettier": "^3.3.3",
     "tailwindcss": "^3.4.7",
-    "typescript": "^5.5.3",
-    "vitest": "^1.6.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "lint-staged": {
     "*.{ts,tsx}": ["eslint --fix", "tsc --noEmit --skipLibCheck"]

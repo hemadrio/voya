@@ -58,7 +58,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20.0.0 <21.0.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -72,16 +72,16 @@
     "generate:baselines": "tsx scripts/generate-baselines.ts"
   },
   "dependencies": {
-    "zod": "^3.23.8"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@typescript-eslint/eslint-plugin": "^7.16.0",
-    "@typescript-eslint/parser": "^7.16.0",
-    "eslint": "^8.57.0",
-    "rimraf": "^5.0.7",
-    "tsx": "^4.0.0",
-    "typescript": "^5.5.3",
-    "vitest": "^1.6.0"
+    "@types/node": "catalog:",
+    "@typescript-eslint/eslint-plugin": "catalog:",
+    "@typescript-eslint/parser": "catalog:",
+    "eslint": "catalog:",
+    "rimraf": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

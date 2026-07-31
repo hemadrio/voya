@@ -1,34 +1,128 @@
 {
   "$schema": "https://turbo.build/schema.json",
+
+  "globalDependencies": [
+    ".env.example",
+    "tsconfig.base.json",
+    "pnpm-workspace.yaml",
+    "pnpm-lock.yaml"
+  ],
+
+  "remoteCache": {
+    "enabled": true
+  },
+
   "tasks": {
-    "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**"]
+    "contract:gen": {
+      "dependsOn": [],
+      "inputs": ["src/**/*.ts", "scripts/**/*.ts", "package.json"],
+      "outputs": ["dist/**", "generated/**"],
+      "cache": true
     },
+
+    "build": {
+      "dependsOn": ["^build", "contract:gen"],
+      "inputs": ["src/**/*.ts", "tsconfig*.json", "package.json"],
+      "outputs": ["dist/**", ".next/**", "build/**"]
+    },
+
+    "typecheck": {
+      "dependsOn": ["^build", "contract:gen"],
+      "inputs": ["src/**/*.ts", "test/**/*.ts", "tsconfig*.json", "package.json"],
+      "outputs": []
+    },
+
     "lint": {
       "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "test/**/*.ts",
+        ".eslintrc*",
+        "eslint.config.*",
+        "package.json"
+      ],
       "outputs": []
     },
+
     "test": {
       "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "test/**/*.ts",
+        "test/**/*.tsx",
+        "__tests__/**/*.ts",
+        "vitest.config.*",
+        "jest.config.*",
+        "package.json"
+      ],
       "outputs": ["coverage/**"]
     },
-    "typecheck": {
+
+    "test:unit": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "inputs": [
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "test/**/*.tsx",
+        "__tests__/**/*.ts",
+        "vitest.config.*",
+        "jest.config.*",
+        "package.json"
+      ],
+      "outputs": ["coverage/**"]
     },
-    "@travel/contracts#test": {
+
+    "test:integration": {
       "dependsOn": ["^build"],
-      "outputs": ["coverage/**"],
+      "inputs": [
+        "src/**/*.ts",
+        "test/**/*.integration.*",
+        "test/**/*.e2e.*",
+        "package.json"
+      ],
+      "outputs": [],
       "cache": false
     },
+
     "contracts:check": {
       "dependsOn": ["@travel/contracts#build"],
       "cache": false,
       "outputs": []
     },
+
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+
+    "clean": {
+      "cache": false,
+      "outputs": []
+    },
+
+    "@travel/contracts#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "vitest.config.*",
+        "package.json"
+      ],
+      "outputs": ["coverage/**"],
+      "cache": true
+    },
+
     "@travel/observability#test": {
       "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.ts",
+        "__tests__/**/*.ts",
+        "jest.config.*",
+        "package.json"
+      ],
       "outputs": ["coverage/**"]
     }
   }

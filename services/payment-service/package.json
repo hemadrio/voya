@@ -2,7 +2,7 @@
   "name": "payment-service",
   "version": "0.1.0",
   "private": true,
-  "description": "Payment service — creates Stripe PaymentIntents and processes webhooks.",
+  "description": "Payment service \u2014 creates Stripe PaymentIntents and processes webhooks.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -12,7 +12,10 @@
     "@travel/contracts": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.5.3",
-    "vitest": "^1.6.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
   }
 }

@@ -1,0 +1,16 @@
+{
+  "name": "@travel/catalog-drift-fixture",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
+  },
+  "dependencies": {
+    "zod": "^3.22.0",
+    "pino": "^8.20.0"
+  },
+  "devDependencies": {
+    "typescript": "5.4.5",
+    "vitest": "catalog:"
+  }
+}

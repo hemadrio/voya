@@ -98,3 +98,10 @@
 - **Files:** 8 (+860/-37)
 - **Duration:** 455ss
 - **Approach:** Rewrote docker-compose.yml removing the deprecated top-level version key, added Redis 7.4 as the missing third dependency, pinned all images to exact minor tags, added a named bridge network (travel-local) for stable DNS, per-service healthchecks with start_period tuned for cold starts, deploy resource limits keeping the stack under 2 GB reserved, and an opt-in LocalStack profile for AWS emulation. Created infra/local/ with PostgreSQL init SQL (idempotent role + extension setup), RabbitMQ rabbitmq.conf loading definitions.json (pre-declares travel.events topology matching RabbitMqAdapter defaults), and LocalStack init scripts for SQS FIFO queues and Secrets Manager placeholders. Wrote scripts/wait-for-stack.sh with Docker health polling then protocol-level probes (SQL SELECT 1, Redis PING, rabbitmq-diagnostics check_running), bounded timeout, and per-container diagnostics on failure. Documented everything in docs/local-development.md including the port map, connection strings, max_connections budget arithmetic, dependency-failure drill commands, and CI integration snippet.
+
+## WO-091: User Story: WO-091 - pnpm Workspaces and Turborepo Task Graph with Remote Caching
+- **Status:** completed
+- **Commit:** `e8f9ceb`
+- **Files:** 34 (+1523/-103)
+- **Duration:** 833ss
+- **Approach:** Established pnpm 9.x workspaces as the single package topology with a 36-entry version catalog pinning every shared runtime and build-tool dependency. Layered Turborepo 2.x task definitions on the resulting dependency graph with correct dependsOn edges, narrowed inputs, declared outputs, and cacheability flags. Enforced the catalog with a TypeScript workspace-lint CLI (catalog-drift, workspace-protocol, engines-consistency checks) with fixture-backed unit tests. Pinned toolchain versions via packageManager, engines fields, and an install-time preinstall guard. Configured remote cache with signature-key injection via environment variables with graceful degradation when unavailable.

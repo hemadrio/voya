@@ -1,0 +1,16 @@
+{
+  "name": "@travel/no-workspace-protocol-fixture",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
+  },
+  "dependencies": {
+    "@travel/contracts": "^0.1.0",
+    "@travel/config": "0.1.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}
