@@ -1,0 +1,19 @@
+{
+  "name": "travel-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered multi-supplier travel booking platform monorepo (pnpm workspaces + Turborepo).",
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@8.15.4",
+  "scripts": {
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.9"
+  }
+}

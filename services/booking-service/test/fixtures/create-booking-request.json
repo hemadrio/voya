@@ -1,0 +1,17 @@
+{
+  "bookingType": "FLIGHT",
+  "offerId": "offer_01HZY",
+  "offerPrice": "412.50",
+  "currency": "USD",
+  "passengers": [
+    {
+      "firstName": "Maya",
+      "lastName": "Chen",
+      "dateOfBirth": "1990-03-14T00:00:00.000Z",
+      "email": "maya.chen@example.com"
+    }
+  ],
+  "contactEmail": "maya.chen@example.com",
+  "contactPhone": "+1-555-0100",
+  "idempotencyKey": "idem_9f8c7b6a"
+}

@@ -1,0 +1,6 @@
+{
+  "userId": "user_01HZY",
+  "role": "traveler",
+  "accessToken": "eyJhbGciOiJSUzI1NiJ9.example.signature",
+  "expiresIn": 900
+}

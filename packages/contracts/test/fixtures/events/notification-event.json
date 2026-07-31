@@ -1,0 +1,9 @@
+{
+  "correlationId": "corr_9f8c7b6a5d4e",
+  "recipientEmail": "maya.chen@example.com",
+  "template": "booking-confirmation",
+  "data": {
+    "bookingId": "booking_01HZY"
+  },
+  "occurredAt": "2026-07-31T12:05:00.000Z"
+}

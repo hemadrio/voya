@@ -1,0 +1,19 @@
+.claude/
+CLAUDE.md
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Next.js
+.next/
+
+# Logs
+*.log

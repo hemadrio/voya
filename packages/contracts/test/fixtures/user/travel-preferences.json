@@ -1,0 +1,7 @@
+{
+  "userId": "user_01HZY",
+  "preferredSeatClass": "BUSINESS",
+  "preferredCurrency": "USD",
+  "preferredAirlines": ["Delta", "United"],
+  "dietaryRestrictions": ["vegetarian"]
+}

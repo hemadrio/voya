@@ -1,0 +1,7 @@
+{
+  "bookingId": "booking_01HZY",
+  "amount": "412.50",
+  "currency": "USD",
+  "paymentMethodId": "pm_1HZY",
+  "idempotencyKey": "idem_9f8c7b6a"
+}

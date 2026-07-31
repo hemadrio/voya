@@ -1,0 +1,8 @@
+{
+  "id": "pi_01HZY",
+  "bookingId": "booking_01HZY",
+  "clientSecret": "pi_01HZY_secret_abc123",
+  "status": "REQUIRES_PAYMENT_METHOD",
+  "amount": "412.50",
+  "currency": "USD"
+}

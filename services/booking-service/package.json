@@ -1,0 +1,18 @@
+{
+  "name": "booking-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Booking saga orchestrator service. This WO-001 scaffold only proves @travel/contracts resolves and validates correctly from a consuming service — the full Express service is out of this story's scope.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@travel/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  }
+}
