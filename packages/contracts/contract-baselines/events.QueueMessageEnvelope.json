@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "correlationId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "eventId": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "eventType": {
+      "enum": [
+        "booking.cancelled",
+        "booking.confirmed",
+        "booking.modified",
+        "itinerary.document.requested"
+      ],
+      "type": "string"
+    },
+    "occurredAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "schemaVersion": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "userId": {
+      "format": "uuid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "correlationId",
+    "eventId",
+    "eventType",
+    "occurredAt",
+    "payload",
+    "schemaVersion",
+    "userId"
+  ],
+  "schemaId": "events.QueueMessageEnvelope",
+  "type": "object"
+}

@@ -27,6 +27,7 @@ import {
   BookingConfirmationEventSchema,
   BookingCancellationEventSchema,
   NotificationEventSchema,
+  QueueMessageEnvelopeSchema,
 } from "./events/index.js";
 import { ErrorDetailSchema, ErrorEnvelopeSchema } from "./errors/envelope.js";
 
@@ -52,6 +53,7 @@ export const SCHEMA_REGISTRY: Readonly<Record<string, ZodTypeAny>> = {
   "events.BookingConfirmationEvent": BookingConfirmationEventSchema,
   "events.BookingCancellationEvent": BookingCancellationEventSchema,
   "events.NotificationEvent": NotificationEventSchema,
+  "events.QueueMessageEnvelope": QueueMessageEnvelopeSchema,
   "errors.ErrorDetail": ErrorDetailSchema,
   "errors.ErrorEnvelope": ErrorEnvelopeSchema,
 };

@@ -1,0 +1,41 @@
+version: "3.9"
+
+# ---------------------------------------------------------------------------
+# Local development stack
+#
+# Services:
+#   rabbitmq  — RabbitMQ 3.13 with management UI for local async event bus.
+#               The @travel/queue RabbitMqAdapter connects here when
+#               QUEUE_DRIVER=rabbitmq (set by default in .env.local).
+#               Management UI: http://localhost:15672 (guest/guest)
+#
+# Usage:
+#   docker compose up -d          # start all services
+#   docker compose down -v        # stop and remove volumes
+#
+# Production uses SQS FIFO queues provisioned by infra/terraform/modules/sqs/.
+# ---------------------------------------------------------------------------
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: travel-rabbitmq
+    ports:
+      - "5672:5672"   # AMQP — used by @travel/queue RabbitMqAdapter
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  rabbitmq_data:
+    driver: local

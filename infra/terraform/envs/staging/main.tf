@@ -102,6 +102,23 @@ module "secrets" {
   rotation_lambda_arn = ""
 }
 
+# ── SQS queues ───────────────────────────────────────────────────────────────
+
+# Look up the SNS alarm topic created by monitoring.tf (expected to exist in
+# the same account/region; created independently of this module).
+data "aws_sns_topic" "alarms" {
+  name = "${local.environment}-travel-platform-alarms"
+}
+
+module "sqs" {
+  source = "../../modules/sqs"
+
+  environment   = local.environment
+  kms_key_arn   = module.kms.key_arns["sqs"]
+  alarm_sns_arn = data.aws_sns_topic.alarms.arn
+  common_tags   = local.common_tags
+}
+
 # ── ECS services ─────────────────────────────────────────────────────────────
 
 module "ecs_service" {

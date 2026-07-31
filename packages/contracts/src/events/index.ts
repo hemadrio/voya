@@ -38,3 +38,10 @@ export const NotificationEventSchema = z
   })
   .strict();
 export type NotificationEvent = z.infer<typeof NotificationEventSchema>;
+
+// Queue message envelope — imported by @travel/queue
+export {
+  EventTypeSchema,
+  QueueMessageEnvelopeSchema,
+} from "./envelope.js";
+export type { EventType, QueueMessageEnvelope } from "./envelope.js";
