@@ -56,6 +56,8 @@ export const ErrorCode = {
   PASSWORD_REUSE_NOT_ALLOWED: "PASSWORD_REUSE_NOT_ALLOWED",
   /** 404 — the session id does not exist or does not belong to the caller. */
   SESSION_NOT_FOUND: "SESSION_NOT_FOUND",
+  /** 401 — the x-internal-actor header is absent, malformed, or has an invalid HMAC signature. */
+  ACTOR_CONTEXT_INVALID: "ACTOR_CONTEXT_INVALID",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -92,6 +94,7 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   INVALID_OR_EXPIRED_TOKEN: 400,
   PASSWORD_REUSE_NOT_ALLOWED: 422,
   SESSION_NOT_FOUND: 404,
+  ACTOR_CONTEXT_INVALID: 401,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

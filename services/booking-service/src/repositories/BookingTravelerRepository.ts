@@ -175,4 +175,37 @@ export class BookingTravelerRepository {
   async countByBookingId(bookingId: string): Promise<number> {
     return this.db.bookingTraveler.count({ where: { bookingId } });
   }
+
+  /**
+   * Redacted read path for support_agent (BR-10).
+   *
+   * NEVER loads encryptedDateOfBirth or encryptedPassportReference into memory.
+   * This is enforced at the repository SELECT projection layer, not in the
+   * controller, so identity-document columns are structurally unavailable to
+   * support_agent regardless of controller logic.
+   *
+   * Returns only safe-to-display fields: name, email, bookingId.
+   */
+  async findRedactedByBookingId(
+    bookingId: string,
+  ): Promise<Array<{
+    id: string;
+    bookingId: string;
+    givenName: string;
+    familyName: string;
+    email: string | null;
+    createdAt: Date;
+  }>> {
+    const rows = await this.db.bookingTraveler.findMany({ where: { bookingId } });
+    // Project only non-RESTRICTED fields — encrypted columns are discarded here,
+    // never returned to the caller.
+    return rows.map(row => ({
+      id: row.id,
+      bookingId: row.bookingId,
+      givenName: row.givenName,
+      familyName: row.familyName,
+      email: row.email,
+      createdAt: row.createdAt,
+    }));
+  }
 }

@@ -26,5 +26,8 @@
     "jest": "catalog:",
     "ts-jest": "catalog:",
     "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "@travel/contracts": "workspace:*"
   }
 }

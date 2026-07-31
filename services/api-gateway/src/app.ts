@@ -29,6 +29,12 @@ import type { HealthHandlers } from '@travel/observability';
 export interface GatewayOptions {
   keyProvider: KeyProvider;
   denylist: JtiDenylist;
+  /**
+   * HMAC-SHA256 secret used to sign the x-internal-actor header forwarded to
+   * internal services. Must be sourced from Secrets Manager; never hard-coded.
+   * Defaults to '' when omitted — only safe in tests that don't reach auth success.
+   */
+  actorContextSecret?: string;
   healthHandlers?: HealthHandlers;
   securityHeadersOptions?: SecurityHeadersOptions;
   /** Override NODE_ENV for CORS allow-list lookup. Useful in tests. */
@@ -40,7 +46,7 @@ export interface GatewayOptions {
 }
 
 export function createApp(options: GatewayOptions): express.Application {
-  const { keyProvider, denylist, healthHandlers, logger, nodeEnv } = options;
+  const { keyProvider, denylist, actorContextSecret, healthHandlers, logger, nodeEnv } = options;
 
   const corsConfig = getCorsConfig(nodeEnv ?? process.env['NODE_ENV']);
   const app = express();
@@ -69,7 +75,7 @@ export function createApp(options: GatewayOptions): express.Application {
   app.use(createCorrelationIdMiddleware());
 
   // ── 7 & 8. Authenticated + CSRF-protected routes ─────────────────────────
-  const authenticate = createAuthenticateMiddleware({ keyProvider, denylist, logger });
+  const authenticate = createAuthenticateMiddleware({ keyProvider, denylist, actorContextSecret, logger });
   const csrf = createCsrfMiddleware({ corsConfig });
 
   // Health endpoints — no auth required

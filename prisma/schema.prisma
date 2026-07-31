@@ -11,6 +11,16 @@
 // generated migration file.
 
 // ---------------------------------------------------------------------------
+// UserRole — authorization role enum (WO-014)
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  traveler
+  support_agent
+  system
+}
+
+// ---------------------------------------------------------------------------
 // SuppressionReason — email suppression source (WO-052)
 // ---------------------------------------------------------------------------
 
@@ -49,7 +59,7 @@ model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
   passwordHash String   @map("password_hash")
-  role         String   @default("traveler")
+  role         UserRole @default(traveler)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -452,4 +462,40 @@ model EmailSuppression {
   createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz
 
   @@map("email_suppressions")
+}
+
+// ---------------------------------------------------------------------------
+// SecurityEvent — append-only access-control audit trail (WO-014)
+// ---------------------------------------------------------------------------
+
+/// Immutable record of every 403 and actor-context verification failure.
+///
+/// Application role has INSERT only — UPDATE and DELETE are REVOKED in the
+/// migration SQL so no in-process bug or misconfigured credential can alter
+/// the audit trail.
+///
+/// Columns follow the SIEM-consumable naming convention so the CloudWatch
+/// metric filter and alarm can match on `decision` = 'DENY' without
+/// additional transformation.
+model SecurityEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  /// Subject ID of the actor making the request (UUID or 'anonymous').
+  actorId      String   @map("actor_id") @db.VarChar(128)
+  /// Role of the actor at the time of the event.
+  actorRole    UserRole @map("actor_role")
+  /// Domain resource type (e.g. "booking", "itinerary", "traveler_document").
+  resourceType String   @map("resource_type") @db.VarChar(64)
+  /// Domain resource identifier (UUID or path segment).
+  resourceId   String?  @map("resource_id") @db.VarChar(128)
+  /// Operation attempted (e.g. "READ", "CANCEL", "DOCUMENT_READ").
+  operation    String   @db.VarChar(64)
+  /// Authorization decision: ALLOW or DENY.
+  decision     String   @db.VarChar(10)
+  /// Human-readable reason for the decision (e.g. "OWNERSHIP_PREDICATE_FAILED").
+  reason       String?  @db.VarChar(512)
+  occurredAt   DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+
+  @@index([actorId, occurredAt], map: "idx_security_events_actor_occurred")
+  @@index([resourceType, resourceId], map: "idx_security_events_resource")
+  @@map("security_events")
 }

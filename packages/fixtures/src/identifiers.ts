@@ -53,12 +53,16 @@ export const RETENTION = {
 
 export const SEED_IDS = {
   user: {
-    /** Alice Leisure — leisure planner, multi-category itinerary. */
+    /** Alice Leisure — leisure planner, multi-category itinerary. Role: traveler. */
     alice: "f0000000-0000-4000-8000-000000000001",
-    /** Bob Business — frequent business traveler, saved preferences. */
+    /** Bob Business — frequent business traveler, saved preferences. Role: traveler. */
     bob: "f0000000-0000-4000-8000-000000000002",
-    /** Charlie Guest — itinerary originated as guest, later re-parented to account. */
+    /** Charlie Guest — itinerary originated as guest, later re-parented to account. Role: traveler. */
     charlie: "f0000000-0000-4000-8000-000000000003",
+    /** Dana Support — customer support agent. Role: support_agent. BR-10: no identity-doc access. */
+    danaSupportAgent: "f0000000-0000-4000-8000-000000000004",
+    /** System Actor — background job identity (queue consumers, purge jobs). Role: system. */
+    systemActor: "f0000000-0000-4000-8000-000000000005",
   },
 
   itinerary: {
@@ -131,4 +135,6 @@ export const SEED_EMAILS = {
   alice: "alice.leisure@synth.example",
   bob: "bob.business@synth.example",
   charlie: "charlie.guest@synth.example",
+  danaSupportAgent: "dana.support@synth.example",
+  systemActor: "system.actor@synth.example",
 };

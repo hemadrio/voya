@@ -2,6 +2,9 @@ import { z } from "zod";
 import { identifier } from "../common/primitives.js";
 import { RoleSchema } from "../common/enums.js";
 
+export { InternalActorContextSchema } from "./actorContext.js";
+export type { InternalActorContext } from "./actorContext.js";
+
 export const EMAIL_INVALID_MESSAGE = "Email must be a valid email address";
 export const PASSWORD_MIN_LENGTH_MESSAGE = "Password must be at least 8 characters";
 export const PASSWORD_COMPLEXITY_MESSAGE =

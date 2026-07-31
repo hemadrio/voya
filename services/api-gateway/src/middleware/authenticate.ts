@@ -21,6 +21,7 @@ import { z } from 'zod';
 import { RoleSchema } from '@travel/contracts';
 import type { ErrorCode } from '@travel/contracts';
 import type { KeyProvider } from '@travel/auth';
+import { mintActorContext } from '@travel/auth';
 
 // ---------------------------------------------------------------------------
 // Actor context schema (Zod-validated JWT payload)
@@ -118,6 +119,17 @@ function makeErrorBody(code: ErrorCode, message: string, reference: string) {
 export interface AuthenticateOptions {
   keyProvider: KeyProvider;
   denylist: JtiDenylist;
+  /**
+   * HMAC-SHA256 secret used to sign the actor context forwarded to internal
+   * services as x-internal-actor.  Internal services verify this signature
+   * before trusting the header.  Must be sourced from Secrets Manager in
+   * production; never hard-coded.
+   *
+   * Defaults to '' (empty string) when omitted — only safe in tests that do
+   * not reach a successful authentication path.  Services that call next()
+   * after successful verification always need this set.
+   */
+  actorContextSecret?: string;
   /** Injected clock — defaults to Date.now. Override in tests. */
   now?: () => number;
   logger?: {
@@ -144,7 +156,7 @@ type NextFn = () => void;
  * webhook route and health endpoints are typically excluded.
  */
 export function createAuthenticateMiddleware(options: AuthenticateOptions) {
-  const { keyProvider, denylist, logger } = options;
+  const { keyProvider, denylist, actorContextSecret = '', logger } = options;
   const getNow = options.now ?? (() => Date.now());
 
   return async function authenticate(
@@ -238,15 +250,20 @@ export function createAuthenticateMiddleware(options: AuthenticateOptions) {
       return;
     }
 
-    // Mint the signed actor context for downstream services.
+    // Mint the HMAC-signed actor context for downstream services.
     // The x-internal-actor header was already stripped by stripInternalActorHeader
     // before this middleware ran, so no client-supplied value survives.
-    req.headers['x-internal-actor'] = JSON.stringify({
-      sub: actor.sub,
-      sid: actor.sid,
-      roles: actor.roles,
-      jti: actor.jti,
-    });
+    const mintedAtSeconds = Math.floor(getNow() / 1000);
+    req.headers['x-internal-actor'] = mintActorContext(
+      {
+        sub: actor.sub,
+        sid: actor.sid,
+        roles: actor.roles,
+        jti: actor.jti,
+        issuedAt: mintedAtSeconds,
+      },
+      actorContextSecret,
+    );
 
     next();
   };

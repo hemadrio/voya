@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@travel/auth": "workspace:*",
     "@travel/contracts": "workspace:*",
     "@travel/observability": "workspace:*",
     "express": "catalog:"
