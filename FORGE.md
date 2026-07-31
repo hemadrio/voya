@@ -329,3 +329,10 @@
 - **Files:** 22 (+3083/-1)
 - **Duration:** 1109ss
 - **Approach:** Implemented a strategy-per-category purge orchestrator with all dependencies injected (no DB or AWS in domain layer). PhysicalDeleteStrategy handles batched parameterized DELETEs, CryptoEraseStrategy nullifies wrapped_dek for expired traveler identity rows, PseudonymiseActorStrategy handles audit actor references, and ConversationSweepStrategy covers both Redis and durable conversation store. The PurgeOrchestrator enforces a run lease, load-aware defer, dry-run-as-default, and never-fail-open policy (A10). A Prisma-backed production repository uses an allowlisted table name approach with all WHERE/SET values parameterized (A05). Deployed as a scheduled Fargate task via EventBridge Scheduler with a dedicated least-privileged IAM task role and CloudWatch alarms for failures, zero-progress, overlong runs, and missed schedules.
+
+## WO-081: User Story: WO-081 - ECS Fargate task definitions and services for ten components
+- **Status:** completed
+- **Commit:** `cb6f30a`
+- **Files:** 13 (+1810/-71)
+- **Duration:** 769ss
+- **Approach:** Extended the existing generic ecs-service module with Service Connect, per-service SQS IAM policies, and a configurable health-check start period. Created a new ecs-cluster module providing the ECS cluster, Container Insights, FARGATE/FARGATE_SPOT capacity providers, and a Cloud Map HTTP namespace for Service Connect mTLS. Replaced the generic for_each module calls in both dev and production main.tf with per-service instantiations in services.tf, giving each service its own explicit sizing, secret ARN mapping, and IAM boundary. Added Terraform unit tests for all sizing, secrets-only injection, IAM isolation, Service Connect, and no-LB notification-consumer assertions.

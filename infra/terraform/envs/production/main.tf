@@ -315,39 +315,7 @@ module "cache" {
   common_tags   = local.common_tags
 }
 
-# ── ECS services ─────────────────────────────────────────────────────────────
-
-module "ecs_service" {
-  for_each = local.service_secret_map
-
-  source = "../../modules/ecs-service"
-
-  environment    = local.environment
-  service_name   = each.key
-  aws_account_id = local.aws_account_id
-  aws_region     = local.aws_region
-
-  container_image = "${local.aws_account_id}.dkr.ecr.${local.aws_region}.amazonaws.com/${each.key}:latest"
-
-  log_group_name     = "/ecs/${local.environment}/${each.key}"
-  ecs_cluster_arn    = data.aws_ecs_cluster.main.arn
-  subnet_ids         = data.aws_subnets.private.ids
-  security_group_ids = data.aws_security_groups.ecs_tasks.ids
-
-  kms_key_arns = [module.kms.key_arns["secretsmanager"]]
-
-  secret_refs = {
-    for slug in each.value :
-    upper(replace(slug, "-", "_")) => module.secrets.secret_arns[slug]
-  }
-
-  rds_connect_policy_arns = contains(local.db_connected_services, each.key) ? [
-    module.rds_proxy.service_rds_connect_policy_arns[each.key]
-  ] : []
-
-  # Register the service with its ALB target group. Target groups are created
-  # by the edge module (WO-080) with /health/ready health checks.
-  target_group_arn = module.edge.target_group_arns[each.key]
-
-  common_tags = local.common_tags
-}
+# ── ECS services and cluster — see services.tf ────────────────────────────────
+# Individual service definitions with per-component sizing, secret boundaries,
+# and Service Connect configuration are in services.tf.
+# The ecs-cluster module (cluster + namespace) is also declared in services.tf.

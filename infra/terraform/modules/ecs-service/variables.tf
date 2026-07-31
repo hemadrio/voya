@@ -164,3 +164,51 @@ variable "target_group_arn" {
   description = "ARN of the ALB target group to attach the ECS service to. Leave empty to skip load balancer registration."
   default     = ""
 }
+
+# ── Service Connect ───────────────────────────────────────────────────────────
+
+variable "service_connect_namespace_arn" {
+  type        = string
+  description = "ARN of the Cloud Map HTTP namespace created by the ecs-cluster module. Required when enable_service_connect=true."
+  default     = ""
+}
+
+variable "enable_service_connect" {
+  type        = bool
+  description = "Enable ECS Service Connect for east-west mTLS routing within the cluster namespace."
+  default     = false
+}
+
+variable "service_connect_port_name" {
+  type        = string
+  description = "Name for the Service Connect port mapping. Defaults to the service name."
+  default     = ""
+}
+
+variable "service_connect_discovery_name" {
+  type        = string
+  description = "Service Connect client alias — the DNS name other services use to reach this one. Defaults to service_name."
+  default     = ""
+}
+
+# ── SQS permissions (task role) ───────────────────────────────────────────────
+
+variable "sqs_producer_queue_arns" {
+  type        = list(string)
+  description = "SQS queue ARNs the service may send messages to (sqs:SendMessage). Specific ARNs only — no wildcards."
+  default     = []
+}
+
+variable "sqs_consumer_queue_arns" {
+  type        = list(string)
+  description = "SQS queue ARNs the service may receive and delete messages from (sqs:ReceiveMessage, sqs:DeleteMessage, sqs:GetQueueAttributes). Specific ARNs only."
+  default     = []
+}
+
+# ── Health check tuning ───────────────────────────────────────────────────────
+
+variable "health_check_start_period" {
+  type        = number
+  description = "Seconds ECS waits before the container healthCheck starts counting failures. Must exceed Prisma client init time."
+  default     = 45
+}

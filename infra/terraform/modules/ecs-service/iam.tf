@@ -172,3 +172,59 @@ resource "aws_iam_role_policy" "telemetry" {
   role   = aws_iam_role.task_role.id
   policy = data.aws_iam_policy_document.telemetry.json
 }
+
+# ── SQS producer policy ───────────────────────────────────────────────────────
+# Attached only to services that produce messages (booking, payment, ai-orchestration).
+# Specific queue ARNs only — no wildcards (policy A01 least privilege).
+
+data "aws_iam_policy_document" "sqs_producer" {
+  count = length(var.sqs_producer_queue_arns) > 0 ? 1 : 0
+
+  statement {
+    sid    = "SQSProducer"
+    effect = "Allow"
+
+    actions = [
+      "sqs:SendMessage",
+      "sqs:GetQueueAttributes",
+    ]
+
+    resources = var.sqs_producer_queue_arns
+  }
+}
+
+resource "aws_iam_role_policy" "sqs_producer" {
+  count  = length(var.sqs_producer_queue_arns) > 0 ? 1 : 0
+  name   = "sqs-producer"
+  role   = aws_iam_role.task_role.id
+  policy = data.aws_iam_policy_document.sqs_producer[0].json
+}
+
+# ── SQS consumer policy ───────────────────────────────────────────────────────
+# Attached only to notification-consumer (and any future consumer services).
+# Specific queue ARNs only — no wildcards.
+
+data "aws_iam_policy_document" "sqs_consumer" {
+  count = length(var.sqs_consumer_queue_arns) > 0 ? 1 : 0
+
+  statement {
+    sid    = "SQSConsumer"
+    effect = "Allow"
+
+    actions = [
+      "sqs:ReceiveMessage",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:ChangeMessageVisibility",
+    ]
+
+    resources = var.sqs_consumer_queue_arns
+  }
+}
+
+resource "aws_iam_role_policy" "sqs_consumer" {
+  count  = length(var.sqs_consumer_queue_arns) > 0 ? 1 : 0
+  name   = "sqs-consumer"
+  role   = aws_iam_role.task_role.id
+  policy = data.aws_iam_policy_document.sqs_consumer[0].json
+}

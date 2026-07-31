@@ -36,6 +36,10 @@ locals {
   # Read collector config at plan time; the ADOT container substitutes
   # ${AWS_DEFAULT_REGION} at runtime from the container environment.
   collector_config = file("${path.module}/collector-config.yaml")
+
+  # Service Connect: resolved names default to the service name when not overridden.
+  sc_port_name       = var.service_connect_port_name != "" ? var.service_connect_port_name : var.service_name
+  sc_discovery_name  = var.service_connect_discovery_name != "" ? var.service_connect_discovery_name : var.service_name
 }
 
 resource "aws_ecs_task_definition" "service" {
@@ -56,8 +60,12 @@ resource "aws_ecs_task_definition" "service" {
 
       portMappings = [
         {
+          name          = local.sc_port_name
           containerPort = var.port
           protocol      = "tcp"
+          # appProtocol must be "http" for Service Connect to proxy HTTP/1.1;
+          # set to "http2" for gRPC services.
+          appProtocol = "http"
         }
       ]
 
@@ -84,7 +92,9 @@ resource "aws_ecs_task_definition" "service" {
         interval    = 30
         timeout     = 5
         retries     = 3
-        startPeriod = 60
+        # 45 s covers Prisma client init + connection pool warm-up.
+        # Increase via health_check_start_period for services with slow cold starts.
+        startPeriod = var.health_check_start_period
       }
     },
     {
@@ -155,6 +165,29 @@ resource "aws_ecs_service" "service" {
   deployment_circuit_breaker {
     enable   = true
     rollback = true
+  }
+
+  # Service Connect — east-west mTLS routing within the cluster namespace.
+  # When enabled, ECS injects a proxy sidecar that intercepts outbound calls
+  # on the Service Connect port and routes them over mTLS. Inbound calls from
+  # other services arrive on the service_connect_configuration client_alias port.
+  dynamic "service_connect_configuration" {
+    for_each = var.enable_service_connect && var.service_connect_namespace_arn != "" ? [1] : []
+    content {
+      enabled   = true
+      namespace = var.service_connect_namespace_arn
+
+      service {
+        port_name      = local.sc_port_name
+        discovery_name = local.sc_discovery_name
+
+        client_alias {
+          # Internal port other services use when calling this service by alias.
+          port     = var.port
+          dns_name = local.sc_discovery_name
+        }
+      }
+    }
   }
 
   tags = merge(var.common_tags, {
