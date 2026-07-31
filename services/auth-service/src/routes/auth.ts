@@ -1,10 +1,10 @@
 /**
  * Auth service routes — register, login, refresh, logout, OAuth callback,
- * session management, forgot-password, and reset-password.
+ * session management, forgot-password, reset-password, verify-email, and
+ * resend-verification.
  *
  * Protected routes use requireAuth to extract the actor context forwarded by
- * the api-gateway.  Public routes (register, login, refresh, forgot/reset
- * password) rely on Zod schema validation only.
+ * the api-gateway.  Public routes rely on Zod schema validation only.
  *
  * Every route (except GET /health) validates its input via validateRequest
  * before any domain call, so unauthenticated requests still return 400 for
@@ -18,6 +18,9 @@ import {
   OAuthCallbackRequestSchema,
   ForgotPasswordRequestSchema,
   ResetPasswordRequestSchema,
+  VerifyEmailRequestSchema,
+  ResendVerificationRequestSchema,
+  REGISTRATION_ACCEPTED_MESSAGE,
 } from "@travel/contracts";
 import { validateRequest } from "../../../../shared/middleware/validateRequest.js";
 import { requireAuth } from "../middleware/requireAuth.js";
@@ -37,11 +40,15 @@ const validateRefresh = validateRequest({ body: RefreshRequestSchema });
 const validateOAuthCallback = validateRequest({ query: OAuthCallbackRequestSchema });
 const validateForgotPassword = validateRequest({ body: ForgotPasswordRequestSchema });
 const validateResetPassword = validateRequest({ body: ResetPasswordRequestSchema });
+const validateVerifyEmail = validateRequest({ body: VerifyEmailRequestSchema });
+const validateResendVerification = validateRequest({ body: ResendVerificationRequestSchema });
 
 // Default rate limiter: 5 requests per 15 minutes per key (email+IP).
 // In production, replace with a Redis-backed limiter injected via createAuthRouter options.
+const defaultRegisterLimiter = createInMemoryRateLimiter({ maxHits: 5, windowSeconds: 900 });
 const defaultForgotPasswordLimiter = createInMemoryRateLimiter({ maxHits: 5, windowSeconds: 900 });
 const defaultResetPasswordLimiter = createInMemoryRateLimiter({ maxHits: 10, windowSeconds: 900 });
+const defaultResendVerificationLimiter = createInMemoryRateLimiter({ maxHits: 5, windowSeconds: 900 });
 
 // ---------------------------------------------------------------------------
 // Domain interface
@@ -58,6 +65,8 @@ export interface AuthDomain {
   deleteSession(params: { sessionId: string; userId: string; currentSid: string }): Promise<void>;
   forgotPassword(params: { email: string }): Promise<void>;
   resetPassword(params: { token: string; password: string }): Promise<void>;
+  verifyEmail(params: { token: string }): Promise<unknown>;
+  resendVerification(params: { email: string }): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,10 +91,14 @@ function clearRefreshCookie(res: Response): void {
 
 export interface AuthRouterOptions {
   domain: AuthDomain;
+  /** Override default in-memory rate limiter for registration (e.g. Redis-backed). */
+  registerLimiter?: RateLimiter;
   /** Override default in-memory rate limiter for forgot-password (e.g. Redis-backed). */
   forgotPasswordLimiter?: RateLimiter;
   /** Override default in-memory rate limiter for reset-password. */
   resetPasswordLimiter?: RateLimiter;
+  /** Override default in-memory rate limiter for resend-verification. */
+  resendVerificationLimiter?: RateLimiter;
   /**
    * Login attempt guard enforcing per-account lockout (5 failures / 15 min).
    * When omitted, account lockout is not enforced (unsafe outside tests).
@@ -100,15 +113,30 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
       : { domain: domainOrOptions as AuthDomain };
 
   const { domain, loginAttemptGuard } = options;
+  const regLimiter = options.registerLimiter ?? defaultRegisterLimiter;
   const fpLimiter = options.forgotPasswordLimiter ?? defaultForgotPasswordLimiter;
   const rpLimiter = options.resetPasswordLimiter ?? defaultResetPasswordLimiter;
+  const rvLimiter = options.resendVerificationLimiter ?? defaultResendVerificationLimiter;
+
+  function normalizedEmailAndIp(req: Request): { email: string; ip: string } {
+    const body = req.body as Record<string, unknown> | undefined;
+    const email = (typeof body?.["email"] === "string" ? body["email"] : "").trim().toLowerCase();
+    const ip = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? "unknown";
+    return { email, ip };
+  }
+
+  const rateLimitRegister = createRateLimitMiddleware({
+    limiter: regLimiter,
+    getKey: (req) => {
+      const { email, ip } = normalizedEmailAndIp(req);
+      return `reg:${email}:${ip}`;
+    },
+  });
 
   const rateLimitForgotPassword = createRateLimitMiddleware({
     limiter: fpLimiter,
     getKey: (req) => {
-      const body = req.body as Record<string, unknown> | undefined;
-      const email = (typeof body?.["email"] === "string" ? body["email"] : "").toLowerCase();
-      const ip = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? "unknown";
+      const { email, ip } = normalizedEmailAndIp(req);
       return `fp:${email}:${ip}`;
     },
   });
@@ -121,14 +149,72 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
     },
   });
 
+  const rateLimitResendVerification = createRateLimitMiddleware({
+    limiter: rvLimiter,
+    getKey: (req) => {
+      const { email, ip } = normalizedEmailAndIp(req);
+      return `rv:${email}:${ip}`;
+    },
+  });
+
   const router = Router();
 
   // ── Public routes ──────────────────────────────────────────────────────────
 
-  router.post("/register", validateRegister, async (req: Request, res: Response): Promise<void> => {
-    const result = await domain.register(req.validated?.body);
-    res.status(201).json({ data: result });
-  });
+  router.post(
+    "/register",
+    rateLimitRegister,
+    validateRegister,
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        await domain.register(req.validated?.body);
+      } catch (err: unknown) {
+        // Password-policy violations are a domain concern; map to 422 here so
+        // the error handler does not need to know about this code.
+        if (
+          err instanceof Error &&
+          (err as { code?: unknown }).code === "POLICY_VIOLATION"
+        ) {
+          const violations =
+            (err as { violations?: Array<{ rule: string; message: string }> }).violations ?? [];
+          res.status(422).json({
+            error: {
+              code: "PASSWORD_POLICY_VIOLATION",
+              message: (err as Error).message,
+              violations,
+            },
+            reference: req.correlationId ?? "unknown",
+          });
+          return;
+        }
+        throw err;
+      }
+      res.status(202).json({ message: REGISTRATION_ACCEPTED_MESSAGE });
+    },
+  );
+
+  // POST /auth/verify-email — consumes token, activates account
+  router.post(
+    "/verify-email",
+    validateVerifyEmail,
+    async (req: Request, res: Response): Promise<void> => {
+      const body = req.validated?.body as { token: string };
+      const result = await domain.verifyEmail({ token: body.token });
+      res.status(200).json(result);
+    },
+  );
+
+  // POST /auth/resend-verification — rate-limited, enumeration-safe 202
+  router.post(
+    "/resend-verification",
+    rateLimitResendVerification,
+    validateResendVerification,
+    async (req: Request, res: Response): Promise<void> => {
+      const body = req.validated?.body as { email: string };
+      await domain.resendVerification({ email: body.email });
+      res.status(202).json({ message: REGISTRATION_ACCEPTED_MESSAGE });
+    },
+  );
 
   router.post("/login", validateLogin, async (req: Request, res: Response): Promise<void> => {
     const body = req.validated?.body as { email?: string } | undefined;

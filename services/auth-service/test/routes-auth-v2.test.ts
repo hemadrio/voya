@@ -37,6 +37,8 @@ function makeDomain(): AuthDomain {
     deleteSession: vi.fn(async () => {}),
     forgotPassword: vi.fn(async () => {}),
     resetPassword: vi.fn(async () => {}),
+    verifyEmail: vi.fn(async () => ({ verified: true as const })),
+    resendVerification: vi.fn(async () => {}),
   };
 }
 

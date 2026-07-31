@@ -378,3 +378,10 @@
 - **Files:** 20 (+2239/-1)
 - **Duration:** 1073ss
 - **Approach:** Extended monitoring.tf and added five new Terraform files. All numeric thresholds are defined exactly once in locals.tf (ratified values: search p95 warning 3000ms/hard 5000ms, cache-hit 180ms, checkout 5000ms, assistant 2000ms, fault-rate 1%, SLO 99.5%, fast-burn 7.2%, slow-burn 3%, queue depth 100, oldest-message 300s). Three SNS severity topics created in sns.tf with a delivery-failure meta-alarm. Pino JSON log metric filters in monitoring-log-filters.tf cover VALIDATION_FAILED, ACCESS_DENIED, AUTH_FAILED, STRIPE_SIGNATURE_INVALID, ILLUSTRATIVE_EXPOSURE_UNFLAGGED, and ADOT_EXPORT_FAILED events — decoupling alerting from application code. monitoring-alarms.tf contains all new alarms (latency, fault-rate, SLO fast/slow-burn, security zero-tolerance, operational). Four journey dashboards in monitoring-dashboards.tf with p50/p95/p99 latency, request rate, fault rate, and availability SLO widget with inline burn-rate math documentation. Composite alarms dampen alarm storms during deployment rollbacks. Terraform check blocks in monitoring-assertions.tf validate runbook references, SNS actions, treat_missing_data, and threshold correctness at plan time.
+
+## WO-020: User Story: WO-020 - Build registration endpoint with email verification
+- **Status:** completed
+- **Commit:** `278d026`
+- **Files:** 14 (+1936/-26)
+- **Duration:** 1188ss
+- **Approach:** N/A

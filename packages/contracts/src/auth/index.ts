@@ -83,3 +83,32 @@ export const ResetPasswordRequestSchema = z
   })
   .strict();
 export type ResetPasswordRequest = z.infer<typeof ResetPasswordRequestSchema>;
+
+export const VerifyEmailRequestSchema = z
+  .object({
+    token: z.string().trim().min(1, { message: "Token must not be empty" }),
+  })
+  .strict();
+export type VerifyEmailRequest = z.infer<typeof VerifyEmailRequestSchema>;
+
+export const ResendVerificationRequestSchema = z
+  .object({
+    email: emailSchema,
+  })
+  .strict();
+export type ResendVerificationRequest = z.infer<typeof ResendVerificationRequestSchema>;
+
+/** Generic 202 registration/resend response — identical for all branches (enumeration-safe). */
+export const RegistrationAcceptedSchema = z.object({
+  message: z.string(),
+});
+export type RegistrationAccepted = z.infer<typeof RegistrationAcceptedSchema>;
+
+export const REGISTRATION_ACCEPTED_MESSAGE =
+  "If the address is valid you will receive a verification email.";
+
+/** 200 response for successful email verification. */
+export const VerifyEmailResponseSchema = z.object({
+  verified: z.literal(true),
+});
+export type VerifyEmailResponse = z.infer<typeof VerifyEmailResponseSchema>;

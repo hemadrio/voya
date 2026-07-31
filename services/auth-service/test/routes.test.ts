@@ -21,6 +21,8 @@ function makeDomain(): AuthDomain {
     deleteSession: vi.fn(async () => {}),
     forgotPassword: vi.fn(async () => {}),
     resetPassword: vi.fn(async () => {}),
+    verifyEmail: vi.fn(async () => ({ verified: true as const })),
+    resendVerification: vi.fn(async () => {}),
   };
 }
 
@@ -68,12 +70,12 @@ describe("POST /auth/register — validation", () => {
     expect(domain.register).not.toHaveBeenCalled();
   });
 
-  it("valid register payload calls domain and returns 201", async () => {
+  it("valid register payload calls domain and returns 202", async () => {
     const domain = makeDomain();
     const app = createApp(domain);
     const res = await request(app).post("/auth/register").send(VALID_REGISTER);
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(202);
     expect(domain.register).toHaveBeenCalledOnce();
   });
 });

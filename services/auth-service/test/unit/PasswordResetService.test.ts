@@ -24,6 +24,8 @@ function makeMailer(): Mailer {
   return {
     sendPasswordResetLink: vi.fn(async () => {}),
     sendPasswordChangedNotice: vi.fn(async () => {}),
+    sendVerificationEmail: vi.fn(async () => {}),
+    sendRegistrationAttemptNotice: vi.fn(async () => {}),
   };
 }
 

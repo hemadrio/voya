@@ -79,13 +79,16 @@ export interface RateLimitMiddlewareOptions {
 export function createRateLimitMiddleware(opts: RateLimitMiddlewareOptions) {
   return function rateLimitMiddleware(
     req: { headers: Record<string, string | string[] | undefined>; body?: unknown },
-    _res: unknown,
+    res: { set?(header: string, value: string): unknown },
     next: (err?: unknown) => void,
   ): void {
     const key = opts.getKey(req);
     const retryAfterSeconds = opts.limiter.check(key);
 
     if (retryAfterSeconds > 0) {
+      // Set the Retry-After header before handing off to the error handler so
+      // clients can back off without parsing the JSON body.
+      res.set?.("Retry-After", String(retryAfterSeconds));
       const err = rateLimited(`Too many requests. Try again in ${retryAfterSeconds} seconds.`);
       next(err);
       return;
