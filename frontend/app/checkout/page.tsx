@@ -8,7 +8,14 @@
  * offer.provenance !== "ILLUSTRATIVE".  An offer that fails either
  * condition must never reach this page — the search page and OfferCard
  * structurally prevent the route from being reached.
+ *
+ * WO-071: Pricing and checkout responses must never be cached.
+ * This directive, combined with Cache-Control: no-store headers in next.config.js,
+ * ensures checkout data is always fetched fresh from the origin.
  */
+
+// Explicitly opt out of Next.js data cache for pricing / checkout data (WO-071 AC5).
+export const dynamic = "force-dynamic";
 
 import type { CreateBookingRequest, BookingResponse } from "@travel/contracts/booking";
 import type { Offer } from "@travel/contracts/search";

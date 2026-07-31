@@ -203,3 +203,10 @@
 - **Files:** 29 (+2722/-23)
 - **Duration:** 968ss
 - **Approach:** Implemented a complete auth and session management layer for the Next.js 14 App Router frontend. Token material is confined exclusively to an HMAC-SHA256 signed httpOnly cookie — it never reaches localStorage, sessionStorage, or any non-httpOnly cookie. Server actions own all token exchange and cookie writes. A client-side SessionProvider is hydrated from a stripped ClientSession (user profile + expiry, no tokens) rendered server-side. The API client's 401 path was extended to support an async retry-capable On401Handler, wiring in a single-flight refresh helper that deduplicates concurrent 401 responses via a shared Promise. Middleware reads the signed cookie directly (no DB call) and redirects unauthenticated visitors to /sign-in with a sanitized returnTo parameter.
+
+## WO-071: User Story: WO-071 - Harden web performance, accessibility, SEO, and observability
+- **Status:** completed
+- **Commit:** `b5c0a7b`
+- **Files:** 28 (+2822/-9)
+- **Duration:** 957ss
+- **Approach:** Implemented the full WO-071 hardening pass across six domains: (1) Performance CI — lighthouserc.json with per-route budgets (LCP≤2500ms, CLS≤0.1, TBT≤300ms, bytes≤512KB) and @next/bundle-analyzer behind ANALYZE flag; (2) Image optimization and security headers in next.config.js plus Cache-Control: no-store for /checkout and /account, supplemented by force-dynamic exports in those pages; (3) SEO — JSON-LD serializers for Organization/BreadcrumbList/LodgingBusiness/Product/FAQPage (aggregateRating omitted for zero reviews), noindex metadata for checkout/account/auth, dynamic sitemap with locale alternates, robots.ts; (4) Observability — Core Web Vitals reporter via sendBeacon, error reporter with PII scrubbing and release tagging; (5) Analytics — typed event schema with PII scrubber removing TOKEN_KEYS/PAYMENT_KEYS and masking emails/card numbers, batching client with pagehide flush; (6) Testing — axe-core helper, Playwright e2e specs for auth/booking/cancellation, and unit tests for all new modules.

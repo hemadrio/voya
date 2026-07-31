@@ -3,7 +3,14 @@
  *
  * All user and preference types are imported from @travel/contracts.
  * No local shape is declared for any platform payload.
+ *
+ * WO-071: Account/profile responses must never be cached.
+ * This directive, combined with Cache-Control: no-store headers in next.config.js,
+ * ensures account data is always fetched fresh from the origin.
  */
+
+// Explicitly opt out of Next.js data cache for account / profile data (WO-071 AC5).
+export const dynamic = "force-dynamic";
 
 import type { Profile, TravelPreferences } from "@travel/contracts/user";
 import type { ApiResult } from "../../types/index.js";
