@@ -16,6 +16,11 @@ function makeDomain(): AuthDomain {
     refresh: vi.fn(async () => ({ accessToken: "new-tok" })),
     logout: vi.fn(async () => {}),
     oauthCallback: vi.fn(async () => ({ userId: "u1", accessToken: "tok" })),
+    logoutAll: vi.fn(async () => ({ revokedCount: 1 })),
+    listSessions: vi.fn(async () => ({ sessions: [] })),
+    deleteSession: vi.fn(async () => {}),
+    forgotPassword: vi.fn(async () => {}),
+    resetPassword: vi.fn(async () => {}),
   };
 }
 

@@ -33,6 +33,9 @@ export {
   supplierTimeout,
   egressDenied,
   offerNotBookable,
+  invalidOrExpiredToken,
+  passwordReuseNotAllowed,
+  sessionNotFound,
 } from "./domain-errors.js";
 
 export { serialiseError, RESTRICTED_FIELDS } from "./serialise.js";

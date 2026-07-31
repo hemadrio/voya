@@ -11,7 +11,8 @@
   "dependencies": {
     "@travel/contracts": "workspace:*",
     "@travel/observability": "workspace:*",
-    "express": "catalog:"
+    "express": "catalog:",
+    "@prisma/client": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",

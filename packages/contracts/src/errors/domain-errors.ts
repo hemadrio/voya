@@ -119,3 +119,24 @@ export function offerNotBookable(
 ): DomainError {
   return new DomainErrorImpl("OFFER_NOT_BOOKABLE", message, field);
 }
+
+/** 400 — password reset token is unknown, expired, or already consumed. */
+export function invalidOrExpiredToken(
+  message = "The reset token is invalid, expired, or has already been used.",
+): DomainError {
+  return new DomainErrorImpl("INVALID_OR_EXPIRED_TOKEN", message);
+}
+
+/** 422 — the supplied password is identical to the current stored password. */
+export function passwordReuseNotAllowed(
+  message = "New password must differ from the current password.",
+): DomainError {
+  return new DomainErrorImpl("PASSWORD_REUSE_NOT_ALLOWED", message, "password");
+}
+
+/** 404 — the session id does not exist or does not belong to the caller. */
+export function sessionNotFound(
+  message = "Session not found.",
+): DomainError {
+  return new DomainErrorImpl("SESSION_NOT_FOUND", message);
+}

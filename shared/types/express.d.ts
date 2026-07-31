@@ -21,11 +21,25 @@ interface RequestChildLogger {
   child(bindings: Record<string, string>): RequestChildLogger;
 }
 
+/** Actor context forwarded by the api-gateway as x-internal-actor. */
+interface ActorContext {
+  sub: string;
+  sid: string;
+  roles: string[];
+  jti: string;
+}
+
 declare global {
   namespace Express {
     interface Request {
       /** Parsed and coerced inputs set by `validateRequest` on success. */
       validated?: ValidatedData;
+
+      /**
+       * Verified actor context — set by requireAuth middleware after parsing
+       * the x-internal-actor header forwarded by the api-gateway.
+       */
+      actor?: ActorContext;
 
       /**
        * Resolved correlation identifier — set by correlationIdMiddleware.

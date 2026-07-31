@@ -65,3 +65,18 @@ export const AuthResponseSchema = z
   })
   .strict();
 export type AuthResponse = z.infer<typeof AuthResponseSchema>;
+
+export const ForgotPasswordRequestSchema = z
+  .object({
+    email: emailSchema,
+  })
+  .strict();
+export type ForgotPasswordRequest = z.infer<typeof ForgotPasswordRequestSchema>;
+
+export const ResetPasswordRequestSchema = z
+  .object({
+    token: z.string().trim().min(1, { message: "Token must not be empty" }),
+    password: passwordSchema,
+  })
+  .strict();
+export type ResetPasswordRequest = z.infer<typeof ResetPasswordRequestSchema>;

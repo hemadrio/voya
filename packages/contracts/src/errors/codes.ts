@@ -50,6 +50,12 @@ export const ErrorCode = {
   TOKEN_REVOKED: "TOKEN_REVOKED",
   /** 403 — state-changing request lacks a valid CSRF double-submit token. */
   CSRF_FAILED: "CSRF_FAILED",
+  /** 400 — password reset token is unknown, expired, or already consumed. */
+  INVALID_OR_EXPIRED_TOKEN: "INVALID_OR_EXPIRED_TOKEN",
+  /** 422 — the supplied password matches the current stored hash. */
+  PASSWORD_REUSE_NOT_ALLOWED: "PASSWORD_REUSE_NOT_ALLOWED",
+  /** 404 — the session id does not exist or does not belong to the caller. */
+  SESSION_NOT_FOUND: "SESSION_NOT_FOUND",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -83,6 +89,9 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   OFFER_NOT_BOOKABLE: 422,
   TOKEN_REVOKED: 401,
   CSRF_FAILED: 403,
+  INVALID_OR_EXPIRED_TOKEN: 400,
+  PASSWORD_REUSE_NOT_ALLOWED: 422,
+  SESSION_NOT_FOUND: 404,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

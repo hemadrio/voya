@@ -32,8 +32,13 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  bookings Booking[]
-  sessions Session[]
+  // WO-024 additions — lockout state cleared on successful password reset
+  failedAttemptCount Int       @default(0) @map("failed_attempt_count")
+  lockedUntil        DateTime? @map("locked_until") @db.Timestamptz
+
+  bookings      Booking[]
+  sessions      Session[]
+  oneTimeTokens OneTimeToken[]
 
   @@map("users")
 }
@@ -45,9 +50,44 @@ model Session {
   expiresAt DateTime @map("expires_at") @db.Timestamptz
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
+  // WO-024 additions — all nullable for backward compatibility with existing rows
+  refreshTokenHash String?   @map("refresh_token_hash")
+  familyId         String?   @map("family_id") @db.Uuid
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
+  ipAddress        String?   @map("ip_address") @db.VarChar(45)
+  userAgent        String?   @map("user_agent") @db.VarChar(512)
+  lastSeenAt       DateTime? @map("last_seen_at") @db.Timestamptz
+
   user User @relation(fields: [userId], references: [id])
 
+  @@index([userId, revokedAt], map: "idx_sessions_user_revoked")
   @@map("sessions")
+}
+
+// ---------------------------------------------------------------------------
+// OneTimeToken — single-use hashed tokens for password reset and verification
+// ---------------------------------------------------------------------------
+
+/// Single-use hashed tokens for password reset (and future purposes).
+///
+/// Only the SHA-256 hash of the raw token is stored — the raw value is
+/// never persisted and must never appear in logs or responses.
+///
+/// consumed_at is set atomically when the token is first used; subsequent
+/// attempts to use a token with a non-null consumed_at are rejected.
+model OneTimeToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  purpose    String    @db.VarChar(64)
+  tokenHash  String    @unique @map("token_hash") @db.Char(64)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, purpose, consumedAt], map: "idx_ott_user_purpose_consumed")
+  @@map("one_time_tokens")
 }
 
 // ---------------------------------------------------------------------------
