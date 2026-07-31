@@ -2,14 +2,15 @@
   "name": "itinerary-service",
   "version": "0.1.0",
   "private": true,
-  "description": "Itinerary service \u2014 aggregates bookings into user itineraries.",
+  "description": "Itinerary service — aggregates bookings into user itineraries.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@travel/contracts": "workspace:*"
+    "@travel/contracts": "workspace:*",
+    "@travel/observability": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:",

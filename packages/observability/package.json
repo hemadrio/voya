@@ -29,6 +29,15 @@
   },
   "dependencies": {
     "@opentelemetry/api": "catalog:",
+    "@opentelemetry/sdk-node": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/auto-instrumentations-node": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:",
+    "@opentelemetry/propagator-aws-xray": "catalog:",
+    "@opentelemetry/id-generator-aws-xray": "catalog:",
     "pino": "catalog:"
   },
   "devDependencies": {

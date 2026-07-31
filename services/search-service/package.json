@@ -2,7 +2,7 @@
   "name": "search-service",
   "version": "0.1.0",
   "private": true,
-  "description": "Search service \u2014 aggregates offers from Amadeus and RapidAPI suppliers.",
+  "description": "Search service — aggregates offers from Amadeus and RapidAPI suppliers.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@travel/contracts": "workspace:*",
+    "@travel/observability": "workspace:*",
     "express": "catalog:"
   },
   "devDependencies": {
