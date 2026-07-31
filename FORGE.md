@@ -294,3 +294,10 @@
 - **Files:** 16 (+2713/-1)
 - **Duration:** 845ss
 - **Approach:** Implemented the identity schema as four additive migrations layers: (1) forward SQL migration 0009 adding UserStatus/CredentialType enums, credentials table, RBAC tables, email_verified_at/display_name/status columns on users, rotated_from_session_id on sessions, and a functional lower(email) unique index; (2) corresponding rollback migration using IF EXISTS guards throughout; (3) Prisma schema updated with five new models (Credential, Role, Permission, RolePermission, UserRoleEntry) and new enum types; (4) four typed repository modules following hexagonal architecture with duck-typed DB client interfaces, enforcing the security invariant that secret_hash is never returned by default selects.
+
+## WO-019: User Story: WO-019 - Implement password hashing and credential service
+- **Status:** completed
+- **Commit:** `15d8769`
+- **Files:** 7 (+1592/-0)
+- **Duration:** 581ss
+- **Approach:** Implemented CredentialService as a hexagonal-architecture domain service. hashPassword uses Node.js built-in crypto.scrypt (memory-hard, no extra dependency) with a PHC-inspired format encoding cost params inline: $scrypt$n=N,r=r,p=p,kl=kl$hex-salt$hex-hash. verifyPassword is constant-time via timingSafeEqual, handles null storedHash (unknown-user path) by running a dummy comparison against a precomputed hash for timing equalization, and detects needsRehash by comparing stored params against current config. Policy validation returns structured violations. Lockout uses atomic Prisma increment with exponential backoff. A separate config module provides production vs test cost parameters. All DB operations are injected via duck-typed interfaces.
