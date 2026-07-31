@@ -1,0 +1,89 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.7.0",
+  "resource_changes": [
+    {
+      "address": "module.network.aws_vpc.main",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_vpc",
+      "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "cidr_block": "10.0.0.0/16",
+          "enable_dns_hostnames": true,
+          "tags": {},
+          "tags_all": {
+            "Service": "travel-platform",
+            "Environment": "production",
+            "CostCentre": "platform-prod",
+            "Owner": "platform-team",
+            "DataClassification": "Confidential"
+          }
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "module.cache.aws_elasticache_replication_group.main",
+      "module_address": "module.cache",
+      "mode": "managed",
+      "type": "aws_elasticache_replication_group",
+      "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "replication_group_id": "production-travel-platform",
+          "node_type": "cache.r7g.large",
+          "tags": {},
+          "tags_all": {
+            "Service": "travel-platform",
+            "Environment": "production",
+            "CostCentre": "platform-prod",
+            "Owner": "platform-team",
+            "DataClassification": "Confidential"
+          }
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_iam_role_policy_attachment.ecs_task_execution",
+      "mode": "managed",
+      "type": "aws_iam_role_policy_attachment",
+      "name": "ecs_task_execution",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "role": "production-booking-service-execution",
+          "policy_arn": "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_route53_record.api",
+      "mode": "managed",
+      "type": "aws_route53_record",
+      "name": "api",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "api.travel-platform.example.com",
+          "type": "A",
+          "zone_id": "Z1234567890"
+        },
+        "after_unknown": {}
+      }
+    }
+  ]
+}

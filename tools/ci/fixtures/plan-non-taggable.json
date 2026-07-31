@@ -1,0 +1,87 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.7.0",
+  "resource_changes": [
+    {
+      "address": "aws_iam_role_policy_attachment.ecs_execution",
+      "mode": "managed",
+      "type": "aws_iam_role_policy_attachment",
+      "name": "ecs_execution",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "role": "production-ecs-execution",
+          "policy_arn": "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_route.private_to_nat",
+      "mode": "managed",
+      "type": "aws_route",
+      "name": "private_to_nat",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "route_table_id": "rtb-0abc123",
+          "destination_cidr_block": "0.0.0.0/0",
+          "nat_gateway_id": "nat-0abc123"
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_route_table_association.private_a",
+      "mode": "managed",
+      "type": "aws_route_table_association",
+      "name": "private_a",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "route_table_id": "rtb-0abc123",
+          "subnet_id": "subnet-0abc123"
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_appautoscaling_policy.booking_service_cpu",
+      "mode": "managed",
+      "type": "aws_appautoscaling_policy",
+      "name": "booking_service_cpu",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "production-booking-service-cpu-scaling",
+          "policy_type": "TargetTrackingScaling",
+          "resource_id": "service/production-travel-platform/production-booking-service"
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "data.aws_vpc.selected",
+      "mode": "data",
+      "type": "aws_vpc",
+      "name": "selected",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["read"],
+        "before": null,
+        "after": {
+          "id": "vpc-0abc123"
+        },
+        "after_unknown": {}
+      }
+    }
+  ]
+}

@@ -427,3 +427,38 @@ stages:
       Terraform validate + plan for production. Apply requires manual approval
       from a reviewer who is NOT the PR author, plus a second approval from a
       security engineer (separation of duty).
+
+  # ── 12. Tag policy check (WO-089) ────────────────────────────────────────
+  #   Consumes the binary plan files produced by tf-plan-staging and
+  #   tf-plan-production, converts them to JSON via terraform show -json,
+  #   and pipes each to tools/ci/tag-policy.ts.
+  #
+  #   Fails (blocking) when any taggable resource would be created or updated
+  #   without all five mandatory tags: Service, Environment, CostCentre,
+  #   Owner, DataClassification.
+  #
+  #   Non-taggable resource types (e.g. aws_iam_role_policy_attachment,
+  #   aws_route, aws_appautoscaling_policy) are skipped via the allow-list
+  #   in tools/ci/tag-policy.ts.  Adding a new exemption requires a code
+  #   review referencing AWS documentation confirming the resource type
+  #   does not accept tags.
+  - name: tag:policy-check
+    run: |
+      set -euo pipefail
+      echo "[tag-policy] Checking staging plan..."
+      terraform -chdir=infra/terraform/envs/staging show -json tfplan.staging \
+        | npx tsx tools/ci/tag-policy.ts
+      echo "[tag-policy] Checking production plan..."
+      terraform -chdir=infra/terraform/envs/production show -json tfplan.production \
+        | npx tsx tools/ci/tag-policy.ts
+    dependsOn:
+      - tf-plan-staging
+      - tf-plan-production
+    blocking: true
+    description: >
+      Tag policy gate — fails when any taggable AWS resource in the staging or
+      production Terraform plan is missing one or more of the five mandatory
+      cost allocation tags (Service, Environment, CostCentre, Owner,
+      DataClassification).  Names the resource address and missing tags in the
+      failure output.  See docs/governance/tagging.md for permitted values and
+      the exemption process.

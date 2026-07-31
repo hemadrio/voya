@@ -1,0 +1,51 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.7.0",
+  "resource_changes": [
+    {
+      "address": "module.network.aws_vpc.main",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_vpc",
+      "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "cidr_block": "10.0.0.0/16",
+          "tags": {},
+          "tags_all": {
+            "Service": "travel-platform",
+            "Environment": "production",
+            "CostCentre": "platform-prod",
+            "Owner": "platform-team"
+          }
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_security_group.ecs_tasks",
+      "mode": "managed",
+      "type": "aws_security_group",
+      "name": "ecs_tasks",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "production-ecs-tasks",
+          "tags": {},
+          "tags_all": {
+            "Service": "travel-platform",
+            "Environment": "production",
+            "Owner": "platform-team",
+            "DataClassification": "Confidential"
+          }
+        },
+        "after_unknown": {}
+      }
+    }
+  ]
+}
