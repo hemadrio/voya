@@ -1,0 +1,6 @@
+{
+  "cabinClass": "ECONOMY",
+  "minHotelStars": 3,
+  "carClass": "ECONOMY",
+  "homeAirports": ["LHR", "LGW"]
+}

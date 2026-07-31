@@ -1,0 +1,86 @@
+[
+  {
+    "id": "rapidapi-car-001",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "RapidAPI Economy Car JFK",
+    "price": 45.00,
+    "currency": "USD",
+    "details": {
+      "supplier": "RAPIDAPI",
+      "vehicleClass": "ECONOMY",
+      "rentalDays": 3,
+      "dailyRate": 15.00,
+      "totalPrice": 45.00
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "rapidapi-car-002",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "RapidAPI Compact Car JFK",
+    "price": 72.00,
+    "currency": "USD",
+    "details": {
+      "supplier": "RAPIDAPI",
+      "vehicleClass": "COMPACT",
+      "rentalDays": 3,
+      "dailyRate": 24.00,
+      "totalPrice": 72.00
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "rapidapi-car-003",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "RapidAPI Midsize Car JFK",
+    "price": 108.00,
+    "currency": "USD",
+    "details": {
+      "supplier": "RAPIDAPI",
+      "vehicleClass": "MIDSIZE",
+      "rentalDays": 3,
+      "dailyRate": 36.00,
+      "totalPrice": 108.00
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "rapidapi-car-004",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "RapidAPI Premium SUV JFK",
+    "price": 180.00,
+    "currency": "USD",
+    "details": {
+      "supplier": "RAPIDAPI",
+      "vehicleClass": "PREMIUM",
+      "rentalDays": 3,
+      "dailyRate": 60.00,
+      "totalPrice": 180.00
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "illustrative-car-001",
+    "provenance": "ILLUSTRATIVE",
+    "bookable": false,
+    "title": "Illustrative Economy Car",
+    "price": 35.00,
+    "currency": "USD",
+    "details": {
+      "supplier": "ILLUSTRATIVE",
+      "vehicleClass": "ECONOMY",
+      "rentalDays": 1,
+      "notBookableLabel": "This is an illustrative result — real inventory was unavailable."
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  }
+]

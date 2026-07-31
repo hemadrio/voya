@@ -1,0 +1,96 @@
+[
+  {
+    "id": "rapidapi-hotel-001",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "RapidAPI Budget Hotel NYC",
+    "price": 89.00,
+    "currency": "USD",
+    "rating": 3,
+    "reviews": 248,
+    "details": {
+      "supplier": "RAPIDAPI",
+      "propertyId": "prop-001",
+      "nightlyPrice": 89.00,
+      "totalPrice": 267.00,
+      "nights": 3,
+      "reviewScore": 7.2
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "rapidapi-hotel-002",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "RapidAPI Boutique Hotel NYC",
+    "price": 175.00,
+    "currency": "USD",
+    "rating": 4,
+    "reviews": 512,
+    "details": {
+      "supplier": "RAPIDAPI",
+      "propertyId": "prop-002",
+      "nightlyPrice": 175.00,
+      "totalPrice": 525.00,
+      "nights": 3,
+      "reviewScore": 8.4
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "rapidapi-hotel-003",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "RapidAPI Luxury Hotel NYC",
+    "price": 450.00,
+    "currency": "USD",
+    "rating": 5,
+    "reviews": 1024,
+    "details": {
+      "supplier": "RAPIDAPI",
+      "propertyId": "prop-003",
+      "nightlyPrice": 450.00,
+      "totalPrice": 1350.00,
+      "nights": 3,
+      "reviewScore": 9.2
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "illustrative-hotel-001",
+    "provenance": "ILLUSTRATIVE",
+    "bookable": false,
+    "title": "Illustrative Standard Hotel",
+    "price": 99.00,
+    "currency": "USD",
+    "rating": 3,
+    "details": {
+      "supplier": "ILLUSTRATIVE",
+      "nightlyPrice": 99.00,
+      "nights": 1,
+      "notBookableLabel": "This is an illustrative result — real inventory was unavailable."
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "rapidapi-hotel-no-rating",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "RapidAPI Hotel No Rating",
+    "price": 130.00,
+    "currency": "USD",
+    "details": {
+      "supplier": "RAPIDAPI",
+      "propertyId": "prop-004",
+      "nightlyPrice": 130.00,
+      "totalPrice": 390.00,
+      "nights": 3
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  }
+]

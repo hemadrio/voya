@@ -1,0 +1,119 @@
+[
+  {
+    "id": "amadeus-flight-001",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "title": "Amadeus Economy Flight LHR-JFK",
+    "price": 299.99,
+    "currency": "USD",
+    "details": {
+      "supplier": "AMADEUS",
+      "cabinClass": "ECONOMY",
+      "stops": 0,
+      "durationMinutes": 435,
+      "departureAirport": "LHR",
+      "arrivalAirport": "JFK"
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "amadeus-flight-002",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "title": "Amadeus Business Class Flight LHR-JFK",
+    "price": 1199.99,
+    "currency": "USD",
+    "details": {
+      "supplier": "AMADEUS",
+      "cabinClass": "BUSINESS",
+      "stops": 0,
+      "durationMinutes": 435,
+      "departureAirport": "LHR",
+      "arrivalAirport": "JFK"
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "rapidapi-flight-001",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "RapidAPI Economy Flight LHR-JFK",
+    "price": 249.50,
+    "currency": "USD",
+    "details": {
+      "supplier": "RAPIDAPI",
+      "cabinClass": "ECONOMY",
+      "stops": 1,
+      "durationMinutes": 600,
+      "departureAirport": "LHR",
+      "arrivalAirport": "JFK"
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "rapidapi-flight-002",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "RapidAPI Budget Flight LGW-JFK",
+    "price": 199.99,
+    "currency": "USD",
+    "details": {
+      "supplier": "RAPIDAPI",
+      "cabinClass": "ECONOMY",
+      "stops": 1,
+      "durationMinutes": 660,
+      "departureAirport": "LGW",
+      "arrivalAirport": "JFK"
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "illustrative-flight-001",
+    "provenance": "ILLUSTRATIVE",
+    "bookable": false,
+    "title": "Illustrative Economy Flight",
+    "price": 150.00,
+    "currency": "USD",
+    "details": {
+      "supplier": "ILLUSTRATIVE",
+      "cabinClass": "ECONOMY",
+      "stops": 0,
+      "durationMinutes": 435,
+      "notBookableLabel": "This is an illustrative result — real inventory was unavailable."
+    },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  },
+  {
+    "id": "amadeus-flight-expired",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "title": "Expired Amadeus Flight Offer",
+    "price": 99.99,
+    "currency": "USD",
+    "details": {
+      "supplier": "AMADEUS",
+      "cabinClass": "ECONOMY",
+      "stops": 0,
+      "durationMinutes": 435,
+      "departureAirport": "LHR",
+      "arrivalAirport": "JFK"
+    },
+    "expiresAt": "2020-01-01T00:00:00Z",
+    "freshness": "STALE"
+  },
+  {
+    "id": "invalid-offer-missing-title",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "price": 199.99,
+    "currency": "USD",
+    "details": { "supplier": "RAPIDAPI" },
+    "expiresAt": "2028-12-31T23:59:59Z",
+    "freshness": "FRESH"
+  }
+]
