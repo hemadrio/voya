@@ -96,6 +96,24 @@
       "outputs": []
     },
 
+    "contracts:compat": {
+      "dependsOn": ["@travel/contracts#build"],
+      "cache": false,
+      "outputs": []
+    },
+
+    "test:generic": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "tests/contract/**/*.ts",
+        "tests/contract/**/*.json",
+        "tests/contract/vitest.config.*",
+        "tests/contract/package.json"
+      ],
+      "outputs": ["tests/contract/coverage/**"],
+      "cache": false
+    },
+
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,

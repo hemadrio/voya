@@ -89,7 +89,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check:deps": "node ./scripts/check-dependency-boundary.mjs",
-    "generate:baselines": "tsx scripts/generate-baselines.ts"
+    "generate:baselines": "tsx scripts/generate-baselines.ts",
+    "contracts:compat": "tsx scripts/check-schema-compatibility.ts"
   },
   "dependencies": {
     "zod": "catalog:"

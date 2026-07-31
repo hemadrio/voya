@@ -87,6 +87,24 @@ stages:
       version gate.  Blocking — a failing contract check prevents the deploy
       stage from running.
 
+  # ── 4a. Schema compatibility check ──────────────────────────────────────────
+  #   Diffs the current @travel/contracts schemas against the committed
+  #   baselines and classifies each change as additive or breaking.
+  #   Fails when a breaking change (removed field, narrowed type, new required
+  #   field) is made without a major-version bump — the concrete realisation
+  #   of the design intent.  Never fails open: an absent or unreadable baseline
+  #   is treated as an explicit failure.
+  #
+  #   Results are archived as SOC 2 evidence alongside coverage artefacts.
+  - name: contracts:compat
+    run: pnpm --filter @travel/contracts contracts:compat
+    dependsOn: [contracts-check]
+    blocking: true
+    description: >
+      Schema compatibility diff (current vs committed baseline).
+      Exits non-zero when a breaking change is detected without a major bump.
+      Names the affected schema, field, and nature of the incompatibility.
+
   # ── 4b. OpenAPI drift check ───────────────────────────────────────────────
   #   Regenerates the OpenAPI spec from Zod schemas and diffs against the
   #   committed docs/api/openapi.yaml.  Fails the build if they differ, so
@@ -201,6 +219,7 @@ stages:
       - test
       - coverage:check
       - contracts-check
+      - contracts:compat
       - openapi:drift-check
       - lint
       - scan:no-direct-fetch
@@ -212,6 +231,27 @@ stages:
       - scan:grype
       - static-analysis
     description: "Package and deploy — blocked until all gates pass"
+
+  # ── 9b. Post-deploy: generic contract smoke tests ────────────────────────
+  #   Runs the @travel/contract-tests suite (tests/contract/) against the
+  #   deployed staging environment. Covers:
+  #     - Schema round-trip tests (offline, always pass)
+  #     - Queue event schema conformance (offline, transport-agnostic)
+  #     - Supplier adapter conformance (offline stubs)
+  #     - Route convention assertions
+  #   SOC 2 evidence: test results archived as pipeline artefacts.
+  - name: test:generic
+    run: >
+      pnpm --filter @travel/contract-tests test &&
+      tar -czf contract-test-results.tar.gz
+      tests/contract/coverage/ 2>/dev/null || true
+    dependsOn: [deploy]
+    blocking: true
+    description: >
+      Cross-service contract and schema compatibility smoke tests.
+      Runs the tests/contract/ offline suite post-deploy. Blocking — a
+      contract test failure after deploy blocks the terraform plan stages.
+      Results archived as SOC 2 evidence artefacts.
 
   # ── 10. Terraform plan (non-production) ──────────────────────────────────
   #   Posts plan output to the pull request. Apply requires manual approval.

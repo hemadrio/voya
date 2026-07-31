@@ -4,6 +4,7 @@ packages:
   - "frontend"
   - "tools/*"
   - "shared"
+  - "tests/*"
 
 # ── Dependency catalog ────────────────────────────────────────────────────────
 # Single source of truth for every shared runtime and tooling dependency.

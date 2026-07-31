@@ -1,0 +1,71 @@
+{
+  "_description": "Canned Amadeus flight offers for INSTANT flow conformance tests. Synthetic data only — BR-18.",
+  "offers": [
+    {
+      "id": "offer_amadeus_flight_001",
+      "provenance": "AMADEUS",
+      "bookable": true,
+      "title": "Nonstop LHR to JFK — Delta DL401",
+      "price": "682.50",
+      "currency": "USD",
+      "rating": 4.3,
+      "reviews": 2140,
+      "details": {
+        "airline": "Delta",
+        "flightNumber": "DL401",
+        "durationMinutes": 435,
+        "departureAirport": "LHR",
+        "arrivalAirport": "JFK",
+        "departureTime": "2028-03-15T09:30:00.000Z",
+        "arrivalTime": "2028-03-15T16:45:00.000Z",
+        "seatClass": "ECONOMY",
+        "stops": 0
+      },
+      "expiresAt": "2028-03-14T23:59:00.000Z",
+      "freshness": "FRESH"
+    },
+    {
+      "id": "offer_amadeus_flight_002",
+      "provenance": "AMADEUS",
+      "bookable": true,
+      "title": "One-stop LHR to JFK via CDG — Air France AF083",
+      "price": "534.00",
+      "currency": "USD",
+      "rating": 4.0,
+      "reviews": 987,
+      "details": {
+        "airline": "Air France",
+        "flightNumber": "AF083",
+        "durationMinutes": 570,
+        "departureAirport": "LHR",
+        "arrivalAirport": "JFK",
+        "departureTime": "2028-03-15T07:00:00.000Z",
+        "arrivalTime": "2028-03-15T16:30:00.000Z",
+        "seatClass": "ECONOMY",
+        "stops": 1,
+        "stopAirports": ["CDG"]
+      },
+      "expiresAt": "2028-03-14T23:59:00.000Z",
+      "freshness": "FRESH"
+    },
+    {
+      "id": "offer_amadeus_flight_003",
+      "provenance": "AMADEUS",
+      "bookable": false,
+      "title": "Sold-out LHR to JFK — BA BA177",
+      "price": "799.00",
+      "currency": "USD",
+      "details": {
+        "airline": "British Airways",
+        "flightNumber": "BA177",
+        "durationMinutes": 420,
+        "departureAirport": "LHR",
+        "arrivalAirport": "JFK",
+        "seatClass": "ECONOMY",
+        "stops": 0
+      },
+      "expiresAt": "2028-03-14T23:59:00.000Z",
+      "freshness": "STALE"
+    }
+  ]
+}

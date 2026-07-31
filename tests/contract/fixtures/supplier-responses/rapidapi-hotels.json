@@ -1,0 +1,49 @@
+{
+  "_description": "Canned RapidAPI hotel offers for RESERVE_THEN_CONFIRM flow conformance tests. Synthetic data only — BR-18.",
+  "offers": [
+    {
+      "id": "offer_rapidapi_hotel_001",
+      "provenance": "RAPIDAPI",
+      "bookable": true,
+      "title": "The Synthetic Grand Hotel — Manhattan",
+      "price": "289.00",
+      "currency": "USD",
+      "rating": 4.7,
+      "reviews": 3412,
+      "details": {
+        "hotelId": "SYNTH-HTL-001",
+        "location": "New York",
+        "checkInDate": "2028-03-15",
+        "checkOutDate": "2028-03-18",
+        "roomType": "STANDARD_DOUBLE",
+        "guests": 2,
+        "nights": 3,
+        "amenities": ["wifi", "gym", "pool"]
+      },
+      "expiresAt": "2028-03-14T18:00:00.000Z",
+      "freshness": "FRESH"
+    },
+    {
+      "id": "offer_rapidapi_hotel_002",
+      "provenance": "RAPIDAPI",
+      "bookable": true,
+      "title": "Synthetic Boutique Loft — Brooklyn",
+      "price": "185.00",
+      "currency": "USD",
+      "rating": 4.2,
+      "reviews": 861,
+      "details": {
+        "hotelId": "SYNTH-HTL-002",
+        "location": "Brooklyn, New York",
+        "checkInDate": "2028-03-15",
+        "checkOutDate": "2028-03-18",
+        "roomType": "LOFT_QUEEN",
+        "guests": 2,
+        "nights": 3,
+        "amenities": ["wifi", "breakfast"]
+      },
+      "expiresAt": "2028-03-14T18:00:00.000Z",
+      "freshness": "FRESH"
+    }
+  ]
+}

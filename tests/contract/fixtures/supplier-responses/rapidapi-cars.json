@@ -1,0 +1,53 @@
+{
+  "_description": "Canned RapidAPI car rental offers for ARI_PUSH flow conformance tests. Synthetic data only — BR-18.",
+  "offers": [
+    {
+      "id": "offer_rapidapi_car_001",
+      "provenance": "RAPIDAPI",
+      "bookable": true,
+      "title": "Economy Sedan — JFK Airport",
+      "price": "42.00",
+      "currency": "USD",
+      "rating": 3.9,
+      "reviews": 512,
+      "details": {
+        "vehicleId": "SYNTH-CAR-001",
+        "carClass": "ECONOMY",
+        "pickupLocation": "JFK",
+        "dropoffLocation": "JFK",
+        "pickupDate": "2028-03-15",
+        "dropoffDate": "2028-03-18",
+        "days": 3,
+        "supplier": "RapidRent",
+        "transmission": "AUTOMATIC",
+        "passengerCapacity": 4
+      },
+      "expiresAt": "2028-03-14T23:59:00.000Z",
+      "freshness": "FRESH"
+    },
+    {
+      "id": "offer_rapidapi_car_002",
+      "provenance": "RAPIDAPI",
+      "bookable": true,
+      "title": "Compact SUV — JFK Airport",
+      "price": "68.00",
+      "currency": "USD",
+      "rating": 4.1,
+      "reviews": 293,
+      "details": {
+        "vehicleId": "SYNTH-CAR-002",
+        "carClass": "SUV_COMPACT",
+        "pickupLocation": "JFK",
+        "dropoffLocation": "JFK",
+        "pickupDate": "2028-03-15",
+        "dropoffDate": "2028-03-18",
+        "days": 3,
+        "supplier": "RapidRent",
+        "transmission": "AUTOMATIC",
+        "passengerCapacity": 5
+      },
+      "expiresAt": "2028-03-14T23:59:00.000Z",
+      "freshness": "FRESH"
+    }
+  ]
+}
