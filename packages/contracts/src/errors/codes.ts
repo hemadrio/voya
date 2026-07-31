@@ -66,6 +66,8 @@ export const ErrorCode = {
   EMAIL_NOT_VERIFIED: "EMAIL_NOT_VERIFIED",
   /** 403 — account is suspended or deleted and cannot authenticate. */
   ACCOUNT_DISABLED: "ACCOUNT_DISABLED",
+  /** 410 — the offer existed but its expiresAt has passed; the booking flow must restart. */
+  OFFER_EXPIRED: "OFFER_EXPIRED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -107,11 +109,12 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   INVALID_CREDENTIALS: 401,
   EMAIL_NOT_VERIFIED: 403,
   ACCOUNT_DISABLED: 403,
+  OFFER_EXPIRED: 410,
 };
 
 /** Allowed HTTP statuses per the API contracts. */
 export const ALLOWED_HTTP_STATUSES = new Set([
-  400, 401, 403, 404, 409, 422, 429, 500, 502, 504,
+  400, 401, 403, 404, 409, 410, 422, 429, 500, 502, 504,
 ]);
 
 /**

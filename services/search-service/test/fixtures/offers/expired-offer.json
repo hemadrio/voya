@@ -1,0 +1,22 @@
+{
+  "offer": {
+    "id": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "Midsize - Ford Mondeo or similar",
+    "price": 200,
+    "currency": "EUR",
+    "details": {
+      "supplier": "RAPIDAPI",
+      "vehicleClass": "MIDSIZE",
+      "pickupLocation": "CDG",
+      "dropoffLocation": "CDG",
+      "totalPrice": 200
+    },
+    "expiresAt": "2020-01-01T00:00:00.000Z",
+    "freshness": "FRESH"
+  },
+  "generatedAt": 1577836800000,
+  "freshUntil": 1577837760000,
+  "category": "car"
+}

@@ -6,6 +6,7 @@ import type {
   CacheLogger,
   CacheMetrics,
   CachedSearchPayload,
+  OfferIndexEntry,
   SearchCacheConfig,
   SearchCacheRedisClient,
   SearchCategory,
@@ -15,6 +16,17 @@ import { SCHEMA_VERSION } from './types.js';
 // ---------------------------------------------------------------------------
 // Payload validation
 // ---------------------------------------------------------------------------
+
+function isValidOfferIndexEntry(value: unknown): value is OfferIndexEntry {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj['offer'] === 'object' && obj['offer'] !== null &&
+    typeof obj['generatedAt'] === 'number' &&
+    typeof obj['freshUntil'] === 'number' &&
+    typeof obj['category'] === 'string'
+  );
+}
 
 function isValidPayload(value: unknown): value is CachedSearchPayload {
   if (typeof value !== 'object' || value === null) return false;
@@ -112,6 +124,53 @@ export class SearchCacheRepository {
       await this.redis.setex(key, ttlSeconds, json);
     } catch {
       this.logger?.warn({ category, key }, 'Redis write error — skipping cache write');
+    }
+
+    // Write per-offer secondary index entries (offer:{id} → OfferIndexEntry).
+    // Errors are logged and silently ignored so a supplier result is always returned.
+    const freshnessWindowMs = this.config.freshnessWindowSeconds[category] * 1000;
+    for (const offer of payload.offers) {
+      const offerId = offer['id'];
+      if (typeof offerId === 'string' && offerId.length > 0) {
+        const entry: OfferIndexEntry = {
+          offer,
+          generatedAt: payload.generatedAt,
+          freshUntil: payload.generatedAt + freshnessWindowMs,
+          category,
+        };
+        try {
+          await this.redis.setex(`offer:${offerId}`, ttlSeconds, JSON.stringify(entry));
+        } catch {
+          this.logger?.warn({ category, offerId }, 'Redis write error — skipping offer index write');
+        }
+      }
+    }
+  }
+
+  /**
+   * Look up a single offer by its deterministic ID from the secondary index.
+   *
+   * Returns null on a miss, a corrupt entry, or a Redis error — callers must
+   * treat null as NOT_FOUND and never attempt to re-query suppliers.
+   */
+  async getOfferById(id: string): Promise<OfferIndexEntry | null> {
+    const key = `offer:${id}`;
+    let raw: string | null;
+    try {
+      raw = await this.redis.get(key);
+    } catch {
+      this.logger?.warn({ key }, 'Redis read error for offer index — treating as miss');
+      return null;
+    }
+    if (raw === null) return null;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (isValidOfferIndexEntry(parsed)) return parsed;
+      this.logger?.warn({ key }, 'Corrupt offer index entry — treating as miss');
+      return null;
+    } catch {
+      this.logger?.warn({ key }, 'Failed to parse offer index entry JSON — treating as miss');
+      return null;
     }
   }
 

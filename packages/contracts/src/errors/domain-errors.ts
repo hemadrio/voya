@@ -169,3 +169,17 @@ export function sessionNotFound(
 ): DomainError {
   return new DomainErrorImpl("SESSION_NOT_FOUND", message);
 }
+
+/**
+ * 410 — the offer existed but its expiresAt has passed.
+ *
+ * Raised on GET /v1/offers/{id} when the resolved offer's expiresAt is in the
+ * past relative to the request clock. The booking flow must restart with a
+ * fresh search. Never falls back to serving an expired offer.
+ */
+export function offerExpired(
+  message = "This offer has expired. Please search again for current availability.",
+  field?: string,
+): DomainError {
+  return new DomainErrorImpl("OFFER_EXPIRED", message, field);
+}

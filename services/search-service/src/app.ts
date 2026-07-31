@@ -15,12 +15,15 @@ import express from "express";
 import { createFlightRouter } from "./routes/flights.js";
 import { createHotelRouter } from "./routes/hotels.js";
 import { createCarRouter } from "./routes/cars.js";
+import { createOfferRouter } from "./routes/offers.js";
 import { createErrorHandler } from "../../../shared/middleware/errorHandler.js";
 import type { SearchAdapter } from "./adapters/SearchAdapter.js";
+import type { IOfferResolutionService } from "./domain/OfferResolutionService.js";
 import type { HealthHandlers } from "@travel/observability";
 
 export function createApp(
   adapter: SearchAdapter,
+  offerResolutionService?: IOfferResolutionService,
   healthHandlers?: HealthHandlers,
 ): express.Application {
   const app = express();
@@ -33,6 +36,11 @@ export function createApp(
   app.use("/search/flights", createFlightRouter(adapter));
   app.use("/search/hotels", createHotelRouter(adapter));
   app.use("/search/cars", createCarRouter(adapter));
+
+  // Offer resolution — mounted at /v1/offers (no auth required)
+  if (offerResolutionService !== undefined) {
+    app.use("/v1/offers", createOfferRouter({ offerResolutionService }));
+  }
 
   // Health endpoints — explicitly exempt from validation middleware.
   if (healthHandlers !== undefined) {

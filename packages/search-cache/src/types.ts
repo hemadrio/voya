@@ -62,6 +62,26 @@ export interface CachedSearchPayload {
 }
 
 // ---------------------------------------------------------------------------
+// Offer secondary index
+// ---------------------------------------------------------------------------
+
+/**
+ * Secondary index entry written for each offer at search-cache-set time.
+ *
+ * Key format: `offer:{offerId}` — expires at the same TTL as the parent search entry.
+ * Enables GET /v1/offers/{id} to resolve without re-querying suppliers.
+ */
+export interface OfferIndexEntry {
+  /** Full normalised offer object as stored in CachedSearchPayload.offers. */
+  readonly offer: Record<string, unknown>;
+  /** Unix ms — copied from CachedSearchPayload.generatedAt. */
+  readonly generatedAt: number;
+  /** Unix ms — generatedAt + freshnessWindowSeconds * 1000. */
+  readonly freshUntil: number;
+  readonly category: SearchCategory;
+}
+
+// ---------------------------------------------------------------------------
 // Cache operation result
 // ---------------------------------------------------------------------------
 

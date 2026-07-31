@@ -1,0 +1,22 @@
+{
+  "offer": {
+    "id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "Economy - Toyota Yaris or similar",
+    "price": 120,
+    "currency": "USD",
+    "details": {
+      "supplier": "RAPIDAPI",
+      "vehicleClass": "ECONOMY",
+      "pickupLocation": "JFK",
+      "dropoffLocation": "JFK",
+      "totalPrice": 120
+    },
+    "expiresAt": "2099-12-31T23:59:59.000Z",
+    "freshness": "FRESH"
+  },
+  "generatedAt": 4070908800000,
+  "freshUntil": 4070910960000,
+  "category": "car"
+}

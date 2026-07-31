@@ -39,6 +39,7 @@ export {
   invalidCredentials,
   emailNotVerified,
   accountDisabled,
+  offerExpired,
 } from "./domain-errors.js";
 
 export { serialiseError, RESTRICTED_FIELDS } from "./serialise.js";

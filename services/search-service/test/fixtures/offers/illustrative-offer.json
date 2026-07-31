@@ -1,0 +1,22 @@
+{
+  "offer": {
+    "id": "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+    "provenance": "ILLUSTRATIVE",
+    "bookable": false,
+    "title": "Premium - Example Vehicle",
+    "price": 350,
+    "currency": "USD",
+    "details": {
+      "supplier": "ILLUSTRATIVE",
+      "vehicleClass": "PREMIUM",
+      "pickupLocation": "LAX",
+      "dropoffLocation": "LAX",
+      "totalPrice": 350
+    },
+    "expiresAt": "2099-12-31T23:59:59.000Z",
+    "freshness": "FRESH"
+  },
+  "generatedAt": 4070908800000,
+  "freshUntil": 4070910960000,
+  "category": "car"
+}

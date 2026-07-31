@@ -1,0 +1,22 @@
+{
+  "offer": {
+    "id": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+    "provenance": "RAPIDAPI",
+    "bookable": true,
+    "title": "Compact - Volkswagen Golf or similar",
+    "price": 150,
+    "currency": "USD",
+    "details": {
+      "supplier": "RAPIDAPI",
+      "vehicleClass": "COMPACT",
+      "pickupLocation": "LHR",
+      "dropoffLocation": "LHR",
+      "totalPrice": 150
+    },
+    "expiresAt": "2099-12-31T23:59:59.000Z",
+    "freshness": "FRESH"
+  },
+  "generatedAt": 1000000000000,
+  "freshUntil": 1000001000000,
+  "category": "car"
+}

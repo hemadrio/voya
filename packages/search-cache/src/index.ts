@@ -6,6 +6,7 @@ export type {
   CacheMetrics,
   CachedSearchPayload,
   CategoryValues,
+  OfferIndexEntry,
   SearchCacheConfig,
   SearchCacheRedisClient,
   SearchCategory,
