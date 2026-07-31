@@ -175,3 +175,10 @@
 - **Files:** 18 (+1946/-0)
 - **Duration:** 809ss
 - **Approach:** New services/car-service/ module following the same pattern as WO-027 hotel-service. Provider confirmed as RapidAPI (not Priceline) based on existing RAPIDAPI_KEY in Secrets Manager and pre-approved *.p.rapidapi.com egress. Core components: vehicleClassMap.ts (data-driven token table with UNKNOWN fallback), rapidApiCarMapper.ts (pure function, total price derived from dailyRate*rentalDays when total absent), RapidApiCarAdapter.ts (SupplierPort, INSTANT flow, OTel span supplier.rapidapi-car.search with unmappedClassCount attribute, warn log per unmapped description, no 429 remapping unlike hotel adapter), composition.ts (factory wiring SupplierHttpClient + EgressAllowList). 91 tests across 4 suites: vehicleClassMap unit (32), mapper unit (20), adapter unit (18), contract-compliance (21).
+
+## WO-030: User Story: WO-030 - Gate illustrative results behind audited feature flag
+- **Status:** completed
+- **Commit:** `756c325`
+- **Files:** 15 (+1537/-0)
+- **Duration:** 713ss
+- **Approach:** New packages/illustrative/ package implementing a feature-flagged illustrative offer generator with append-only audit trail. Core components: (1) gating.ts — pure evaluateGating() function over the matrix of hardDisabledEnvironments × flagEnabled × supplierWasUnavailable, returning an explicit allow/suppress decision with reason; (2) IllustrativeOfferGenerator implements SupplierPort (INSTANT), with layered defence-in-depth: hard-disable check → flag check (flag errors treated as disabled) → deterministic offer generation → audit write (fail-closed: if write fails, returns [] and emits alertable error log) → OTel counter emission; (3) DegradedResultBlockSchema added to @travel/contracts for the response-level illustrative indicator (AC6). Deterministic generation uses SHA-256 fingerprint of normalised criteria as a seed; same query always produces the same 3 offers per category (flight/hotel/car templates with seed-derived price offset). FakeFeatureFlagProvider and FakeAuditWriter committed for test isolation.

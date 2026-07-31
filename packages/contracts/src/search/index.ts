@@ -25,3 +25,6 @@ export type { CarRentalSearchRequest } from "./car.js";
 
 export { OfferSchema, ILLUSTRATIVE_NOT_BOOKABLE_MESSAGE } from "./offer.js";
 export type { Offer } from "./offer.js";
+
+export { DegradedResultBlockSchema } from "./degraded.js";
+export type { DegradedResultBlock } from "./degraded.js";
