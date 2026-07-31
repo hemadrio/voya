@@ -36,7 +36,7 @@ import {
 } from "@aws-sdk/client-sqs";
 import type { QueueMessageEnvelope } from "@travel/contracts";
 import { QueueMessageEnvelopeSchema } from "@travel/contracts";
-import type { QueuePort, MessageHandler, SubscribeOptions, AckHandle } from "../QueuePort.js";
+import type { QueuePort, MessageHandler, SubscribeOptions, AckHandle, TraceContext } from "../QueuePort.js";
 import { QueueValidationError } from "../QueueValidationError.js";
 /** Minimal logger surface — duck-typed so callers can inject pino, a test spy, or undefined. */
 interface MinimalLogger {
@@ -105,7 +105,7 @@ export class SqsAdapter implements QueuePort {
     return url;
   }
 
-  async publish(topic: string, envelope: QueueMessageEnvelope): Promise<void> {
+  async publish(topic: string, envelope: QueueMessageEnvelope, traceContext?: TraceContext): Promise<void> {
     const result = QueueMessageEnvelopeSchema.safeParse(envelope);
     if (!result.success) {
       throw new QueueValidationError(
@@ -117,17 +117,22 @@ export class SqsAdapter implements QueuePort {
     const validated = result.data;
     const queueUrl = this.queueUrl(topic);
 
+    const messageAttributes: Record<string, { DataType: string; StringValue: string }> = {
+      eventType: { DataType: "String", StringValue: validated.eventType },
+      correlationId: { DataType: "String", StringValue: validated.correlationId },
+      schemaVersion: { DataType: "Number", StringValue: String(validated.schemaVersion) },
+    };
+    if (traceContext?.traceparent !== undefined) {
+      messageAttributes['traceparent'] = { DataType: "String", StringValue: traceContext.traceparent };
+    }
+
     await this.client.send(
       new SendMessageCommand({
         QueueUrl: queueUrl,
         MessageBody: JSON.stringify(validated),
         MessageGroupId: validated.userId,
         MessageDeduplicationId: validated.eventId,
-        MessageAttributes: {
-          eventType: { DataType: "String", StringValue: validated.eventType },
-          correlationId: { DataType: "String", StringValue: validated.correlationId },
-          schemaVersion: { DataType: "Number", StringValue: String(validated.schemaVersion) },
-        },
+        MessageAttributes: messageAttributes,
       }),
     );
 
@@ -213,6 +218,13 @@ export class SqsAdapter implements QueuePort {
     }
 
     const envelope = result.data;
+
+    // Extract trace context from SQS MessageAttributes for context restoration.
+    const traceContext: TraceContext = {
+      correlationId: msg.MessageAttributes?.['correlationId']?.StringValue ?? envelope.correlationId,
+      traceparent: msg.MessageAttributes?.['traceparent']?.StringValue,
+    };
+
     let ackCalled = false;
 
     const handle: AckHandle = {
@@ -259,7 +271,7 @@ export class SqsAdapter implements QueuePort {
     };
 
     try {
-      await handler(envelope, handle);
+      await handler(envelope, handle, traceContext);
     } catch (err) {
       if (!ackCalled) {
         await handle.nack(true);

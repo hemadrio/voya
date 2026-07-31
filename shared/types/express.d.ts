@@ -1,13 +1,8 @@
 /**
- * Global Express Request augmentation — adds the `validated` property set
- * by the `validateRequest` middleware on parse success.
+ * Global Express Request augmentation — adds properties set by shared middleware.
  *
  * Services include this file via their tsconfig `include` or `typeRoots`
  * settings once they have `@types/express` installed.
- *
- * The `validated` property is intentionally typed as `ValidatedData` (all
- * fields unknown) here — downstream handlers narrow the type by casting to
- * the inferred schema type, which is the safe, single-parse pattern.
  *
  * WHY `req.validated` instead of overwriting `req.body`:
  *   The Stripe webhook route must keep `req.body` as a raw Buffer for HMAC
@@ -18,11 +13,32 @@
 
 import type { ValidatedData } from "../middleware/validateRequest.js";
 
+/** Minimal structured request logger — duck-typed against pino.Logger. */
+interface RequestChildLogger {
+  info(obj: Record<string, unknown>, msg: string): void;
+  warn(obj: Record<string, unknown>, msg: string): void;
+  error(obj: Record<string, unknown>, msg: string): void;
+  child(bindings: Record<string, string>): RequestChildLogger;
+}
+
 declare global {
   namespace Express {
     interface Request {
       /** Parsed and coerced inputs set by `validateRequest` on success. */
       validated?: ValidatedData;
+
+      /**
+       * Resolved correlation identifier — set by correlationIdMiddleware.
+       * Equal to the validated inbound x-correlation-id or a generated ULID.
+       */
+      correlationId?: string;
+
+      /**
+       * Request-scoped child logger — set by correlationIdMiddleware when a
+       * root logger is injected.  Carries correlationId, traceId, method, and
+       * route bindings so every log line for this request is correlated.
+       */
+      log?: RequestChildLogger;
     }
   }
 }

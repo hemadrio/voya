@@ -9,9 +9,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@travel/contracts": "workspace:*"
+    "@travel/contracts": "workspace:*",
+    "@travel/observability": "workspace:*",
+    "@travel/queue": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

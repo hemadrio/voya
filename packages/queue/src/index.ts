@@ -4,6 +4,7 @@ export type {
   MessageHandler,
   SubscribeOptions,
   QueuePort,
+  TraceContext,
 } from "./QueuePort.js";
 
 // Validation error

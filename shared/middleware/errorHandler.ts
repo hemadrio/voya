@@ -1,45 +1,38 @@
 /**
  * Shared Express error middleware — thin adapter over @travel/contracts serialiseError.
  *
- * Usage (each service's Express app wiring — WO-007):
+ * Usage (each service's Express app wiring):
  * ```ts
  * import { createErrorHandler } from "../../shared/middleware/errorHandler.js";
  * app.use(createErrorHandler({ logger }));
  * ```
  *
  * The middleware:
- *  1. Reads the active trace / correlation identifier from the
- *     `X-Trace-Id` request header (injected by the gateway or ADOT sidecar).
- *  2. Delegates to `serialiseError` from @travel/contracts, which converts any
- *     thrown value — ZodError, DomainError, or unknown — into the documented
- *     error envelope and the correct HTTP status, with no internal detail leaking.
- *  3. Optionally logs the error via an injected logger (WO-007 wires this up).
+ *  1. Resolves the active correlation / trace identifier from req.correlationId
+ *     (set by correlationIdMiddleware), falling back to the x-correlation-id
+ *     and x-trace-id request headers.
+ *  2. Delegates to `serialiseError` from @travel/contracts to produce the
+ *     standard envelope and HTTP status with no internal detail leaking.
+ *  3. Logs at warn level for 4xx and error level for 5xx via the injected
+ *     logger; logs nothing when no logger is supplied.
  *  4. Writes `res.status(status).json(envelope)`.
  *
- * Constraints (from WO-002):
+ * Constraints:
  *  - @travel/contracts must NOT import Express; all HTTP framework code stays here.
- *  - The wiring of this handler into individual service apps is delivered by WO-007.
- *
- * NOTE: This file is intentionally NOT part of a workspace package and carries
- * no package.json.  Services reference it via a relative import.  When the
- * shared package is formally scaffolded in a later WO, this file migrates into
- * that package without API changes.
+ *  - Never call next() after responding — the error is terminal.
+ *  - If headers are already sent (partial stream), delegate to next(err).
  */
 
 import { serialiseError } from "@travel/contracts";
 import type { ErrorEnvelope } from "@travel/contracts";
 
 // ---------------------------------------------------------------------------
-// Minimal Express-compatible interface types.
-//
-// Typed inline rather than importing from `express` so this file can be
-// compiled without an explicit `express` devDependency.  The shapes match
-// Express 4/5 exactly; swap for `import type { Request, Response, NextFunction }
-// from "express"` once the service package has @types/express installed.
+// Minimal Express-compatible interface types (inline — no express import).
 // ---------------------------------------------------------------------------
 
 interface Request {
   headers: Record<string, string | string[] | undefined>;
+  correlationId?: string | undefined;
 }
 
 interface Response {
@@ -51,49 +44,44 @@ interface Response {
 type NextFunction = (err?: unknown) => void;
 
 // ---------------------------------------------------------------------------
-// Minimal logger interface — duck-typed so this file does not import
-// @travel/observability directly.  A pino.Logger satisfies this interface.
-// WO-007 wires the concrete logger in at service startup.
+// Minimal logger interface — duck-typed for warn/error levels.
+// A pino.Logger satisfies this interface.
 // ---------------------------------------------------------------------------
 
 interface ErrorLogger {
-  error(obj: { err: unknown; status: number; traceId: string | undefined }, msg: string): void;
+  warn(obj: { err: unknown; status: number; correlationId: string | undefined }, msg: string): void;
+  error(obj: { err: unknown; status: number; correlationId: string | undefined }, msg: string): void;
 }
 
 export interface CreateErrorHandlerOptions {
   /**
-   * Optional structured logger.  When supplied, every error is logged with
-   * the serialised error object, HTTP status, and traceId before the response
-   * is written.  Injected by service startup — never imported as a singleton.
-   *
-   * TODO(WO-007): inject @travel/observability createLogger here during
-   * service scaffold so all errors are logged in structured JSON.
+   * Optional structured logger (e.g. from @travel/observability createLogger).
+   * When supplied, 4xx errors are logged at warn and 5xx at error, each with
+   * the serialised error object, HTTP status, and correlation identifier.
    */
-  readonly logger?: ErrorLogger;
+  readonly logger?: ErrorLogger | undefined;
 }
 
 /**
  * Express four-argument error middleware factory.
  *
- * Returns a middleware function that converts any thrown value into the
- * standard error envelope and writes the appropriate HTTP status.
+ * Returns a middleware that converts any thrown value into the standard error
+ * envelope and writes the appropriate HTTP status.  Logs at the correct level
+ * (warn for 4xx, error for 5xx) when a logger is provided.
  *
  * The `_next` parameter is intentionally accepted-but-unused: Express
  * identifies an error handler by its four-argument arity.
  */
-export function createErrorHandler(options?: CreateErrorHandlerOptions): (
-  err: unknown,
-  req: Request,
-  res: Response,
-  _next: NextFunction
-) => void {
+export function createErrorHandler(
+  options?: CreateErrorHandlerOptions,
+): (err: unknown, req: Request, res: Response, _next: NextFunction) => void {
   const logger = options?.logger;
 
   return function errorHandler(
     err: unknown,
     req: Request,
     res: Response,
-    _next: NextFunction
+    _next: NextFunction,
   ): void {
     // Guard: if headers have already been sent (e.g. a streaming response
     // partially flushed), we cannot write a new status/body — delegate.
@@ -102,17 +90,34 @@ export function createErrorHandler(options?: CreateErrorHandlerOptions): (
       return;
     }
 
-    // The X-Trace-Id header is injected by the gateway or ADOT sidecar and
-    // propagated on the internal mTLS hop.  Use it as the reference so the
-    // traveler's error reference links directly to the X-Ray trace.
-    const rawTraceId = req.headers["x-trace-id"];
-    const traceId = Array.isArray(rawTraceId) ? rawTraceId[0] : rawTraceId;
+    // Resolve the trace/correlation reference.
+    // Priority: req.correlationId (set by correlationIdMiddleware)
+    //         > x-correlation-id header
+    //         > x-trace-id header (legacy gateway header)
+    const correlationId: string | undefined =
+      typeof req.correlationId === 'string'
+        ? req.correlationId
+        : (() => {
+            const cid = req.headers['x-correlation-id'];
+            const candidate = Array.isArray(cid) ? cid[0] : cid;
+            if (typeof candidate === 'string') return candidate;
+            const tid = req.headers['x-trace-id'];
+            const tCandidate = Array.isArray(tid) ? tid[0] : tid;
+            return typeof tCandidate === 'string' ? tCandidate : undefined;
+          })();
 
-    const { envelope, status } = serialiseError(err, traceId);
+    const { envelope, status } = serialiseError(err, correlationId);
 
-    // Structured error log — only when a logger is injected.  PII redaction
-    // is handled by the @travel/observability logger, not here.
-    logger?.error({ err, status, traceId }, "Unhandled error converted to error envelope");
+    // Log at appropriate level: warn for 4xx (client errors), error for 5xx
+    if (logger !== undefined) {
+      const logCtx = { err, status, correlationId };
+      const msg = 'Unhandled error converted to error envelope';
+      if (status >= 500) {
+        logger.error(logCtx, msg);
+      } else {
+        logger.warn(logCtx, msg);
+      }
+    }
 
     res.status(status).json(envelope);
   };

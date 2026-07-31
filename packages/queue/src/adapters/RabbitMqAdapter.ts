@@ -19,7 +19,7 @@
 
 import type { QueueMessageEnvelope } from "@travel/contracts";
 import { QueueMessageEnvelopeSchema } from "@travel/contracts";
-import type { QueuePort, MessageHandler, SubscribeOptions, AckHandle } from "../QueuePort.js";
+import type { QueuePort, MessageHandler, SubscribeOptions, AckHandle, TraceContext } from "../QueuePort.js";
 import { QueueValidationError } from "../QueueValidationError.js";
 /** Minimal logger surface — duck-typed so callers can inject pino, a test spy, or undefined. */
 interface MinimalLogger {
@@ -112,7 +112,7 @@ export class RabbitMqAdapter implements QueuePort {
     return ch;
   }
 
-  async publish(topic: string, envelope: QueueMessageEnvelope): Promise<void> {
+  async publish(topic: string, envelope: QueueMessageEnvelope, traceContext?: TraceContext): Promise<void> {
     const result = QueueMessageEnvelopeSchema.safeParse(envelope);
     if (!result.success) {
       throw new QueueValidationError(
@@ -123,11 +123,16 @@ export class RabbitMqAdapter implements QueuePort {
 
     const ch = await this.getChannel();
     const content = Buffer.from(JSON.stringify(result.data));
+    const headers: Record<string, string> = {};
+    if (traceContext?.traceparent !== undefined) {
+      headers['traceparent'] = traceContext.traceparent;
+    }
     const published = ch.publish(this.exchangeName, topic, content, {
       persistent: true,
       messageId: envelope.eventId,
       correlationId: envelope.correlationId,
       contentType: "application/json",
+      headers,
     });
 
     if (!published) {
@@ -196,6 +201,16 @@ export class RabbitMqAdapter implements QueuePort {
     }
 
     const envelope = result.data;
+
+    // Extract trace context from AMQP message properties/headers.
+    const traceparent = typeof msg.properties.headers?.['traceparent'] === 'string'
+      ? msg.properties.headers['traceparent']
+      : undefined;
+    const traceContext: TraceContext = {
+      correlationId: msg.properties.correlationId ?? envelope.correlationId,
+      traceparent,
+    };
+
     let ackCalled = false;
 
     const handle: AckHandle = {
@@ -220,7 +235,7 @@ export class RabbitMqAdapter implements QueuePort {
     };
 
     try {
-      await handler(envelope, handle);
+      await handler(envelope, handle, traceContext);
     } catch (err) {
       if (!ackCalled) {
         await handle.nack(true);

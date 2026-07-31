@@ -11,5 +11,5 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true
   },
-  "include": ["middleware/**/*.ts", "types/**/*.ts"]
+  "include": ["middleware/**/*.ts", "types/**/*.ts", "errors/**/*.ts"]
 }
