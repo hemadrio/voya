@@ -1,0 +1,32 @@
+{
+  "_comment": "Fixture for the flight search journey. Supplier calls are stubbed when X-Load-Test: true is present.",
+  "flight": {
+    "searchType": "FLIGHT",
+    "origin": "LHR",
+    "destination": "JFK",
+    "departureDate": "2025-03-15",
+    "returnDate": "2025-03-22",
+    "adults": 2,
+    "children": 0,
+    "cabinClass": "ECONOMY",
+    "currency": "GBP"
+  },
+  "hotel": {
+    "searchType": "HOTEL",
+    "destination": "New York, NY",
+    "checkIn": "2025-03-15",
+    "checkOut": "2025-03-22",
+    "rooms": 1,
+    "adults": 2,
+    "currency": "GBP"
+  },
+  "car": {
+    "searchType": "CAR_RENTAL",
+    "pickupLocation": "JFK",
+    "dropoffLocation": "JFK",
+    "pickupDate": "2025-03-15",
+    "dropoffDate": "2025-03-22",
+    "driverAge": 30,
+    "currency": "GBP"
+  }
+}

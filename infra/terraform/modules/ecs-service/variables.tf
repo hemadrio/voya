@@ -111,3 +111,16 @@ variable "common_tags" {
   description = "Tags applied to all resources in this module."
   default     = {}
 }
+
+# ── RDS Proxy ────────────────────────────────────────────────────────────────
+
+variable "rds_connect_policy_arns" {
+  type        = list(string)
+  description = <<-EOT
+    List of IAM policy ARNs granting rds-db:connect for this service.
+    Provided by the rds-proxy module output `service_rds_connect_policy_arns`.
+    When empty (default) no rds-db:connect policy is attached — safe for
+    services that do not connect to the database (e.g. search services).
+  EOT
+  default     = []
+}

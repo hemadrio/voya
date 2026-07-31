@@ -1,0 +1,24 @@
+{
+  "_comment": "Fixture for the checkout/booking journey. Uses ILLUSTRATIVE offerId so no real supplier charge occurs. Stub intercepts payment creation when X-Load-Test: true.",
+  "createBookingRequest": {
+    "bookingType": "FLIGHT",
+    "offerId": "off_load_test_lhr_jfk_stub_01",
+    "offerPrice": 34900,
+    "currency": "GBP",
+    "passengers": [
+      {
+        "firstName": "Load",
+        "lastName": "Test",
+        "dateOfBirth": "1985-06-15T00:00:00.000Z"
+      }
+    ],
+    "contactEmail": "loadtest@example.invalid",
+    "idempotencyKey": "__REPLACED_BY_VU_ID__"
+  },
+  "paymentIntentRequest": {
+    "bookingId": "__REPLACED_BY_BOOKING_ID__",
+    "amount": 34900,
+    "currency": "GBP",
+    "idempotencyKey": "__REPLACED_BY_VU_ID__"
+  }
+}

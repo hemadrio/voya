@@ -99,3 +99,15 @@ resource "aws_iam_role" "task_role" {
     ManagedBy   = "terraform"
   })
 }
+
+# Attach rds-db:connect policies when the service connects through RDS Proxy.
+# Uses for_each over the list index to allow multiple policies (e.g. a service
+# that connects as two users during a migration window).
+resource "aws_iam_role_policy_attachment" "rds_connect" {
+  for_each = {
+    for idx, arn in var.rds_connect_policy_arns : tostring(idx) => arn
+  }
+
+  role       = aws_iam_role.task_role.name
+  policy_arn = each.value
+}

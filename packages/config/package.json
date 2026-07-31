@@ -1,0 +1,38 @@
+{
+  "name": "@travel/config",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Shared database URL builder and connection-limit assertion for the travel platform. Centralises RDS Proxy connection string construction so all nine services inherit the same pooling parameters and the startup assertion enforces the per-service ceiling.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "clean": "rimraf dist",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  }
+}

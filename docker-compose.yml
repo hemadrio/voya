@@ -4,6 +4,12 @@ version: "3.9"
 # Local development stack
 #
 # Services:
+#   postgres  — PostgreSQL 16 for local development.
+#               DATABASE_URL includes connection_limit=5 so pool behaviour
+#               matches production (RDS Proxy enforces the same ceiling).
+#               Local dev uses sslmode=disable; production requires TLS.
+#               Connection: postgresql://postgres:postgres@localhost:5432/travel_dev
+#
 #   rabbitmq  — RabbitMQ 3.13 with management UI for local async event bus.
 #               The @travel/queue RabbitMqAdapter connects here when
 #               QUEUE_DRIVER=rabbitmq (set by default in .env.local).
@@ -13,10 +19,48 @@ version: "3.9"
 #   docker compose up -d          # start all services
 #   docker compose down -v        # stop and remove volumes
 #
-# Production uses SQS FIFO queues provisioned by infra/terraform/modules/sqs/.
+# Services connect to Postgres using:
+#   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/travel_dev?connection_limit=5&pool_timeout=10&sslmode=disable
+#
+# Use packages/config buildLocalDatabaseUrl() to construct the URL in code —
+# do not hand-edit the connection string per service to avoid drift.
+#
+# Production uses RDS Proxy (IAM auth, TLS required) provisioned by
+# infra/terraform/modules/rds-proxy/. See connection-budget.md.
 # ---------------------------------------------------------------------------
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: travel-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: travel_dev
+      # Align max_connections with RDS Proxy ceiling arithmetic in
+      # infra/terraform/modules/rds-proxy/connection-budget.md.
+      # Local dev: 100 is sufficient for the full service fleet at
+      # connection_limit=5 per service (20 services max × 5 = 100).
+      POSTGRES_MAX_CONNECTIONS: "100"
+    command:
+      - postgres
+      - -c
+      - max_connections=100
+      - -c
+      - log_connections=on
+      - -c
+      - log_disconnections=on
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d travel_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     container_name: travel-rabbitmq
@@ -37,5 +81,7 @@ services:
       start_period: 15s
 
 volumes:
+  postgres_data:
+    driver: local
   rabbitmq_data:
     driver: local
