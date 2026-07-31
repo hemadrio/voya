@@ -130,6 +130,7 @@ function makeFakeCache(state: CacheState = 'miss'): CarSearchServiceDeps['cacheR
       _fn: BackgroundRefreshFn,
       _cid: string,
     ) => state === 'miss' ? null : freshHit),
+    isAvailable: vi.fn(() => true),
   } as unknown as CarSearchServiceDeps['cacheRepository'];
 }
 

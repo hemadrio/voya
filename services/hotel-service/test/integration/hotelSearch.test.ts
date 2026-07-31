@@ -138,6 +138,7 @@ function makeFakeCache(state: CacheState = 'miss'): HotelSearchServiceDeps['cach
       _fn: BackgroundRefreshFn,
       _cid: string,
     ) => state === 'miss' ? null : freshHit),
+    isAvailable: vi.fn(() => true),
   } as unknown as HotelSearchServiceDeps['cacheRepository'];
 }
 

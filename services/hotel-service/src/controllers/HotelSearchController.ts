@@ -113,6 +113,7 @@ export function createHotelSearchController(deps: { hotelSearchService: IHotelSe
           generatedAt: result.freshness.generatedAt.toISOString(),
           stale: result.freshness.stale,
         },
+        cacheAvailable: result.cacheAvailable,
       };
 
       if (result.emptyState !== undefined) {

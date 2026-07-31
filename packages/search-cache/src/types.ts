@@ -163,4 +163,6 @@ export interface CacheMetrics {
   recordMiss(category: string): void;
   recordStaleServe(category: string): void;
   recordSingleflightSuppressed(category: string): void;
+  /** Incremented whenever a Redis operation fails and is converted to a no-op. */
+  recordUnavailable(category: string): void;
 }

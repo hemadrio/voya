@@ -22,6 +22,23 @@ locals {
   # (this legitimately breaches during Redis outage; runbook distinguishes modes)
   threshold_search_cache_p95_ms = 180
 
+  # ---------------------------------------------------------------------------
+  # Search degradation — WO-038
+  # ---------------------------------------------------------------------------
+
+  # Stale-serve rate threshold — alarm when stale serves exceed 20% of total cache responses
+  # A sustained high stale-serve rate indicates the cache freshness windows are too short
+  # or the background-refresh pipeline is falling behind under load.
+  threshold_stale_serve_rate_pct = 20.0
+
+  # Cache unavailability sustained period — 5-minute evaluation window
+  # Any non-zero unavailability count over this window triggers the alarm.
+  threshold_cache_unavailable_count = 0
+
+  # Supplier timeout — healthy 2200 ms, degraded 1500 ms (must match service config)
+  supplier_timeout_healthy_ms  = 2200
+  supplier_timeout_degraded_ms = 1500
+
   # Checkout acknowledgement — hard alarm above 5.0 s p95
   threshold_checkout_p95_ms = 5000
 

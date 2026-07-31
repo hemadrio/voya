@@ -103,7 +103,7 @@ resource "aws_cloudwatch_dashboard" "search" {
           }
         }
       },
-      # Row 3: Alarms
+      # Row 3: Alarms (updated to include WO-038 alarms)
       {
         type   = "alarm"
         x      = 0; y = 12; width = 24; height = 3
@@ -113,7 +113,95 @@ resource "aws_cloudwatch_dashboard" "search" {
             "arn:aws:cloudwatch:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alarm:${aws_cloudwatch_metric_alarm.search_p95_hard.alarm_name}",
             "arn:aws:cloudwatch:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alarm:${aws_cloudwatch_metric_alarm.search_p95_warning.alarm_name}",
             "arn:aws:cloudwatch:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alarm:${aws_cloudwatch_metric_alarm.search_fault_rate.alarm_name}",
+            "arn:aws:cloudwatch:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alarm:${aws_cloudwatch_metric_alarm.search_cache_unavailable.alarm_name}",
+            "arn:aws:cloudwatch:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alarm:${aws_cloudwatch_metric_alarm.search_breaker_open.alarm_name}",
+            "arn:aws:cloudwatch:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alarm:${aws_cloudwatch_metric_alarm.search_stale_serve_rate.alarm_name}",
           ]
+        }
+      },
+      # Row 4: Cache reliability signals (WO-038)
+      {
+        type   = "metric"
+        x      = 0; y = 15; width = 8; height = 6
+        properties = {
+          title  = "Cache Unavailability (search_cache_unavailable_total)"
+          view   = "timeSeries"
+          region = data.aws_region.current.name
+          period = 60
+          metrics = [
+            ["${local.namespace_search}", "search_cache_unavailable_total", { stat = "Sum", label = "unavailable ops/min", color = "#d62728" }],
+          ]
+          annotations = {
+            horizontal = [
+              { label = "any = degraded mode", value = 0, color = "#d62728" },
+            ]
+          }
+        }
+      },
+      {
+        type   = "metric"
+        x      = 8; y = 15; width = 8; height = 6
+        properties = {
+          title  = "Supplier Breaker Transitions (SupplierBreakerTransitionsTotal)"
+          view   = "timeSeries"
+          region = data.aws_region.current.name
+          period = 300
+          metrics = [
+            ["${local.namespace_search}", "SupplierBreakerTransitionsTotal", { stat = "Sum", label = "breaker opens/5min", color = "#ff7f0e" }],
+          ]
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16; y = 15; width = 8; height = 6
+        properties = {
+          title  = "Cache Hit / Miss / Stale Rate"
+          view   = "timeSeries"
+          region = data.aws_region.current.name
+          period = 300
+          metrics = [
+            ["${local.namespace_search}", "search_cache_hits_total",        { stat = "Sum", label = "hits",        color = "#2ca02c" }],
+            ["${local.namespace_search}", "search_cache_misses_total",       { stat = "Sum", label = "misses",      color = "#ff7f0e" }],
+            ["${local.namespace_search}", "search_cache_stale_serves_total", { stat = "Sum", label = "stale serves", color = "#1f77b4" }],
+          ]
+        }
+      },
+      # Row 5: Per-supplier outcomes + illustrative exposure (WO-038)
+      {
+        type   = "metric"
+        x      = 0; y = 21; width = 12; height = 6
+        properties = {
+          title  = "Search Latency by Category (SearchLatencyByCategory) — ms"
+          view   = "timeSeries"
+          region = data.aws_region.current.name
+          period = 60
+          metrics = [
+            ["${local.namespace_search}", "SearchLatencyByCategory", { stat = "p95", label = "p95 all categories", color = "#ff7f0e" }],
+          ]
+          annotations = {
+            horizontal = [
+              { label = "warn (${local.threshold_search_p95_warning_ms} ms)", value = local.threshold_search_p95_warning_ms, color = "#ff7f0e" },
+              { label = "hard (${local.threshold_search_p95_hard_ms} ms)", value = local.threshold_search_p95_hard_ms, color = "#d62728" },
+            ]
+          }
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12; y = 21; width = 12; height = 6
+        properties = {
+          title  = "Illustrative Offers Served (illustrative_offers_served_total)"
+          view   = "timeSeries"
+          region = data.aws_region.current.name
+          period = 300
+          metrics = [
+            ["${local.namespace_search}", "illustrative_offers_served_total", { stat = "Sum", label = "illustrative serves", color = "#d62728" }],
+          ]
+          annotations = {
+            horizontal = [
+              { label = "zero-tolerance", value = 0, color = "#d62728" },
+            ]
+          }
         }
       },
     ]

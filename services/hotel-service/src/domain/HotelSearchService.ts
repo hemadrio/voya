@@ -52,11 +52,17 @@ export interface HotelSearchResult {
   readonly supplierOutcomes: SupplierOutcomeEntry[];
   readonly freshness: HotelSearchFreshness;
   readonly emptyState?: HotelSearchEmptyState;
+  readonly cacheAvailable: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // Service dependencies
 // ---------------------------------------------------------------------------
+
+export interface SupplierTimeoutConfig {
+  healthyMs: number;
+  degradedMs: number;
+}
 
 export interface HotelSearchServiceDeps {
   suppliers: SupplierPort[];
@@ -70,6 +76,7 @@ export interface HotelSearchServiceDeps {
     error(obj: Record<string, unknown>, msg: string): void;
   };
   alternativeStayOffsetDays?: number;
+  supplierTimeout?: SupplierTimeoutConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +137,8 @@ function computeAlternativeStayDates(
 // Factory
 // ---------------------------------------------------------------------------
 
+const DEFAULT_SUPPLIER_TIMEOUT: SupplierTimeoutConfig = { healthyMs: 2200, degradedMs: 1500 };
+
 export function createHotelSearchService(deps: HotelSearchServiceDeps): IHotelSearchService {
   const {
     suppliers,
@@ -140,6 +149,7 @@ export function createHotelSearchService(deps: HotelSearchServiceDeps): IHotelSe
   } = deps;
   const clock = deps.clock ?? { now: () => Date.now() };
   const logger = deps.logger;
+  const supplierTimeout = deps.supplierTimeout ?? DEFAULT_SUPPLIER_TIMEOUT;
 
   async function backgroundRefresh(
     _category: string,
@@ -147,7 +157,10 @@ export function createHotelSearchService(deps: HotelSearchServiceDeps): IHotelSe
     correlationId: string,
   ): Promise<CachedSearchPayload> {
     const request = params as HotelSearchRequest;
-    const { offers, supplierOutcomes } = await fanOutAndNormalise(request, correlationId);
+    const bgTimeoutMs = cacheRepository.isAvailable()
+      ? supplierTimeout.healthyMs
+      : supplierTimeout.degradedMs;
+    const { offers, supplierOutcomes } = await fanOutAndNormalise(request, correlationId, bgTimeoutMs);
     return {
       schemaVersion: 1,
       generatedAt: clock.now(),
@@ -159,12 +172,17 @@ export function createHotelSearchService(deps: HotelSearchServiceDeps): IHotelSe
   async function fanOutAndNormalise(
     request: HotelSearchRequest,
     correlationId: string,
+    fanOutTimeoutMs: number,
   ): Promise<{ offers: Offer[]; supplierOutcomes: SupplierOutcomeEntry[] }> {
     const criteria: SearchCriteria = { ...request, kind: 'hotel' as const };
 
-    const results = await Promise.allSettled(
+    const fanOut = Promise.allSettled(
       suppliers.map((adapter) => adapter.searchOffers(criteria, correlationId)),
     );
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Supplier fan-out exceeded ${fanOutTimeoutMs}ms`)), fanOutTimeoutMs),
+    );
+    const results = await Promise.race([fanOut, timeoutPromise]);
 
     const rawOffers: unknown[] = [];
     const supplierOutcomes: SupplierOutcomeEntry[] = [];
@@ -199,6 +217,11 @@ export function createHotelSearchService(deps: HotelSearchServiceDeps): IHotelSe
   ): Promise<HotelSearchResult> {
     const cacheParams = request as unknown as Record<string, unknown>;
 
+    const cacheAvailable = cacheRepository.isAvailable();
+    const fanOutTimeoutMs = cacheAvailable
+      ? supplierTimeout.healthyMs
+      : supplierTimeout.degradedMs;
+
     const cacheHit = await cacheRepository.getWithRefresh(
       'hotel',
       cacheParams,
@@ -216,11 +239,16 @@ export function createHotelSearchService(deps: HotelSearchServiceDeps): IHotelSe
           outcome: o.outcome as SupplierCallOutcome,
         })),
         freshness: { generatedAt: cacheHit.generatedAt, stale: cacheHit.stale },
+        cacheAvailable,
       };
     }
 
     const generatedAt = new Date(clock.now());
-    const { offers, supplierOutcomes } = await fanOutAndNormalise(request, correlationId);
+    const { offers, supplierOutcomes } = await fanOutAndNormalise(
+      request,
+      correlationId,
+      fanOutTimeoutMs,
+    );
 
     const allUnavailable =
       supplierOutcomes.length > 0 &&
@@ -246,6 +274,7 @@ export function createHotelSearchService(deps: HotelSearchServiceDeps): IHotelSe
         offers: [],
         supplierOutcomes,
         freshness: { generatedAt, stale: false },
+        cacheAvailable,
         emptyState: {
           reason: 'No availability found for the requested destination and dates.',
           alternativeStayDates: altStayDates,
@@ -253,7 +282,12 @@ export function createHotelSearchService(deps: HotelSearchServiceDeps): IHotelSe
       };
     }
 
-    return { offers: ranked, supplierOutcomes, freshness: { generatedAt, stale: false } };
+    return {
+      offers: ranked,
+      supplierOutcomes,
+      freshness: { generatedAt, stale: false },
+      cacheAvailable,
+    };
   }
 
   return { search };

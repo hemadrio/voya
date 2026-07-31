@@ -149,6 +149,7 @@ function makeFakeCache(state: FakeCacheState = 'miss'): FlightSearchServiceDeps[
       if (state === 'fresh') return freshHit;
       return staleHit;
     }),
+    isAvailable: vi.fn(() => true),
   } as unknown as FlightSearchServiceDeps['cacheRepository'];
 }
 

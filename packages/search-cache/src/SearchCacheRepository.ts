@@ -12,6 +12,7 @@ import type {
   SearchCategory,
 } from './types.js';
 import { SCHEMA_VERSION } from './types.js';
+import { CacheHealthState, type CacheHealthConfig, DEFAULT_HEALTH_CONFIG } from './CacheHealthState.js';
 
 // ---------------------------------------------------------------------------
 // Payload validation
@@ -49,6 +50,8 @@ export interface SearchCacheRepositoryOptions {
   config: SearchCacheConfig;
   logger?: CacheLogger;
   metrics?: CacheMetrics;
+  /** Health-state configuration. Defaults to DEFAULT_HEALTH_CONFIG. */
+  healthConfig?: CacheHealthConfig;
 }
 
 /**
@@ -73,6 +76,7 @@ export class SearchCacheRepository {
   private readonly config: SearchCacheConfig;
   private readonly logger?: CacheLogger;
   private readonly metrics?: CacheMetrics;
+  private readonly healthState: CacheHealthState;
 
   constructor(options: SearchCacheRepositoryOptions) {
     this.redis = options.redis;
@@ -80,6 +84,20 @@ export class SearchCacheRepository {
     this.config = options.config;
     this.logger = options.logger;
     this.metrics = options.metrics;
+    this.healthState = new CacheHealthState(
+      options.healthConfig ?? DEFAULT_HEALTH_CONFIG,
+      options.clock,
+    );
+  }
+
+  /** Returns true when the cache is considered healthy and available. */
+  isAvailable(): boolean {
+    return this.healthState.isAvailable();
+  }
+
+  /** Exposes the underlying health state for domain-service timeout selection. */
+  getHealthState(): CacheHealthState {
+    return this.healthState;
   }
 
   // ---------------------------------------------------------------------------
@@ -122,7 +140,10 @@ export class SearchCacheRepository {
 
     try {
       await this.redis.setex(key, ttlSeconds, json);
+      this.healthState.recordSuccess();
     } catch {
+      this.healthState.recordFailure();
+      this.metrics?.recordUnavailable(category);
       this.logger?.warn({ category, key }, 'Redis write error — skipping cache write');
     }
 
@@ -250,10 +271,24 @@ export class SearchCacheRepository {
     const hash = buildKeyHash(params);
     const key = buildKey(category, hash);
 
+    // If UNAVAILABLE and not yet time to probe, skip Redis entirely.
+    if (!this.healthState.isAvailable() && !this.healthState.shouldProbe()) {
+      this.metrics?.recordUnavailable(category);
+      this.logger?.warn({ category, key }, 'Cache unavailable — skipping Redis read (no-op)');
+      return null;
+    }
+
+    if (this.healthState.shouldProbe()) {
+      this.healthState.markProbeAttempt();
+    }
+
     let raw: string | null;
     try {
       raw = await this.redis.get(key);
+      this.healthState.recordSuccess();
     } catch {
+      this.healthState.recordFailure();
+      this.metrics?.recordUnavailable(category);
       this.logger?.warn({ category, key }, 'Redis read error — treating as cache miss');
       return null;
     }

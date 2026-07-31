@@ -75,7 +75,7 @@ function makeRanker(out: RankedOffer[] = [makeRanked('n1')]) {
   return { rank: vi.fn((_offers: Offer[], _prefs: MemberPreferences) => out) };
 }
 
-function makeCache(hit: CacheGetResult | null = null) {
+function makeCache(hit: CacheGetResult | null = null, available = true) {
   return {
     get: vi.fn(async () => hit),
     set: vi.fn(async () => {}),
@@ -85,6 +85,7 @@ function makeCache(hit: CacheGetResult | null = null) {
       _fn: BackgroundRefreshFn,
       _cid: string,
     ) => hit),
+    isAvailable: vi.fn(() => available),
   };
 }
 

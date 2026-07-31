@@ -99,6 +99,7 @@ function makeFakeCache(state: CacheState = 'miss', cachedOffers: Offer[] = [make
       _fn: BackgroundRefreshFn,
       _cid: string,
     ) => state === 'miss' ? null : hitResult),
+    isAvailable: vi.fn(() => state !== 'unavailable'),
   } as unknown as CarSearchServiceDeps['cacheRepository'];
 }
 

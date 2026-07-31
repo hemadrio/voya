@@ -29,3 +29,10 @@ export {
   SpyCacheMetrics,
   createOtelCacheMetrics,
 } from './metrics.js';
+
+export {
+  CacheHealthState,
+  DEFAULT_HEALTH_CONFIG,
+  type CacheHealthConfig,
+  type CacheHealthStatus,
+} from './CacheHealthState.js';

@@ -105,6 +105,7 @@ export function createCarSearchController(deps: { carSearchService: ICarSearchSe
           generatedAt: result.freshness.generatedAt.toISOString(),
           stale: result.freshness.stale,
         },
+        cacheAvailable: result.cacheAvailable,
       };
 
       if (result.emptyState !== undefined) {

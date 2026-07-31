@@ -482,6 +482,142 @@ resource "aws_cloudwatch_metric_alarm" "alb_request_count_per_target" {
 }
 
 # ---------------------------------------------------------------------------
+# SEARCH DEGRADATION ALARMS — WO-038
+#
+# These alarms cover the multi-supplier-search epic reliability signals:
+#   1. Circuit-breaker open transitions
+#   2. Stale-serve rate
+#   3. Cache unavailability (sustained)
+#   4. Illustrative offer exposure in production (any count)
+#   5. Search latency p95 by category (warn 3.0 s / hard 5.0 s)
+# ---------------------------------------------------------------------------
+
+# Circuit-breaker open transitions — any breach triggers a ticket (HIGH)
+# Metric emitted by the supplier circuit-breaker (WO-029) as
+# supplier_breaker_transitions_total{direction="open"}.
+resource "aws_cloudwatch_metric_alarm" "search_breaker_open" {
+  alarm_name          = "HIGH-search-supplier-breaker-open"
+  alarm_description   = "Supplier circuit-breaker opened at least once in the last 5 minutes. A supplier is failing and requests are being short-circuited. Check supplier_breaker_transitions_total and supplier call outcomes in the search dashboard. Runbook: ${local.runbook_base_url}/search-degradation.md"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "SupplierBreakerTransitionsTotal"
+  namespace           = local.namespace_search
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = local.platform_ticket_actions
+  ok_actions          = local.platform_ticket_actions
+}
+
+# Stale-serve rate — alarm when stale serves exceed threshold over a 5-minute window
+resource "aws_cloudwatch_metric_alarm" "search_stale_serve_rate" {
+  alarm_name          = "HIGH-search-cache-stale-serve-rate"
+  alarm_description   = "Search stale-serve rate exceeded ${local.threshold_stale_serve_rate_pct}% over 5 minutes. Background cache refresh may be falling behind supplier latency. Check cache freshness window configuration and background-refresh logs. Runbook: ${local.runbook_base_url}/search-degradation.md"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  datapoints_to_alarm = 2
+  threshold           = local.threshold_stale_serve_rate_pct
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = local.platform_ticket_actions
+  ok_actions          = local.platform_ticket_actions
+
+  metric_query {
+    id          = "staleRate"
+    expression  = "IF(cacheResponses > 0, staleServes/cacheResponses*100, 0)"
+    label       = "Stale Serve Rate (%)"
+    return_data = true
+  }
+
+  metric_query {
+    id = "staleServes"
+    metric {
+      metric_name = "search_cache_stale_serves_total"
+      namespace   = local.namespace_search
+      period      = 300
+      stat        = "Sum"
+    }
+  }
+
+  metric_query {
+    id = "cacheResponses"
+    metric {
+      metric_name = "search_cache_hits_total"
+      namespace   = local.namespace_search
+      period      = 300
+      stat        = "Sum"
+    }
+  }
+}
+
+# Cache unavailability — any search_cache_unavailable_total count over 5 minutes
+resource "aws_cloudwatch_metric_alarm" "search_cache_unavailable" {
+  alarm_name          = "CRITICAL-search-cache-unavailable"
+  alarm_description   = "Redis cache unavailability detected: search_cache_unavailable_total > 0 in the last 5 minutes. Search has degraded to direct supplier calls with a tightened 1500ms timeout. Responses are labelled cacheAvailable:false. Verify Redis cluster health and check for connection pool exhaustion. Runbook: ${local.runbook_base_url}/search-degradation.md"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "search_cache_unavailable_total"
+  namespace           = local.namespace_search
+  period              = 300
+  statistic           = "Sum"
+  threshold           = local.threshold_cache_unavailable_count
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = local.platform_page_actions
+  ok_actions          = local.platform_page_actions
+}
+
+# Illustrative offer exposure — any illustrative_offers_served_total in production
+# Zero-tolerance: any count indicates a non-bookable offer was served (WO-030).
+resource "aws_cloudwatch_metric_alarm" "search_illustrative_offers_served" {
+  alarm_name          = "CRITICAL-search-illustrative-offers-served"
+  alarm_description   = "Illustrative (non-bookable) offers were served to clients: illustrative_offers_served_total > 0. Zero-tolerance in production. An illustrative result in a booking flow would result in a failed checkout. Immediately check search service logs for ILLUSTRATIVE provenance results. Runbook: ${local.runbook_base_url}/illustrative-result-exposure.md"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "illustrative_offers_served_total"
+  namespace           = local.namespace_search
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = local.platform_page_actions
+  ok_actions          = local.platform_page_actions
+}
+
+# Search latency p95 by category — WARNING (already exists at endpoint level, this is per-category)
+resource "aws_cloudwatch_metric_alarm" "search_latency_p95_by_category_warning" {
+  alarm_name          = "HIGH-search-latency-p95-by-category-warning"
+  alarm_description   = "Search latency p95 by category exceeded ${local.threshold_search_p95_warning_ms}ms. One or more search categories (flights/hotels/cars) are degraded. Distinguish supplier latency from cache miss rate in the search dashboard. Runbook: ${local.runbook_base_url}/search-degradation.md"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 5
+  datapoints_to_alarm = 2
+  metric_name         = "SearchLatencyByCategory"
+  namespace           = local.namespace_search
+  period              = 60
+  extended_statistic  = "p95"
+  threshold           = local.threshold_search_p95_warning_ms
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = local.platform_ticket_actions
+  ok_actions          = local.platform_ticket_actions
+}
+
+# Search latency p95 by category — HARD alert
+resource "aws_cloudwatch_metric_alarm" "search_latency_p95_by_category_hard" {
+  alarm_name          = "CRITICAL-search-latency-p95-by-category-hard"
+  alarm_description   = "Search latency p95 by category exceeded ${local.threshold_search_p95_hard_ms}ms hard threshold. Immediate investigation required. This level indicates supplier failure, Redis outage without degraded-mode activation, or resource exhaustion. Runbook: ${local.runbook_base_url}/search-degradation.md"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 5
+  datapoints_to_alarm = 3
+  metric_name         = "SearchLatencyByCategory"
+  namespace           = local.namespace_search
+  period              = 60
+  extended_statistic  = "p95"
+  threshold           = local.threshold_search_p95_hard_ms
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = local.platform_page_actions
+  ok_actions          = local.platform_page_actions
+}
+
+# ---------------------------------------------------------------------------
 # COMPOSITE ALARMS — dampen alarm storms during deployment rollbacks
 #
 # A composite alarm fires only when ALL constituent alarms are in ALARM state

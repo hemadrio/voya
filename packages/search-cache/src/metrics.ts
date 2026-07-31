@@ -10,6 +10,7 @@ let _hitsCounter: Counter | null = null;
 let _missesCounter: Counter | null = null;
 let _staleServesCounter: Counter | null = null;
 let _suppressedCounter: Counter | null = null;
+let _unavailableCounter: Counter | null = null;
 
 function meter() {
   return metrics.getMeter('@travel/search-cache');
@@ -44,6 +45,13 @@ function suppressedCounter(): Counter {
   return _suppressedCounter;
 }
 
+function unavailableCounter(): Counter {
+  _unavailableCounter ??= meter().createCounter('search_cache_unavailable_total', {
+    description: 'Cache operations that failed due to Redis unavailability (warn-logged and converted to no-op)',
+  });
+  return _unavailableCounter;
+}
+
 // ---------------------------------------------------------------------------
 // OTel-backed implementation
 // ---------------------------------------------------------------------------
@@ -62,6 +70,9 @@ export function createOtelCacheMetrics(): CacheMetrics {
     recordSingleflightSuppressed(category: string): void {
       suppressedCounter().add(1, { category });
     },
+    recordUnavailable(category: string): void {
+      unavailableCounter().add(1, { category });
+    },
   };
 }
 
@@ -74,16 +85,19 @@ export class SpyCacheMetrics implements CacheMetrics {
   misses: Array<string> = [];
   staleServes: Array<string> = [];
   singleflightSuppressed: Array<string> = [];
+  unavailable: Array<string> = [];
 
   recordHit(category: string): void { this.hits.push(category); }
   recordMiss(category: string): void { this.misses.push(category); }
   recordStaleServe(category: string): void { this.staleServes.push(category); }
   recordSingleflightSuppressed(category: string): void { this.singleflightSuppressed.push(category); }
+  recordUnavailable(category: string): void { this.unavailable.push(category); }
 
   reset(): void {
     this.hits = [];
     this.misses = [];
     this.staleServes = [];
     this.singleflightSuppressed = [];
+    this.unavailable = [];
   }
 }

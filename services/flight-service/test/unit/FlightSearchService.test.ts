@@ -72,11 +72,12 @@ function makeRanker(out: RankedOffer[] = []) {
 
 const FIXED_NOW = Date.UTC(2099, 5, 10); // June 10 2099
 
-function makeCache(hit: CacheGetResult | null = null) {
+function makeCache(hit: CacheGetResult | null = null, available = true) {
   return {
     get: vi.fn(async () => hit),
     set: vi.fn(async () => {}),
     getWithRefresh: vi.fn(async () => hit),
+    isAvailable: vi.fn(() => available),
   };
 }
 
