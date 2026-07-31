@@ -187,6 +187,82 @@ module "rds_proxy" {
   common_tags = local.common_tags
 }
 
+# ── Network foundation data sources ──────────────────────────────────────────
+
+data "aws_vpc" "main" {
+  tags = { Environment = local.environment, Name = "${local.environment}-vpc" }
+}
+
+data "aws_subnets" "public" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.main.id]
+  }
+  filter {
+    name   = "tag:Tier"
+    values = ["public"]
+  }
+}
+
+data "aws_subnets" "private_app" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.main.id]
+  }
+  filter {
+    name   = "tag:Tier"
+    values = ["private-app"]
+  }
+}
+
+data "aws_security_group" "edge_alb" {
+  vpc_id = data.aws_vpc.main.id
+  filter {
+    name   = "tag:Name"
+    values = ["${local.environment}-edge-alb-sg"]
+  }
+}
+
+data "aws_security_group" "internal_alb" {
+  vpc_id = data.aws_vpc.main.id
+  filter {
+    name   = "tag:Name"
+    values = ["${local.environment}-internal-alb-sg"]
+  }
+}
+
+# ── Edge module — CloudFront + WAF + ALBs + target groups (WO-080) ───────────
+
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
+module "edge" {
+  source = "../../modules/edge"
+
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  environment    = local.environment
+  aws_account_id = local.aws_account_id
+  aws_region     = local.aws_region
+
+  vpc_id                 = data.aws_vpc.main.id
+  public_subnet_ids      = data.aws_subnets.public.ids
+  private_app_subnet_ids = data.aws_subnets.private_app.ids
+  edge_alb_sg_id         = data.aws_security_group.edge_alb.id
+  internal_alb_sg_id     = data.aws_security_group.internal_alb.id
+
+  domain_name     = var.domain_name
+  route53_zone_id = var.route53_zone_id
+
+  waf_log_retention_days = 365
+  common_tags            = local.common_tags
+}
+
 # ── ECS services ─────────────────────────────────────────────────────────────
 
 module "ecs_service" {

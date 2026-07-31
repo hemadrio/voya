@@ -35,3 +35,8 @@ tags = {
   Owner              = "platform-team"
   DataClassification = "Confidential"
 }
+
+# Domain for ACM certificates (edge module). Override in environment-specific CI/CD.
+# Set route53_zone_id to enable automated DNS validation via Route 53.
+domain_name     = "travel.example.com"
+route53_zone_id = ""

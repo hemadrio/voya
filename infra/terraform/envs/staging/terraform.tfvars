@@ -33,3 +33,6 @@ tags = {
   Owner              = "platform-team"
   DataClassification = "Synthetic"
 }
+
+domain_name     = "staging.travel.example.com"
+route53_zone_id = ""
