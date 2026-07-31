@@ -343,3 +343,10 @@
 - **Files:** 13 (+1639/-155)
 - **Duration:** 903ss
 - **Approach:** Extended the existing @travel/config package with a composable Zod environment schema and a startup validator, composed the existing wait-for-stack.sh and workspace tasks into a fail-fast bootstrap script, expanded .env.example to enumerate every variable for all nine services and the frontend, and rewrote docs/local-development.md as a full runbook. The existing @travel/observability secretValidator (assertSecretsOrExit) was reused for PLACEHOLDER_BLOCKLIST so no duplication occurred. The Zod approach adds typed frozen config objects on top of the existing per-service SecretDescriptor lists.
+
+## WO-095: User Story: WO-095 - Characterize booking, payment webhook, and auth logic
+- **Status:** completed
+- **Commit:** `38a820f`
+- **Files:** 12 (+2577/-0)
+- **Duration:** 1076ss
+- **Approach:** Created three domain modules (BookingStateMachine, CheckoutSaga, WebhookVerifier) that did not exist, then wrote six characterization test files over them plus the existing CredentialService, LoginAttemptGuard, and SessionService. All tests use constructor-injected fakes — no Prisma, no Express, no Redis, no Stripe API. The WebhookVerifier implements Stripe HMAC-SHA256 verification using Node.js crypto directly. The idempotency tests model a dual-layer dedup harness (Redis SET NX + DB unique constraint) and prove exactly-once in both healthy-Redis and Redis-unavailable configurations. A traceability document maps BR-01 through BR-05 and BR-09 through BR-12 to named tests and deferred WO-096/WO-097 integration assertions.
