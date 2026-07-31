@@ -57,6 +57,23 @@ stages:
     dependsOn: [build]
     description: "ESLint including no-restricted-imports boundary rule"
 
+  # ── 5b. Direct-fetch gate (SSRF policy) ──────────────────────────────────
+  #   Fails the build on any direct axios / node-fetch / global fetch /
+  #   http.request usage outside the egress module. Rules live in
+  #   .semgrep/no-direct-fetch.yml.
+  - name: scan:no-direct-fetch
+    run: >
+      semgrep --config .semgrep/no-direct-fetch.yml
+      --error
+      --include "*.ts"
+      --exclude "node_modules"
+      .
+    blocking: true
+    description: >
+      Semgrep SSRF policy gate — fails if any service or package makes outbound
+      HTTP directly with axios, node-fetch, global fetch, or http.request instead
+      of routing through createHardenedClient from @travel/suppliers.
+
   # ── 6. Dependency advisory scan ──────────────────────────────────────────
   - name: scan-deps
     run: pnpm audit --audit-level=critical
@@ -120,6 +137,7 @@ stages:
       - test
       - contracts-check
       - lint
+      - scan:no-direct-fetch
       - scan-deps
       - scan:gitleaks
       - scan:semgrep

@@ -41,6 +41,8 @@ export const ErrorCode = {
   SUPPLIER_UNAVAILABLE: "SUPPLIER_UNAVAILABLE",
   SUPPLIER_TIMEOUT: "SUPPLIER_TIMEOUT",
   INTERNAL_ERROR: "INTERNAL_ERROR",
+  /** 502 — outbound request denied by the SSRF egress allow-list policy. */
+  EGRESS_DENIED: "EGRESS_DENIED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -70,6 +72,7 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   SUPPLIER_UNAVAILABLE: 502,
   SUPPLIER_TIMEOUT: 504,
   INTERNAL_ERROR: 500,
+  EGRESS_DENIED: 502,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

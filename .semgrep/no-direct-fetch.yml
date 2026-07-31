@@ -1,0 +1,91 @@
+rules:
+  # ── Prevent direct HTTP clients outside the egress module ─────────────────
+  #
+  # All server-side outbound HTTP must go through createHardenedClient from
+  # @travel/suppliers. Using axios, node-fetch, global fetch, or the raw
+  # node:http / node:https modules directly bypasses:
+  #   - The SSRF allow-list (EgressDeniedError)
+  #   - DNS rebinding protection
+  #   - The circuit breaker
+  #   - Timeout enforcement
+  #
+  # Exceptions:
+  #   - packages/suppliers/src/egress/hardenedClient.ts (the implementation itself)
+  #   - packages/suppliers/__tests__/              (test files)
+  #   - scripts/**                                 (build scripts, not deployed)
+
+  - id: no-direct-axios
+    patterns:
+      - pattern: import axios from 'axios'
+      - pattern: import axios from "axios"
+      - pattern: require('axios')
+      - pattern: require("axios")
+    message: >
+      Direct axios usage is prohibited outside the egress module.
+      Use createHardenedClient from @travel/suppliers for all outbound HTTP.
+      See packages/suppliers/src/egress/hardenedClient.ts.
+    languages: [typescript, javascript]
+    severity: ERROR
+    paths:
+      exclude:
+        - packages/suppliers/src/egress/hardenedClient.ts
+        - packages/suppliers/__tests__/**
+        - scripts/**
+        - "*.test.ts"
+        - "*.spec.ts"
+
+  - id: no-node-fetch-import
+    patterns:
+      - pattern: import nodeFetch from 'node-fetch'
+      - pattern: import nodeFetch from "node-fetch"
+      - pattern: require('node-fetch')
+      - pattern: require("node-fetch")
+    message: >
+      Direct node-fetch usage is prohibited outside the egress module.
+      Use createHardenedClient from @travel/suppliers for all outbound HTTP.
+    languages: [typescript, javascript]
+    severity: ERROR
+    paths:
+      exclude:
+        - packages/suppliers/src/egress/hardenedClient.ts
+        - packages/suppliers/__tests__/**
+        - scripts/**
+
+  - id: no-global-fetch
+    patterns:
+      - pattern: fetch($URL, ...)
+      - pattern: globalThis.fetch($URL, ...)
+      - pattern: global.fetch($URL, ...)
+    message: >
+      Direct global fetch() usage is prohibited in service code.
+      Use createHardenedClient from @travel/suppliers for all outbound HTTP.
+      If this is a test or script file, add it to the excludes list.
+    languages: [typescript, javascript]
+    severity: ERROR
+    paths:
+      exclude:
+        - packages/suppliers/src/egress/hardenedClient.ts
+        - packages/suppliers/__tests__/**
+        - frontend/**
+        - scripts/**
+        - "*.test.ts"
+        - "*.spec.ts"
+
+  - id: no-raw-http-request
+    patterns:
+      - pattern: http.request(...)
+      - pattern: https.request(...)
+      - pattern: http.get(...)
+      - pattern: https.get(...)
+    message: >
+      Direct node:http / node:https usage is prohibited outside the egress module.
+      Use createHardenedClient from @travel/suppliers for all outbound HTTP.
+    languages: [typescript, javascript]
+    severity: ERROR
+    paths:
+      exclude:
+        - packages/suppliers/src/egress/hardenedClient.ts
+        - packages/suppliers/__tests__/**
+        - scripts/**
+        - "*.test.ts"
+        - "*.spec.ts"

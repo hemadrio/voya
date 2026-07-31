@@ -97,3 +97,11 @@ export function supplierUnavailable(message = "Supplier is currently unavailable
 export function supplierTimeout(message = "Supplier request timed out. Please try again."): DomainError {
   return new DomainErrorImpl("SUPPLIER_TIMEOUT", message);
 }
+
+/**
+ * 502 — the outbound request was refused by the SSRF egress allow-list policy.
+ * The attempted host is recorded in the security event, not in the response body.
+ */
+export function egressDenied(message = "Outbound request denied by security policy."): DomainError {
+  return new DomainErrorImpl("EGRESS_DENIED", message);
+}
