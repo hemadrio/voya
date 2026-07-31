@@ -142,6 +142,27 @@ export function passwordReuseNotAllowed(
   return new DomainErrorImpl("PASSWORD_REUSE_NOT_ALLOWED", message, "password");
 }
 
+/** 401 — email or password did not match; collapses all credential failure reasons. */
+export function invalidCredentials(
+  message = "Invalid email or password.",
+): DomainError {
+  return new DomainErrorImpl("INVALID_CREDENTIALS", message);
+}
+
+/** 403 — the account exists but the email address has not been verified. */
+export function emailNotVerified(
+  message = "Please verify your email address before logging in.",
+): DomainError {
+  return new DomainErrorImpl("EMAIL_NOT_VERIFIED", message);
+}
+
+/** 403 — the account is suspended or deleted and may not authenticate. */
+export function accountDisabled(
+  message = "This account has been disabled. Please contact support.",
+): DomainError {
+  return new DomainErrorImpl("ACCOUNT_DISABLED", message);
+}
+
 /** 404 — the session id does not exist or does not belong to the caller. */
 export function sessionNotFound(
   message = "Session not found.",

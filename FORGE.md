@@ -385,3 +385,10 @@
 - **Files:** 14 (+1936/-26)
 - **Duration:** 1188ss
 - **Approach:** N/A
+
+## WO-021: User Story: WO-021 - Implement login endpoint issuing signed access tokens
+- **Status:** completed
+- **Commit:** `388dad9`
+- **Files:** 11 (+1469/-1)
+- **Duration:** 1109ss
+- **Approach:** Implemented the login endpoint and associated services using a hexagonal architecture with no external JWT library. The TokenService uses Node.js built-in crypto (createSign/createVerify for RS256, createHmac for HS256) with a hard algorithm allow-list that rejects 'none' at both construction and verify time, and never infers algorithm from the token header. The LoginService implements the ordered security pipeline: email normalization, user+credential load, lockout check before hash work, password verification with timing equalization for unknown users, emailVerifiedAt check, status check, session creation with pre-generated jti stored in session.token, token minting with sid=session.id and jti synchronized to session.token, and counter reset. Three new error codes were added to @travel/contracts (INVALID_CREDENTIALS/401, EMAIL_NOT_VERIFIED/403, ACCOUNT_DISABLED/403). SessionRepository was extended with session.create support. Unit tests cover all pipeline branches for LoginService and all JWT security properties for TokenService.

@@ -36,6 +36,9 @@ export {
   invalidOrExpiredToken,
   passwordReuseNotAllowed,
   sessionNotFound,
+  invalidCredentials,
+  emailNotVerified,
+  accountDisabled,
 } from "./domain-errors.js";
 
 export { serialiseError, RESTRICTED_FIELDS } from "./serialise.js";

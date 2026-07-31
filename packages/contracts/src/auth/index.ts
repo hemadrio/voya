@@ -112,3 +112,22 @@ export const VerifyEmailResponseSchema = z.object({
   verified: z.literal(true),
 });
 export type VerifyEmailResponse = z.infer<typeof VerifyEmailResponseSchema>;
+
+/** Sanitized user profile returned in the login response. */
+export const LoginUserProfileSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  displayName: z.string().nullable(),
+  roles: z.array(z.string()),
+  emailVerified: z.boolean(),
+});
+export type LoginUserProfile = z.infer<typeof LoginUserProfileSchema>;
+
+/** 200 response for successful login. */
+export const LoginResponseSchema = z.object({
+  accessToken: z.string(),
+  tokenType: z.literal("Bearer"),
+  expiresIn: z.number().int().positive(),
+  user: LoginUserProfileSchema,
+});
+export type LoginResponse = z.infer<typeof LoginResponseSchema>;

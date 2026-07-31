@@ -254,7 +254,9 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
       await loginAttemptGuard.recordSuccess(email, ipAddress);
     }
 
-    res.json({ data: result });
+    // Return the LoginResponse shape directly (no wrapper) so the api-gateway
+    // can forward the accessToken without unwrapping.
+    res.json(result);
   });
 
   router.post("/refresh", validateRefresh, async (req: Request, res: Response): Promise<void> => {

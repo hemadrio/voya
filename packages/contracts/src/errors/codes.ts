@@ -60,6 +60,12 @@ export const ErrorCode = {
   ACTOR_CONTEXT_INVALID: "ACTOR_CONTEXT_INVALID",
   /** 429 — account temporarily locked after too many failed authentication attempts. */
   ACCOUNT_TEMPORARILY_LOCKED: "ACCOUNT_TEMPORARILY_LOCKED",
+  /** 401 — email or password did not match; does not reveal which field failed. */
+  INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
+  /** 403 — account exists but email address has not been verified. */
+  EMAIL_NOT_VERIFIED: "EMAIL_NOT_VERIFIED",
+  /** 403 — account is suspended or deleted and cannot authenticate. */
+  ACCOUNT_DISABLED: "ACCOUNT_DISABLED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -98,6 +104,9 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   SESSION_NOT_FOUND: 404,
   ACTOR_CONTEXT_INVALID: 401,
   ACCOUNT_TEMPORARILY_LOCKED: 429,
+  INVALID_CREDENTIALS: 401,
+  EMAIL_NOT_VERIFIED: 403,
+  ACCOUNT_DISABLED: 403,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

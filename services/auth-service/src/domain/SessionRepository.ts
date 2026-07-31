@@ -37,10 +37,48 @@ interface ActiveSessionRow {
   userAgent: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Session creation — used by the login pipeline (WO-021)
+// ---------------------------------------------------------------------------
+
+export interface SessionCreateInput {
+  /** User who owns this session. */
+  userId: string;
+  /**
+   * JWT ID (jti claim) stored in the legacy token column.
+   * Must be unique — used to detect token reuse in WO-022.
+   */
+  token: string;
+  /** When the access token (and therefore this session record) expires. */
+  expiresAt: Date;
+  /** Client IPv4/IPv6 address (up to 45 chars). */
+  ipAddress?: string;
+  /** User-Agent header value (truncated to 512 chars by the schema). */
+  userAgent?: string;
+}
+
+/** Minimal row returned after creating a session. */
+export interface CreatedSessionRow {
+  id: string;
+  token: string;
+  expiresAt: Date;
+  createdAt: Date;
+}
+
 export interface SessionDbClient {
   session: {
     updateMany(args: SessionUpdateManyArgs): Promise<{ count: number }>;
     findMany(args: SessionFindManyArgs): Promise<ActiveSessionRow[]>;
+    create(args: {
+      data: {
+        userId: string;
+        token: string;
+        expiresAt: Date;
+        ipAddress?: string;
+        userAgent?: string;
+      };
+      select: { id: true; token: true; expiresAt: true; createdAt: true };
+    }): Promise<CreatedSessionRow>;
   };
 }
 
@@ -49,6 +87,12 @@ export interface SessionDbClient {
 // ---------------------------------------------------------------------------
 
 export interface SessionRepository {
+  /**
+   * Create a new session row after a successful login.
+   * The `token` field stores the JWT jti for the issued access token.
+   */
+  createSession(input: SessionCreateInput): Promise<CreatedSessionRow>;
+
   /**
    * Revoke a single session by ID, filtered to the owning user.
    * Returns true if the session was found and revoked; false if it did not
@@ -73,8 +117,28 @@ export interface SessionRepository {
 // Concrete implementation backed by a duck-typed Prisma client
 // ---------------------------------------------------------------------------
 
+const SESSION_CREATE_SELECT = {
+  id: true as const,
+  token: true as const,
+  expiresAt: true as const,
+  createdAt: true as const,
+};
+
 export function createSessionRepository(db: SessionDbClient): SessionRepository {
   return {
+    async createSession(input: SessionCreateInput): Promise<CreatedSessionRow> {
+      return db.session.create({
+        data: {
+          userId: input.userId,
+          token: input.token,
+          expiresAt: input.expiresAt,
+          ipAddress: input.ipAddress,
+          userAgent: input.userAgent,
+        },
+        select: SESSION_CREATE_SELECT,
+      });
+    },
+
     async revokeById(sessionId: string, userId: string): Promise<boolean> {
       const result = await db.session.updateMany({
         where: { id: sessionId, userId, revokedAt: null },
