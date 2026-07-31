@@ -1,0 +1,7 @@
+{
+  "status": 503,
+  "body": {
+    "error": "Service Temporarily Unavailable",
+    "retryAfter": 30
+  }
+}

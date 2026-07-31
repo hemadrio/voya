@@ -1,0 +1,6 @@
+{
+  "scenario": "blocked-host",
+  "description": "Supplier URL resolves to a host not in SUPPLIER_ALLOWED_HOSTS allow-list",
+  "attemptedUrl": "https://evil.example.com/exfiltrate",
+  "expectedError": "SupplierEgressBlockedError"
+}

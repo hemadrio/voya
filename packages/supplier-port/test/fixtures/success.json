@@ -1,0 +1,17 @@
+[
+  {
+    "id": "TEST-OFFER-001",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "title": "Test Flight LHR → JFK",
+    "price": "199.99",
+    "currency": "USD",
+    "details": {
+      "origin": "LHR",
+      "destination": "JFK",
+      "departureDate": "2027-03-15"
+    },
+    "expiresAt": "2027-01-01T12:00:00.000Z",
+    "freshness": "FRESH"
+  }
+]

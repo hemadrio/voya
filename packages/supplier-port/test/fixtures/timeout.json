@@ -1,0 +1,6 @@
+{
+  "scenario": "timeout",
+  "description": "Supplier does not respond within configured timeoutMs",
+  "simulatedDelayMs": 5000,
+  "configuredTimeoutMs": 2200
+}

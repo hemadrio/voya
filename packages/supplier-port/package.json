@@ -1,0 +1,40 @@
+{
+  "name": "@travel/supplier-port",
+  "version": "0.1.0",
+  "description": "SupplierPort abstraction, typed error hierarchy, HTTP client wrapper, and adapter contract-compliance harness for the travel platform search domain",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./test": {
+      "import": "./dist/test/contract-compliance.js",
+      "types": "./dist/test/contract-compliance.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rimraf dist",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
+    "test": "jest --config jest.config.cjs",
+    "test:coverage": "jest --config jest.config.cjs --coverage",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@travel/contracts": "workspace:*",
+    "@travel/suppliers": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "rimraf": "^5.0.7",
+    "ts-jest": "^29.2.0",
+    "typescript": "^5.5.3"
+  }
+}
