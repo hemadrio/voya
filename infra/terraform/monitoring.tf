@@ -1,11 +1,18 @@
 # monitoring.tf — CloudWatch alarms for index tuning and partition maintenance.
 # WO-077: alarms for the audit-log partition maintenance health and
 # booking write latency regression detection.
+#
+# WO-011 extension: application-level dashboards, SLO-driven alarms, security
+# alarms, and log metric filters are in monitoring-alarms.tf,
+# monitoring-dashboards.tf, and monitoring-log-filters.tf.
+# Ratified thresholds are in locals.tf.
+# SNS severity topics (platform-page, platform-ticket, platform-info) are in sns.tf.
+# New alarms use local.platform_page_actions / platform_ticket_actions from locals.tf.
 
 locals {
   # Namespace shared across booking operational alarms
   booking_alarm_namespace = "travel/booking"
-  # Alarm actions: notify the on-call SNS topic (must be defined per environment)
+  # Alarm actions: existing on-call SNS topic (legacy; new alarms use severity topics)
   alarm_actions = [var.oncall_sns_topic_arn]
 }
 
