@@ -17,6 +17,8 @@ packages:
 
 catalog:
   # ── Core runtime ──────────────────────────────────────────────────────────
+  "js-yaml": "^4.1.0"
+  "@types/js-yaml": "^4.0.9"
   zod: "^3.23.8"
   pino: "^8.21.0"
   express: "^4.19.2"
@@ -28,6 +30,7 @@ catalog:
   # ── AWS SDKs ──────────────────────────────────────────────────────────────
   "@aws-sdk/client-kms": "^3.600.0"
   "@aws-sdk/client-sqs": "^3.600.0"
+  "@aws-sdk/client-s3": "^3.600.0"
   "@aws-sdk/client-secrets-manager": "^3.600.0"
   "@aws-sdk/client-ses": "^3.600.0"
   "@aws-sdk/client-sesv2": "^3.600.0"

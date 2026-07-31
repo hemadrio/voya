@@ -364,3 +364,10 @@
 - **Files:** 9 (+1662/-1)
 - **Duration:** 789ss
 - **Approach:** Implemented GDPR data subject rights as a pure hexagonal domain service (DataSubjectRightsService) with all side-effects injected via TypeScript interfaces (no Express/Prisma imports). Added seven privacy Zod schemas to packages/contracts/src/privacy/index.ts and registered them in the schema registry. Created five /v1/me routes (GET, PATCH, POST /export, GET /export/:id, DELETE) in me.ts that derive subject identity exclusively from the bearer token actor context. ExportWorker handles async archive assembly with deep key redaction and ExportArchiveManifestSchema validation before upload. Erasure orchestrates session revocation, HMAC pseudonymisation recording, KMS key destruction, and retention-registry-driven outcome classification. All four GDPR rights are audited through the AuditWriter port.
+
+## WO-105: User Story: WO-105 - SOC 2 Continuous Evidence Collection and Compliance Alerting
+- **Status:** completed
+- **Commit:** `b424b26`
+- **Files:** 38 (+3203/-0)
+- **Duration:** 1023ss
+- **Approach:** Built a pluggable scheduled evidence collector following the hexagonal/ports-and-adapters pattern used elsewhere in the codebase. The EvidenceSource port defines the interface all adapters implement; the SourceRegistry validates adapter completeness before the run starts. The collector iterates the control matrix, gathers evidence per control (or records an explicit gap record), serialises artefacts with SHA-256, and asserts no PII keys survive before upload. A per-run manifest captures all artefact hashes and gaps. Eight source adapters cover all eight required evidence categories. CloudWatch EMF metrics are emitted via stdout (ADOT picks them up without a PutMetricData API call). Terraform provisions the Object Lock S3 bucket with compliance mode retention, KMS encryption, blocked public access, a least-privilege PutObject-only collector IAM role (with explicit Deny on DeleteObject/PutObjectRetention), EventBridge daily schedule, 8 CloudWatch metric alarms with SLI framing, and a multi-widget compliance dashboard. Nine runbooks cover every alarm.

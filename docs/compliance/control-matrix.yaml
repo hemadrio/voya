@@ -1,0 +1,116 @@
+# SOC 2 Type II Control Traceability Matrix
+# Continuously consumed by the compliance-evidence-collector (WO-105).
+#
+# Schema rules enforced at collector startup:
+#   - Every control must have a unique id, a group, a description,
+#     and an evidence_source that matches a registered adapter name.
+#   - control_id is kebab-case: [a-z][a-z0-9-]+
+#   - Not-yet-operating controls use status: planned — they produce an
+#     explicit "planned" gap record rather than a failure gap.
+
+schema_version: "1.0"
+environment_variable: ENVIRONMENT   # injected at runtime
+
+control_groups:
+  - id: CC1
+    name: Control Environment
+  - id: CC2
+    name: Communication and Information
+  - id: CC6
+    name: Logical and Physical Access
+  - id: CC7
+    name: System Operations
+  - id: CC8
+    name: Change Management
+  - id: CC9
+    name: Risk Mitigation
+  - id: A1
+    name: Availability
+  - id: P1
+    name: Privacy
+
+controls:
+  # ── CC6: Logical Access ────────────────────────────────────────────────────
+
+  - id: cc6-audit-chain
+    group: CC6
+    description: >
+      Audit log hash-chain integrity is continuously verified. Any break in
+      the chain indicates unauthorised mutation of the immutable audit record.
+    slo_description: Chain verified within 25 hours of the previous successful check.
+    evidence_source: audit_chain_verifier
+    status: operating
+
+  - id: cc6-access-review
+    group: CC6
+    description: >
+      IAM role assignments and application-level role grants are snapshotted
+      daily so entitlement drift is detectable across the observation window.
+    slo_description: Snapshot produced within 25 hours of the previous successful snapshot.
+    evidence_source: access_review_snapshot
+    status: operating
+
+  - id: cc6-dsr-fulfilment
+    group: CC6
+    description: >
+      Data subject requests are fulfilled within the 30-day GDPR window.
+      Evidence records the oldest outstanding request age and any breaches.
+    slo_description: All DSR requests completed within 30 days.
+    evidence_source: dsr_fulfilment_timings
+    status: operating
+
+  # ── CC7: System Operations ─────────────────────────────────────────────────
+
+  - id: cc7-purge-summary
+    group: CC7
+    description: >
+      Retention purge worker run outcome (rows purged per category, errors,
+      duration) is captured daily to prove automated data lifecycle controls
+      are operating.
+    slo_description: Purge run completed within 25 hours and zero category failures.
+    evidence_source: purge_run_summary
+    status: operating
+
+  - id: cc7-secret-rotation
+    group: CC7
+    description: >
+      Secret rotation events from Secrets Manager are captured to demonstrate
+      credentials are rotated on schedule and no secret has exceeded its
+      maximum age.
+    slo_description: No secret exceeds the maximum age policy (90 days).
+    evidence_source: secret_rotation_events
+    status: operating
+
+  - id: cc7-payment-reconciliation
+    group: CC7
+    description: >
+      Daily payment reconciliation exception count (confirmed bookings with
+      unmatched payment events). Objective O3 requires zero exceptions at
+      daily close.
+    slo_description: Zero unreconciled payments at daily close.
+    evidence_source: payment_reconciliation
+    status: operating
+
+  # ── CC8: Change Management ─────────────────────────────────────────────────
+
+  - id: cc8-pipeline-changes
+    group: CC8
+    description: >
+      Deployment and change approval records from the shipping pipeline prove
+      that every production change passed the required gates (build, scan,
+      approval) before reaching production.
+    slo_description: Every deployment to production has a recorded approval.
+    evidence_source: pipeline_change_records
+    status: operating
+
+  # ── CC9: Risk Mitigation / Dependency Security ─────────────────────────────
+
+  - id: cc9-scan-outcomes
+    group: CC9
+    description: >
+      Dependency vulnerability scan (SCA) and secret scan outcomes from the
+      CI pipeline are captured daily so the presence of unmitigated critical
+      CVEs or leaked secrets is detectable across the observation window.
+    slo_description: No unmitigated critical CVEs and no leaked secrets in production.
+    evidence_source: scan_results
+    status: operating

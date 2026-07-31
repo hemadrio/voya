@@ -1,0 +1,31 @@
+# Sample control matrix for tests — minimal version with two controls.
+schema_version: "1.0"
+environment_variable: ENVIRONMENT
+
+control_groups:
+  - id: CC6
+    name: Logical and Physical Access
+  - id: CC7
+    name: System Operations
+
+controls:
+  - id: cc6-audit-chain
+    group: CC6
+    description: Audit log hash-chain integrity verification.
+    slo_description: Chain verified within 25 hours.
+    evidence_source: audit_chain_verifier
+    status: operating
+
+  - id: cc7-purge-summary
+    group: CC7
+    description: Retention purge worker run outcome.
+    slo_description: Purge run completed and zero errors.
+    evidence_source: purge_run_summary
+    status: operating
+
+  - id: cc7-future-control
+    group: CC7
+    description: A control that is not yet operating.
+    slo_description: Will be in place by Q4.
+    evidence_source: future_adapter
+    status: planned

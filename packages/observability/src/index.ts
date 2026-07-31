@@ -1,4 +1,18 @@
 export type { LogContext } from './context.js';
+
+export {
+  recordAuditWriteFailure,
+  recordAuditChainBreak,
+  recordEvidenceCollectorHeartbeat,
+  recordEvidenceGap,
+  recordEvidenceRunCompleted,
+  recordDsrWindowBreaches,
+  recordPurgeRunFailure,
+  recordPaymentReconciliationExceptions,
+  recordWebhookSignatureFailure,
+  recordAccessControlDenial,
+  recordIllustrativeResultExposure,
+} from './metrics.js';
 export { createLogger, createChildLogger } from './logger.js';
 export type { CreateLoggerOptions } from './logger.js';
 

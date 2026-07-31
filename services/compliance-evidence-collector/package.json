@@ -1,0 +1,30 @@
+{
+  "name": "compliance-evidence-collector",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scheduled SOC 2 evidence collector — gathers control evidence, writes dated artefacts to Object Lock S3, emits compliance metrics.",
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-vm-modules dist/index.js",
+    "report": "node --experimental-vm-modules dist/report.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "@aws-sdk/client-secrets-manager": "catalog:",
+    "@travel/contracts": "workspace:*",
+    "@travel/observability": "workspace:*",
+    "js-yaml": "catalog:"
+  },
+  "devDependencies": {
+    "@travel/test-config": "workspace:*",
+    "@types/js-yaml": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
+  }
+}
