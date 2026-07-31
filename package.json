@@ -24,7 +24,10 @@
     "openapi:generate": "npx tsx scripts/generate-openapi.ts",
     "openapi:check": "npx tsx scripts/generate-openapi.ts --out /tmp/openapi-check.yaml && diff docs/api/openapi.yaml /tmp/openapi-check.yaml",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "bash scripts/db-reset.sh"
+    "db:reset": "bash scripts/db-reset.sh",
+    "bootstrap": "bash scripts/bootstrap.sh",
+    "bootstrap:reset": "bash scripts/bootstrap.sh --reset",
+    "infra:start": "bash scripts/bootstrap.sh --infra-only"
   },
   "devDependencies": {
     "turbo": "2.1.3",

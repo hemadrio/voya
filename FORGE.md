@@ -336,3 +336,10 @@
 - **Files:** 13 (+1810/-71)
 - **Duration:** 769ss
 - **Approach:** Extended the existing generic ecs-service module with Service Connect, per-service SQS IAM policies, and a configurable health-check start period. Created a new ecs-cluster module providing the ECS cluster, Container Insights, FARGATE/FARGATE_SPOT capacity providers, and a Cloud Map HTTP namespace for Service Connect mTLS. Replaced the generic for_each module calls in both dev and production main.tf with per-service instantiations in services.tf, giving each service its own explicit sizing, secret ARN mapping, and IAM boundary. Added Terraform unit tests for all sizing, secrets-only injection, IAM isolation, Service Connect, and no-LB notification-consumer assertions.
+
+## WO-093: User Story: WO-093 - One-Command Developer Bootstrap and Environment Validation
+- **Status:** completed
+- **Commit:** `e3111b6`
+- **Files:** 13 (+1639/-155)
+- **Duration:** 903ss
+- **Approach:** Extended the existing @travel/config package with a composable Zod environment schema and a startup validator, composed the existing wait-for-stack.sh and workspace tasks into a fail-fast bootstrap script, expanded .env.example to enumerate every variable for all nine services and the frontend, and rewrote docs/local-development.md as a full runbook. The existing @travel/observability secretValidator (assertSecretsOrExit) was reused for PLACEHOLDER_BLOCKLIST so no duplication occurred. The Zod approach adds typed frozen config objects on top of the existing per-service SecretDescriptor lists.

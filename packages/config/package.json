@@ -27,6 +27,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@travel/observability": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
