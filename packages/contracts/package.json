@@ -85,6 +85,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@travel/test-config": "workspace:*",
     "@types/node": "catalog:",
     "@typescript-eslint/eslint-plugin": "catalog:",
     "@typescript-eslint/parser": "catalog:",

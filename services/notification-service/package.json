@@ -2,7 +2,7 @@
   "name": "notification-service",
   "version": "0.1.0",
   "private": true,
-  "description": "Notification service — consumes SQS events and dispatches emails via SES.",
+  "description": "Notification service \u2014 consumes SQS events and dispatches emails via SES.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -17,6 +17,7 @@
     "ioredis": "catalog:"
   },
   "devDependencies": {
+    "@travel/test-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

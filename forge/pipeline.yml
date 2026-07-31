@@ -24,18 +24,54 @@ stages:
     dependsOn: [build]
     description: "Strict TypeScript --noEmit over all affected packages"
 
-  # ── 3. Unit & integration tests ──────────────────────────────────────────
+  # ── 3. Unit tests with coverage + per-path threshold gate ───────────────
   #   @travel/contracts#test is non-cacheable (turbo.json) so the baseline
   #   comparator and classifier always re-run even when turbo remote cache
   #   would otherwise serve a stale result.
+  #
+  #   Coverage artefacts (lcov + JUnit XML) are archived for ≥ 1-year SOC 2
+  #   evidence retention.  See docs/testing/test-strategy.md.
   - name: test
-    run: pnpm turbo test --affected
+    run: pnpm turbo test:unit --affected -- --coverage
     dependsOn: [build]
     description: >
-      Vitest suites including: unit tests, JSON round-trip, dependency-boundary,
-      registry completeness, baseline comparator, classifier, and all consumer
-      fixture suites (9 services + frontend).
+      Vitest unit suites (all affected packages) with V8 coverage output.
+      Generates per-package coverage/lcov.info and coverage/coverage-summary.json.
     blocking: true
+
+  - name: coverage:check
+    run: pnpm coverage:check
+    dependsOn: [test]
+    blocking: true
+    description: >
+      Per-path coverage threshold gate (scripts/coverage-check.ts).
+      Phase 1 gates: auth-service domain ≥ 60% lines/branches.
+      Phase 2 gates: booking-service domain ≥ 60% lines/branches.
+      Exits non-zero with a per-path failure summary when any threshold is not met.
+
+  - name: coverage:publish
+    run: >
+      sonar-scanner
+      -Dsonar.coverageReportPaths=services/*/coverage/lcov.info,packages/*/coverage/lcov.info
+      -Dsonar.qualitygate.wait=false
+    dependsOn: [coverage:check]
+    description: >
+      Publish lcov coverage to SonarQube for historical trend tracking.
+      Does not block the pipeline (qualitygate.wait=false) — the scan:sonarqube
+      stage at step 7 enforces the SonarQube quality gate.
+
+  - name: coverage:archive
+    run: >
+      tar -czf coverage-artefacts.tar.gz
+      services/*/coverage/lcov.info
+      services/*/coverage/coverage-summary.json
+      packages/*/coverage/lcov.info
+      packages/*/coverage/coverage-summary.json
+    dependsOn: [coverage:check]
+    description: >
+      Archive lcov + json-summary files as an immutable pipeline artefact
+      (S3 Object Lock, COMPLIANCE mode, 365-day retention) for SOC 2
+      change-management evidence.  See docs/testing/test-strategy.md.
 
   # ── 4. Contract compatibility gate ───────────────────────────────────────
   #   Non-cacheable.  Fails when:
@@ -135,6 +171,7 @@ stages:
       - build
       - typecheck
       - test
+      - coverage:check
       - contracts-check
       - lint
       - scan:no-direct-fetch

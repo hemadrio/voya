@@ -35,4 +35,34 @@ export default [
       'no-console': 'off',
     },
   },
+  {
+    // Architecture rule: domain-service modules must not import Express or
+    // @prisma/client directly.  Business logic in src/domain/ must depend only
+    // on pure TypeScript interfaces (duck-typed repository / presenter contracts)
+    // so the unit-test harness can run without any infrastructure.
+    //
+    // Violations fail the lint step — not just a warning — so CI blocks the PR.
+    files: ['services/*/src/domain/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'express',
+              message:
+                'Domain services must not import Express directly. ' +
+                'Accept typed interfaces via constructor injection instead.',
+            },
+            {
+              name: '@prisma/client',
+              message:
+                'Domain services must not import @prisma/client directly. ' +
+                'Accept a duck-typed repository interface via constructor injection instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];

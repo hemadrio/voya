@@ -46,7 +46,7 @@
     },
 
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@travel/test-config#typecheck"],
       "inputs": [
         "src/**/*.ts",
         "src/**/*.tsx",
@@ -55,13 +55,15 @@
         "__tests__/**/*.ts",
         "vitest.config.*",
         "jest.config.*",
-        "package.json"
+        "package.json",
+        "../../packages/test-config/src/**/*.ts",
+        "../../packages/fixtures/src/**/*.ts"
       ],
       "outputs": ["coverage/**"]
     },
 
     "test:unit": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@travel/test-config#typecheck"],
       "inputs": [
         "src/**/*.ts",
         "test/**/*.ts",
@@ -69,7 +71,9 @@
         "__tests__/**/*.ts",
         "vitest.config.*",
         "jest.config.*",
-        "package.json"
+        "package.json",
+        "../../packages/test-config/src/**/*.ts",
+        "../../packages/fixtures/src/**/*.ts"
       ],
       "outputs": ["coverage/**"]
     },
@@ -116,14 +120,21 @@
     },
 
     "@travel/observability#test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@travel/test-config#typecheck"],
       "inputs": [
         "src/**/*.ts",
         "__tests__/**/*.ts",
-        "jest.config.*",
+        "vitest.config.*",
         "package.json"
       ],
       "outputs": ["coverage/**"]
+    },
+
+    "@travel/test-config#typecheck": {
+      "dependsOn": [],
+      "inputs": ["src/**/*.ts", "tsconfig.json", "package.json"],
+      "outputs": [],
+      "cache": true
     }
   }
 }

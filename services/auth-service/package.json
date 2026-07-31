@@ -2,7 +2,7 @@
   "name": "auth-service",
   "version": "0.1.0",
   "private": true,
-  "description": "Auth service — handles registration, login, JWT refresh, and OAuth.",
+  "description": "Auth service \u2014 handles registration, login, JWT refresh, and OAuth.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -15,11 +15,12 @@
     "@prisma/client": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:",
-    "vitest": "catalog:",
+    "@travel/test-config": "workspace:*",
     "@types/express": "catalog:",
     "@types/supertest": "catalog:",
-    "supertest": "catalog:"
+    "supertest": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=20.0.0 <21.0.0"

@@ -1,8 +1,11 @@
-import { defineConfig } from 'vitest/config';
+import { createBaseConfig } from "@travel/test-config";
 
-export default defineConfig({
-  test: {
-    environment: 'node',
-    include: ['test/**/*.test.ts'],
+export default createBaseConfig({
+  coverage: {
+    provider: "v8",
+    reporter: ["text", "lcov", "json-summary"],
+    include: ["src/**/*.ts"],
+    reportsDirectory: "./coverage",
+    clean: true,
   },
 });

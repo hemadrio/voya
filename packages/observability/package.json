@@ -23,8 +23,8 @@
     "build": "tsc -p tsconfig.build.json",
     "clean": "rimraf dist",
     "lint": "eslint \"src/**/*.ts\" \"__tests__/**/*.ts\"",
-    "test": "jest --config jest.config.cjs",
-    "test:coverage": "jest --config jest.config.cjs --coverage",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -41,16 +41,15 @@
     "pino": "catalog:"
   },
   "devDependencies": {
+    "@travel/test-config": "workspace:*",
     "@types/express": "catalog:",
-    "@types/jest": "catalog:",
     "@types/node": "catalog:",
     "@typescript-eslint/eslint-plugin": "catalog:",
     "@typescript-eslint/parser": "catalog:",
     "eslint": "catalog:",
     "express": "catalog:",
-    "jest": "catalog:",
     "rimraf": "catalog:",
-    "ts-jest": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

@@ -2,7 +2,7 @@
   "name": "reporting-service",
   "version": "0.1.0",
   "private": true,
-  "description": "Reporting service — generates booking analytics and audit reports.",
+  "description": "Reporting service \u2014 generates booking analytics and audit reports.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -13,6 +13,7 @@
     "@travel/observability": "workspace:*"
   },
   "devDependencies": {
+    "@travel/test-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

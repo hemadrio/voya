@@ -2,7 +2,7 @@
   "name": "ai-service",
   "version": "0.1.0",
   "private": true,
-  "description": "AI service — generates ILLUSTRATIVE offer previews using Claude.",
+  "description": "AI service \u2014 generates ILLUSTRATIVE offer previews using Claude.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -14,11 +14,12 @@
     "express": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:",
-    "vitest": "catalog:",
+    "@travel/test-config": "workspace:*",
     "@types/express": "catalog:",
     "@types/supertest": "catalog:",
-    "supertest": "catalog:"
+    "supertest": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=20.0.0 <21.0.0"

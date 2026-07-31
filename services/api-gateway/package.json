@@ -2,7 +2,7 @@
   "name": "api-gateway",
   "version": "0.1.0",
   "private": true,
-  "description": "API gateway — edge hardening: security headers, CORS allow-list, RS256 JWT verification, jti denylist, CSRF, and raw-body webhook passthrough.",
+  "description": "API gateway \u2014 edge hardening: security headers, CORS allow-list, RS256 JWT verification, jti denylist, CSRF, and raw-body webhook passthrough.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -16,6 +16,7 @@
     "ioredis": "catalog:"
   },
   "devDependencies": {
+    "@travel/test-config": "workspace:*",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@types/supertest": "catalog:",

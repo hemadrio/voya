@@ -252,3 +252,10 @@
 - **Files:** 27 (+2098/-1)
 - **Duration:** 1034ss
 - **Approach:** Created a new @travel/fixtures workspace package containing deterministic identifier helpers (stable UUIDs with f0000xxx- prefix, fixed reference instant 2026-01-15T12:00:00.000Z), typed factory functions with partial-override signatures for every domain entity, and static payload fixtures validated against @travel/contracts schemas. The seed entrypoint (prisma/seed.ts) upserts the full graph using stable IDs for idempotency. The db-reset.sh script enforces a hard-coded allow-list before executing. Four test files cover schema drift, factory determinism, pattern scanning for PII, and live integration assertions.
+
+## WO-094: User Story: WO-094 - Establish unit test harness with per-path coverage gate
+- **Status:** completed
+- **Commit:** `97c3be4`
+- **Files:** 44 (+1107/-146)
+- **Duration:** 872ss
+- **Approach:** Created @travel/test-config as the single shared test configuration package exporting createBaseConfig()/mergeConfig. Migrated @travel/observability from Jest 29 to Vitest (replaced jest.fn/spyOn/restoreAllMocks with vi.* equivalents, added explicit vitest imports, replaced jest.config.cjs with vitest.config.ts). Added vitest.config.ts extending @travel/test-config to all 13 services that lacked coverage config. Added ESLint no-restricted-imports rule blocking express and @prisma/client in domain directories. Created scripts/coverage-check.ts for per-path threshold enforcement. Updated turbo.json to declare test-config and fixtures as inputs. Wired coverage:check (blocking), coverage:publish, and coverage:archive stages into forge/pipeline.yml. Created ADR-0003, test strategy doc, and mandatory scenario checklist.

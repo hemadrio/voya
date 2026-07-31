@@ -3,10 +3,9 @@
  *
  * Tests run fully offline: no real DB, Redis, or queue required.
  * All timing is deterministic because probes are injected fakes.
- *
- * Framework: Jest (globals — no explicit import needed).
  */
 
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as http from 'node:http';
 import {
   createHealthCheck,
@@ -24,7 +23,7 @@ function makePassProbe(name: string, required = true): Probe {
   return {
     name,
     required,
-    check: jest.fn(async () => true),
+    check: vi.fn(async () => true),
     timeoutMs: 500,
     cacheTtlMs: 0, // disable cache — most tests want fresh probe calls
   };
@@ -35,7 +34,7 @@ function makeFailProbe(name: string, required = true): Probe {
   return {
     name,
     required,
-    check: jest.fn(async () => false),
+    check: vi.fn(async () => false),
     timeoutMs: 500,
     cacheTtlMs: 0,
   };
@@ -48,7 +47,7 @@ function makeSlowProbe(name: string, required = true, timeoutMs = 40): Probe {
     required,
     // The check waits 10× the probe timeout — guaranteed to be killed by the
     // per-probe timer before it resolves.
-    check: jest.fn(
+    check: vi.fn(
       () =>
         new Promise<boolean>((resolve) =>
           setTimeout(() => resolve(true), timeoutMs * 10),
@@ -64,7 +63,7 @@ function makeThrowingProbe(name: string, required = true): Probe {
   return {
     name,
     required,
-    check: jest.fn(() => {
+    check: vi.fn(() => {
       throw new Error('BOOM — must be caught by framework');
     }),
     timeoutMs: 500,
@@ -77,7 +76,7 @@ function makeRejectingProbe(name: string, required = true): Probe {
   return {
     name,
     required,
-    check: jest.fn(async () => {
+    check: vi.fn(async () => {
       throw new Error('async BOOM — must be caught by framework');
     }),
     timeoutMs: 500,
@@ -135,7 +134,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
   _resetHealthCache();
 });
 
@@ -344,7 +343,7 @@ describe('/health/ready — probe throws', () => {
 
 describe('cache — N sequential calls inside TTL trigger exactly one check', () => {
   it('calls check exactly once for 5 sequential calls inside TTL', async () => {
-    const checkFn = jest.fn(async () => true);
+    const checkFn = vi.fn(async () => true);
     const probe: Probe = {
       name: 'cached-db',
       required: true,
@@ -363,7 +362,7 @@ describe('cache — N sequential calls inside TTL trigger exactly one check', ()
   });
 
   it('invokes check again after TTL expiry', async () => {
-    const checkFn = jest.fn(async () => true);
+    const checkFn = vi.fn(async () => true);
     const probe: Probe = {
       name: 'short-ttl-db',
       required: true,

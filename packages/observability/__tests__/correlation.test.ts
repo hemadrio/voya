@@ -5,6 +5,7 @@
  *      injection, ALS survival across awaits, and queue attribute injection.
  */
 
+import { describe, it, expect, vi } from "vitest";
 import {
   generateULID,
   isValidCorrelationId,
@@ -39,7 +40,7 @@ type MockResponse = {
   headers: Record<string, string>;
   setHeader(name: string, value: string): MockResponse;
 };
-type MockNext = jest.Mock;
+type MockNext = ReturnType<typeof vi.fn>;
 
 function mockReq(correlationIdHeader?: string): MockRequest {
   return {
@@ -63,7 +64,7 @@ function mockRes(): MockResponse {
 function runMiddleware(
   req: MockRequest,
   res = mockRes(),
-  next: MockNext = jest.fn(),
+  next: MockNext = vi.fn(),
 ): { req: MockRequest; res: MockResponse; next: MockNext } {
   const mw = createCorrelationIdMiddleware();
   mw(req, res, next);
@@ -190,7 +191,7 @@ describe('createCorrelationIdMiddleware — ID resolution', () => {
     const req = mockReq(VALID_ULID);
     const res = mockRes();
     const mw = createCorrelationIdMiddleware();
-    mw(req, res, jest.fn());
+    mw(req, res, vi.fn());
     expect(res.headers['x-correlation-id']).toBe(VALID_ULID);
   });
 });

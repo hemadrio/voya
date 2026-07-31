@@ -15,10 +15,10 @@
  *   - assertSecretsOrExit logs envVar name only — NEVER the value
  *   - assertSecretsOrExit exits in strict mode
  *   - assertSecretsOrExit warns and continues in relaxed dev mode
- *
- * Framework: Jest (globals — no explicit import needed).
  */
 
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { MockInstance } from "vitest";
 import {
   validate,
   assertSecretsOrExit,
@@ -258,8 +258,8 @@ describe('assertSecretsOrExit — values must never appear in logs', () => {
     process.env['NODE_ENV'] = 'development';
     process.env['JWT_SECRET'] = SECRET_VALUE;
 
-    const warnMock = jest.fn();
-    const mockLogger = { warn: warnMock, error: jest.fn(), fatal: jest.fn() };
+    const warnMock = vi.fn();
+    const mockLogger = { warn: warnMock, error: vi.fn(), fatal: vi.fn() };
 
     assertSecretsOrExit(
       [{ envVar: 'JWT_SECRET', description: 'signing key', minLength: 200 }],
@@ -283,11 +283,11 @@ describe('assertSecretsOrExit — values must never appear in logs', () => {
 
 describe('assertSecretsOrExit — exit behaviour', () => {
   let originalEnv: NodeJS.ProcessEnv;
-  let exitSpy: jest.SpyInstance;
+  let exitSpy: MockInstance;
 
   beforeEach(() => {
     originalEnv = { ...process.env };
-    exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => {
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
       // suppress; just record the call
     }) as (code?: number) => never);
   });
@@ -304,7 +304,7 @@ describe('assertSecretsOrExit — exit behaviour', () => {
     process.env['NODE_ENV'] = 'production';
     delete process.env['JWT_SECRET'];
 
-    const mockLogger = { warn: jest.fn(), error: jest.fn(), fatal: jest.fn() };
+    const mockLogger = { warn: vi.fn(), error: vi.fn(), fatal: vi.fn() };
     assertSecretsOrExit([JWT_KEY], mockLogger);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
@@ -314,7 +314,7 @@ describe('assertSecretsOrExit — exit behaviour', () => {
     process.env['NODE_ENV'] = 'development';
     delete process.env['AMADEUS_CLIENT_SECRET'];
 
-    const mockLogger = { warn: jest.fn(), error: jest.fn(), fatal: jest.fn() };
+    const mockLogger = { warn: vi.fn(), error: vi.fn(), fatal: vi.fn() };
     assertSecretsOrExit([AMADEUS_KEY], mockLogger);
 
     expect(exitSpy).not.toHaveBeenCalled();
@@ -324,9 +324,9 @@ describe('assertSecretsOrExit — exit behaviour', () => {
     process.env['NODE_ENV'] = 'development';
     delete process.env['AMADEUS_CLIENT_SECRET'];
 
-    const warnMock = jest.fn();
-    const fatalMock = jest.fn();
-    const mockLogger = { warn: warnMock, error: jest.fn(), fatal: fatalMock };
+    const warnMock = vi.fn();
+    const fatalMock = vi.fn();
+    const mockLogger = { warn: warnMock, error: vi.fn(), fatal: fatalMock };
 
     assertSecretsOrExit([AMADEUS_KEY], mockLogger);
 
@@ -338,7 +338,7 @@ describe('assertSecretsOrExit — exit behaviour', () => {
     process.env['NODE_ENV'] = 'production';
     process.env['JWT_SECRET'] = 'a-real-32-byte-signing-key-value!';
 
-    const mockLogger = { warn: jest.fn(), error: jest.fn(), fatal: jest.fn() };
+    const mockLogger = { warn: vi.fn(), error: vi.fn(), fatal: vi.fn() };
     assertSecretsOrExit([JWT_KEY], mockLogger);
 
     expect(exitSpy).not.toHaveBeenCalled();
