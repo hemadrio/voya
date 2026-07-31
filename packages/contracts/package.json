@@ -72,6 +72,11 @@
       "import": "./dist/audit/index.js",
       "default": "./dist/audit/index.js"
     },
+    "./privacy": {
+      "types": "./dist/privacy/index.d.ts",
+      "import": "./dist/privacy/index.js",
+      "default": "./dist/privacy/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

@@ -23,3 +23,4 @@ export * from "./errors/index.js";
 export * from "./traveler.js";
 export * from "./retention/index.js";
 export * from "./audit/index.js";
+export * from "./privacy/index.js";

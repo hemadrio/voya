@@ -3,6 +3,7 @@
  */
 import express from "express";
 import { createUserRouter } from "./routes/users.js";
+import { createMeRouter } from "./routes/me.js";
 import { createErrorHandler } from "../../../shared/middleware/errorHandler.js";
 import {
   createRateLimiter,
@@ -12,6 +13,7 @@ import {
   type RedisClient,
 } from "@travel/ratelimit";
 import type { UserDomain } from "./routes/users.js";
+import type { DataSubjectRightsService } from "./services/DataSubjectRightsService.js";
 import type { HealthHandlers } from "@travel/observability";
 
 export interface UserAppOptions {
@@ -21,6 +23,8 @@ export interface UserAppOptions {
    */
   floorLimitRedis?: RedisClient;
   healthHandlers?: HealthHandlers;
+  /** GDPR data-subject rights service. When omitted /v1/me routes are not mounted. */
+  dsrService?: DataSubjectRightsService;
 }
 
 export function createApp(
@@ -31,7 +35,7 @@ export function createApp(
     healthHandlersOrOptions !== undefined && "liveHandler" in healthHandlersOrOptions
       ? { healthHandlers: healthHandlersOrOptions as HealthHandlers }
       : (healthHandlersOrOptions as UserAppOptions) ?? {};
-  const { floorLimitRedis, healthHandlers } = options;
+  const { floorLimitRedis, healthHandlers, dsrService } = options;
 
   const app = express();
   app.use(express.json({ limit: "64kb" }));
@@ -57,6 +61,10 @@ export function createApp(
   }
 
   app.use("/users", createUserRouter(domain));
+
+  if (dsrService) {
+    app.use("/v1/me", createMeRouter(dsrService));
+  }
 
   if (healthHandlers !== undefined) {
     app.get("/health/live", healthHandlers.liveHandler.bind(healthHandlers));

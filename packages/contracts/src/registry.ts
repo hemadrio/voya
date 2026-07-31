@@ -30,6 +30,15 @@ import {
   QueueMessageEnvelopeSchema,
 } from "./events/index.js";
 import { ErrorDetailSchema, ErrorEnvelopeSchema } from "./errors/envelope.js";
+import {
+  ProfilePatchSchema,
+  ExportAcceptedSchema,
+  ExportStatusSchema,
+  ExportArchiveManifestSchema,
+  ErasureRequestSchema,
+  ErasureAcceptedSchema,
+  DataSubjectRequestSchema,
+} from "./privacy/index.js";
 
 export const SCHEMA_REGISTRY: Readonly<Record<string, ZodTypeAny>> = {
   "search.FlightSearchRequest": FlightSearchRequestSchema,
@@ -56,6 +65,13 @@ export const SCHEMA_REGISTRY: Readonly<Record<string, ZodTypeAny>> = {
   "events.QueueMessageEnvelope": QueueMessageEnvelopeSchema,
   "errors.ErrorDetail": ErrorDetailSchema,
   "errors.ErrorEnvelope": ErrorEnvelopeSchema,
+  "privacy.ProfilePatch": ProfilePatchSchema,
+  "privacy.ExportAccepted": ExportAcceptedSchema,
+  "privacy.ExportStatus": ExportStatusSchema,
+  "privacy.ExportArchiveManifest": ExportArchiveManifestSchema,
+  "privacy.ErasureRequest": ErasureRequestSchema,
+  "privacy.ErasureAccepted": ErasureAcceptedSchema,
+  "privacy.DataSubjectRequest": DataSubjectRequestSchema,
 };
 
 export const SCHEMA_IDS: ReadonlyArray<string> = Object.keys(SCHEMA_REGISTRY).sort();
