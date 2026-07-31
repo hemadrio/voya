@@ -29,6 +29,7 @@ import {
   emailNotVerified,
   accountDisabled,
 } from '@travel/contracts';
+import { generateRefreshToken, hashRefreshToken } from './RefreshService.js';
 import type { ICredentialService } from './CredentialService.js';
 import type { UserRepository } from './UserRepository.js';
 import type { CredentialRepository } from './CredentialRepository.js';
@@ -64,6 +65,10 @@ export interface LoginOutput {
   /** Access token lifetime in seconds (matches the TokenService config TTL). */
   expiresIn: number;
   user: LoginUserProfile;
+  /** Raw refresh token (base64url, 32 bytes entropy) — deliver via HttpOnly cookie, not response body. */
+  refreshToken: string;
+  /** Refresh token idle TTL in milliseconds (for Set-Cookie Max-Age). */
+  refreshTtlMs: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +83,10 @@ export interface LoginServiceDeps {
   tokenService: ITokenService;
   /** Access-token TTL in seconds — must match the TokenService config. */
   accessTokenTtlSeconds: number;
+  /** Refresh-token idle TTL in milliseconds. Default: 14 days. */
+  refreshIdleTtlMs?: number;
+  /** Absolute session lifetime in milliseconds. Default: 30 days. */
+  absoluteSessionTtlMs?: number;
   /**
    * Optional role resolver.  If omitted, roles defaults to ['user'].
    * Provide a real implementation (e.g. from RoleRepository) in production.
@@ -101,6 +110,8 @@ export function createLoginService(deps: LoginServiceDeps): ILoginService {
     sessionRepository,
     tokenService,
     accessTokenTtlSeconds,
+    refreshIdleTtlMs = 14 * 24 * 60 * 60 * 1000,
+    absoluteSessionTtlMs = 30 * 24 * 60 * 60 * 1000,
     getRoles,
   } = deps;
 
@@ -156,18 +167,32 @@ export function createLoginService(deps: LoginServiceDeps): ILoginService {
       throw accountDisabled();
     }
 
-    // 8. Create session.
-    //    Pre-generate the jti so we can store it in session.token (for future
-    //    revocation checks in WO-022) while also embedding it in the JWT claim.
+    // 8. Create session with refresh token.
+    //    Pre-generate the jti for the access token and a fresh opaque refresh
+    //    token.  Only the SHA-256 hash of the refresh token is persisted —
+    //    the raw value is returned to the caller for cookie delivery.
     const jti = randomUUID();
-    const expiresAt = new Date(Date.now() + accessTokenTtlSeconds * 1000);
+    const now = Date.now();
+    // Idle timeout: expiresAt (used for both the session row and the refresh cookie Max-Age).
+    const idleExpiresAt = new Date(now + refreshIdleTtlMs);
+    // Absolute lifetime: copied verbatim through every rotation — never extended.
+    const absoluteExpiresAt = new Date(now + absoluteSessionTtlMs);
+
+    const rawRefreshToken = generateRefreshToken();
+    const refreshTokenHash = hashRefreshToken(rawRefreshToken);
+    // family_id identifies the full rotation chain for this login.
+    // Pre-generate so it can be stored in the initial INSERT (no second write).
+    const familyId = randomUUID();
 
     const session = await sessionRepository.createSession({
       userId: user.id,
       token: jti,   // session.token == jti for revocation lookup
-      expiresAt,
+      expiresAt: idleExpiresAt,
       ipAddress: input.ipAddress,
       userAgent: input.userAgent,
+      refreshTokenHash,
+      familyId,
+      absoluteExpiresAt,
     });
 
     // 9. Mint access token — embed session.id as sid and the pre-generated jti.
@@ -200,6 +225,8 @@ export function createLoginService(deps: LoginServiceDeps): ILoginService {
       accessToken,
       tokenType: 'Bearer',
       expiresIn: accessTokenTtlSeconds,
+      refreshToken: rawRefreshToken,
+      refreshTtlMs: refreshIdleTtlMs,
       user: {
         id: user.id,
         email: user.email,

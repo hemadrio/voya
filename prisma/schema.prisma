@@ -132,6 +132,12 @@ model Session {
   // WO-018 addition — nullable self-reference preserving refresh-token rotation chain
   rotatedFromSessionId String?  @map("rotated_from_session_id") @db.Uuid
 
+  // WO-022 addition — absolute session lifetime (never extended by rotation)
+  /// The wall-clock deadline beyond which this session may not be refreshed,
+  /// regardless of recent activity.  Copied verbatim from the parent session
+  /// on every rotation so clock drift cannot extend the absolute lifetime.
+  absoluteExpiresAt DateTime? @map("absolute_expires_at") @db.Timestamptz
+
   // WO-074 additions
   /// Data classification tier (RESTRICTED — contains token hashes and IP).
   classification DataClassification @default(RESTRICTED) @map("classification")

@@ -40,6 +40,9 @@ export {
   emailNotVerified,
   accountDisabled,
   offerExpired,
+  refreshTokenReused,
+  sessionExpired,
+  invalidRefreshToken,
 } from "./domain-errors.js";
 
 export { serialiseError, RESTRICTED_FIELDS } from "./serialise.js";

@@ -20,6 +20,7 @@
  *     the audit logger; only masked email (domain part retained) and actor IP.
  */
 import { Router } from "express";
+import { randomBytes } from "node:crypto";
 import {
   RegisterRequestSchema,
   LoginRequestSchema,
@@ -87,6 +88,76 @@ function maskEmail(email: string): string {
   return `***@${email.slice(at + 1)}`;
 }
 
+// ---------------------------------------------------------------------------
+// Refresh cookie + CSRF helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a Cookie header string into a key→value map.
+ * Inline to avoid the `cookie-parser` dependency.
+ */
+function parseCookieHeader(header: string | undefined): Record<string, string> {
+  if (!header) return {};
+  const result: Record<string, string> = {};
+  for (const part of header.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq < 0) continue;
+    const name = part.slice(0, eq).trim();
+    const value = part.slice(eq + 1).trim();
+    if (name) result[name] = decodeURIComponent(value);
+  }
+  return result;
+}
+
+/** Name of the HttpOnly refresh cookie. */
+const REFRESH_COOKIE_NAME = "rt";
+/** Name of the non-HttpOnly CSRF cookie (double-submit pair). */
+const CSRF_COOKIE_NAME = "csrf_token";
+/** Header the client must mirror from the CSRF cookie for double-submit. */
+const CSRF_HEADER_NAME = "x-csrf-token";
+
+/** Cookie options shared by set and clear operations. */
+const REFRESH_COOKIE_BASE = {
+  httpOnly: true,
+  secure: process.env["NODE_ENV"] !== "test",
+  path: "/auth/refresh",
+} as const;
+
+/** Cookie options for the non-HttpOnly CSRF token (readable by JS). */
+const CSRF_COOKIE_BASE = {
+  httpOnly: false,
+  secure: process.env["NODE_ENV"] !== "test",
+  path: "/auth/refresh",
+} as const;
+
+/**
+ * Set the HttpOnly refresh cookie and the non-HttpOnly CSRF double-submit cookie.
+ * @param sameSite - "strict" by default; set to "lax" for cross-site OAuth flows.
+ */
+function setRefreshCookies(
+  res: Response,
+  rawRefreshToken: string,
+  csrfToken: string,
+  maxAgeSeconds: number,
+  sameSite: "strict" | "lax" = "strict",
+): void {
+  res.cookie(REFRESH_COOKIE_NAME, rawRefreshToken, {
+    ...REFRESH_COOKIE_BASE,
+    sameSite,
+    maxAge: maxAgeSeconds * 1000,
+  });
+  res.cookie(CSRF_COOKIE_NAME, csrfToken, {
+    ...CSRF_COOKIE_BASE,
+    sameSite,
+    maxAge: maxAgeSeconds * 1000,
+  });
+}
+
+function clearRefreshCookies(res: Response): void {
+  res.clearCookie(REFRESH_COOKIE_NAME, { ...REFRESH_COOKIE_BASE, sameSite: "strict" });
+  res.clearCookie(CSRF_COOKIE_NAME, { ...CSRF_COOKIE_BASE, sameSite: "strict" });
+}
+
 // Schemas compiled once at module scope (8 ms budget constraint).
 const validateRegister = validateRequest({ body: RegisterRequestSchema });
 const validateLogin = validateRequest({ body: LoginRequestSchema });
@@ -111,7 +182,7 @@ const defaultResendVerificationLimiter = createInMemoryRateLimiter({ maxHits: 5,
 export interface AuthDomain {
   register(input: unknown): Promise<unknown>;
   login(input: unknown): Promise<unknown>;
-  refresh(input: unknown): Promise<unknown>;
+  refresh(input: { rawToken: string; ipAddress?: string; userAgent?: string }): Promise<unknown>;
   logout(params: { sid: string; userId: string }): Promise<void>;
   oauthCallback(input: unknown): Promise<unknown>;
   logoutAll(params: { userId: string }): Promise<{ revokedCount: number }>;
@@ -121,22 +192,6 @@ export interface AuthDomain {
   resetPassword(params: { token: string; password: string }): Promise<void>;
   verifyEmail(params: { token: string }): Promise<unknown>;
   resendVerification(params: { email: string }): Promise<void>;
-}
-
-// ---------------------------------------------------------------------------
-// Refresh cookie constants — same attributes used to set and clear the cookie
-// ---------------------------------------------------------------------------
-
-const REFRESH_COOKIE_NAME = "refresh_token";
-const REFRESH_COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env["NODE_ENV"] !== "test",
-  sameSite: "strict" as const,
-  path: "/auth/refresh",
-};
-
-function clearRefreshCookie(res: Response): void {
-  res.clearCookie(REFRESH_COOKIE_NAME, REFRESH_COOKIE_OPTIONS);
 }
 
 // ---------------------------------------------------------------------------
@@ -360,9 +415,35 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
       });
     }
 
+    // Set HttpOnly refresh cookie + CSRF double-submit cookie for browser clients.
+    const loginOut = result as {
+      refreshToken?: string;
+      refreshTtlMs?: number;
+      accessToken: string;
+      tokenType: string;
+      expiresIn: number;
+      user: unknown;
+    };
+    if (loginOut.refreshToken && loginOut.refreshTtlMs) {
+      const csrfToken = randomBytes(16).toString("hex");
+      setRefreshCookies(
+        res,
+        loginOut.refreshToken,
+        csrfToken,
+        Math.floor(loginOut.refreshTtlMs / 1000),
+      );
+    }
+
+    // Strip raw refresh token from the response body — browser clients use the
+    // cookie; non-browser clients that cannot read cookies will need to call
+    // /refresh with the body field, which they should store securely.
+    // Per the security constraint, raw tokens must never appear in response logs.
+    const { refreshToken: _rt, refreshTtlMs: _ttl, ...publicLoginResult } = loginOut;
+    void _rt; void _ttl;
+
     // Return the LoginResponse shape directly (no wrapper) so the api-gateway
     // can forward the accessToken without unwrapping.
-    res.json(result);
+    res.json(publicLoginResult);
   });
 
   router.post("/refresh", validateRefresh, async (req: Request, res: Response): Promise<void> => {
@@ -372,14 +453,46 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
       "unknown";
     const correlationId = req.correlationId;
 
+    // ── Token extraction ────────────────────────────────────────────────────
+    // Preference order: HttpOnly cookie (browser) → body field (non-browser).
+    const cookies = parseCookieHeader(req.headers["cookie"] as string | undefined);
+    const cookieToken = cookies[REFRESH_COOKIE_NAME];
+    const bodyToken = (req.validated?.body as { refreshToken?: string } | undefined)?.refreshToken;
+    const rawToken = cookieToken ?? bodyToken;
+
+    if (!rawToken) {
+      res.status(401).json({
+        error: { code: "INVALID_REFRESH_TOKEN", message: "Refresh token is required." },
+        reference: correlationId ?? "unknown",
+      });
+      return;
+    }
+
+    // ── CSRF double-submit validation (cookie path only) ───────────────────
+    // When the token arrived via cookie, require the matching CSRF header.
+    // SameSite=strict cookies already provide strong CSRF protection, but we
+    // add the double-submit token as defence-in-depth for Lax configurations
+    // and older browsers.
+    if (cookieToken) {
+      const csrfCookie = cookies[CSRF_COOKIE_NAME];
+      const csrfHeader = req.headers[CSRF_HEADER_NAME] as string | undefined;
+      if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+        res.status(403).json({
+          error: { code: "CSRF_FAILED", message: "CSRF token mismatch." },
+          reference: correlationId ?? "unknown",
+        });
+        return;
+      }
+    }
+
     let result: unknown;
     try {
-      result = await domain.refresh(req.validated?.body);
+      result = await domain.refresh({ rawToken, ipAddress, userAgent: req.headers["user-agent"] });
     } catch (err) {
       // WO-101: emit AUTH_REFRESH_REUSE_DETECTED for token reuse errors
       const errCode = err instanceof Error ? (err as { code?: string }).code : undefined;
       if (auditLogger) {
-        const action = errCode === "REFRESH_TOKEN_REUSE"
+        const action = errCode === "REFRESH_TOKEN_REUSED"
           ? "AUTH_REFRESH_REUSE_DETECTED"
           : "AUTH_VALIDATION_FAILURE";
         await auditLogger.log({
@@ -393,13 +506,34 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
           metadata: { errorCode: errCode ?? "UNKNOWN" },
         });
       }
+      // Clear cookies on any auth failure to prevent stale cookie loops.
+      clearRefreshCookies(res);
       throw err;
+    }
+
+    // ── Rotate cookies and return response ─────────────────────────────────
+    const refreshOut = result as {
+      accessToken: string;
+      tokenType: string;
+      expiresIn: number;
+      newRefreshToken?: string;
+      refreshTtlMs?: number;
+      userId?: string;
+    };
+
+    if (refreshOut.newRefreshToken && refreshOut.refreshTtlMs) {
+      const newCsrfToken = randomBytes(16).toString("hex");
+      setRefreshCookies(
+        res,
+        refreshOut.newRefreshToken,
+        newCsrfToken,
+        Math.floor(refreshOut.refreshTtlMs / 1000),
+      );
     }
 
     // WO-101: emit AUTH_TOKEN_REFRESH on success
     if (auditLogger) {
-      const refreshResult = result as { userId?: string } | undefined;
-      const userId = refreshResult?.userId ?? "unknown";
+      const userId = refreshOut.userId ?? "unknown";
       await auditLogger.log({
         action: "AUTH_TOKEN_REFRESH",
         actorId: userId,
@@ -411,7 +545,24 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
       });
     }
 
-    res.json({ data: result });
+    // Response body: only include raw refreshToken for non-browser clients
+    // (those that sent the token in the body rather than a cookie).
+    const responseBody: {
+      accessToken: string;
+      tokenType: string;
+      expiresIn: number;
+      refreshToken?: string;
+    } = {
+      accessToken: refreshOut.accessToken,
+      tokenType: refreshOut.tokenType,
+      expiresIn: refreshOut.expiresIn,
+    };
+    if (!cookieToken && refreshOut.newRefreshToken) {
+      // Non-browser client — echo back the new token in the body.
+      responseBody.refreshToken = refreshOut.newRefreshToken;
+    }
+
+    res.json(responseBody);
   });
 
   // OAuth callback — input in query params, not body
@@ -475,7 +626,7 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
         });
       }
 
-      clearRefreshCookie(res);
+      clearRefreshCookies(res);
       res.status(204).end();
     },
   );

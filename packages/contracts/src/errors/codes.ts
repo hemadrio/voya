@@ -68,6 +68,12 @@ export const ErrorCode = {
   ACCOUNT_DISABLED: "ACCOUNT_DISABLED",
   /** 410 — the offer existed but its expiresAt has passed; the booking flow must restart. */
   OFFER_EXPIRED: "OFFER_EXPIRED",
+  /** 401 — the presented refresh token has already been rotated or revoked; the entire session family has been revoked as a precaution against theft. */
+  REFRESH_TOKEN_REUSED: "REFRESH_TOKEN_REUSED",
+  /** 401 — the session has exceeded its idle timeout or absolute lifetime and can no longer be refreshed. */
+  SESSION_EXPIRED: "SESSION_EXPIRED",
+  /** 401 — the presented refresh token is unknown, malformed, or does not match any session record. */
+  INVALID_REFRESH_TOKEN: "INVALID_REFRESH_TOKEN",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -110,6 +116,9 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   EMAIL_NOT_VERIFIED: 403,
   ACCOUNT_DISABLED: 403,
   OFFER_EXPIRED: 410,
+  REFRESH_TOKEN_REUSED: 401,
+  SESSION_EXPIRED: 401,
+  INVALID_REFRESH_TOKEN: 401,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

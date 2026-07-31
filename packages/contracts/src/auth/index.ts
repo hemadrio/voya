@@ -39,10 +39,28 @@ export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 
 export const RefreshRequestSchema = z
   .object({
-    refreshToken: z.string().trim().min(1),
+    /**
+     * Opaque refresh token for non-browser clients that cannot use cookies.
+     * Browser clients deliver the token via HttpOnly cookie; this field is
+     * therefore optional — when absent the route extracts from the cookie.
+     */
+    refreshToken: z.string().trim().min(1).optional(),
   })
   .strict();
 export type RefreshRequest = z.infer<typeof RefreshRequestSchema>;
+
+/** 200 response for a successful token refresh. */
+export const RefreshResponseSchema = z.object({
+  accessToken: z.string(),
+  tokenType: z.literal("Bearer"),
+  expiresIn: z.number().int().positive(),
+  /**
+   * New opaque refresh token for non-browser clients.
+   * Browser clients receive the rotated token as a Set-Cookie header instead.
+   */
+  refreshToken: z.string().optional(),
+});
+export type RefreshResponse = z.infer<typeof RefreshResponseSchema>;
 
 export const LogoutRequestSchema = z
   .object({

@@ -183,3 +183,24 @@ export function offerExpired(
 ): DomainError {
   return new DomainErrorImpl("OFFER_EXPIRED", message, field);
 }
+
+/** 401 — the presented refresh token was already rotated or revoked (theft signal); the entire session family has been revoked. */
+export function refreshTokenReused(
+  message = "Refresh token has already been used. All sessions in this device family have been revoked.",
+): DomainError {
+  return new DomainErrorImpl("REFRESH_TOKEN_REUSED", message);
+}
+
+/** 401 — the session has exceeded its idle timeout or absolute lifetime. */
+export function sessionExpired(
+  message = "Your session has expired. Please log in again.",
+): DomainError {
+  return new DomainErrorImpl("SESSION_EXPIRED", message);
+}
+
+/** 401 — the refresh token is unknown, malformed, or does not match any session. */
+export function invalidRefreshToken(
+  message = "Invalid or unknown refresh token.",
+): DomainError {
+  return new DomainErrorImpl("INVALID_REFRESH_TOKEN", message);
+}
