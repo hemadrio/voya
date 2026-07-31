@@ -1,5 +1,6 @@
 /**
- * ECS Fargate service definitions — ten components of the travel platform.
+ * ECS Fargate service definitions — ten components of the travel platform,
+ * plus the one-off migration-runner task definition (WO-086).
  *
  * Sizing rationale (AC2):
  *   api-gateway         2 vCPU / 4 GB   — fan-out to all internal services, JWT validation
@@ -561,6 +562,55 @@ module "notification_consumer" {
   consumer_scaling_queue_name     = module.sqs.notifications_queue_name
   consumer_scale_out_threshold    = 100
   consumer_scale_in_threshold     = 20
+
+  common_tags = local.common_tags
+}
+
+# ── migration-runner — one-off DDL task, not a running service (WO-086) ───────
+# Not a continuously running service; desired_count = 0 prevents ECS from
+# scheduling tasks. The pipeline invokes this via RunTask before every rollout.
+# Only this task role holds the DDL-capable rds-db:connect policy; all service
+# task roles receive DML-only policies.
+
+module "migration_runner" {
+  source = "../../modules/ecs-service"
+
+  environment    = local.environment
+  service_name   = "migration-runner"
+  container_image = "${local.aws_account_id}.dkr.ecr.${local.aws_region}.amazonaws.com/travel-platform:latest"
+  cpu            = 1024
+  memory         = 2048
+  port           = 3099
+  desired_count  = 0
+
+  aws_account_id = local.aws_account_id
+  aws_region     = local.aws_region
+  log_group_name = "/ecs/${local.environment}/migration-runner-svc"
+  ecs_cluster_arn = module.ecs_cluster.cluster_arn
+  subnet_ids     = data.aws_subnets.private_app.ids
+  security_group_ids = [data.aws_security_group.ecs_tasks_sg.id]
+  kms_key_arns   = [module.kms.key_arns["secretsmanager"]]
+
+  secret_refs = {}
+
+  environment_vars = {
+    NODE_ENV = local.environment
+    PORT     = "3099"
+  }
+
+  # No load balancer attachment — migration runner is not internet-facing.
+  # No service connect — it talks directly to the RDS Proxy.
+
+  # ── Migration task resources (WO-086) ──────────────────────────────────────
+  enable_migration_task = true
+
+  migration_secret_refs = {
+    DATABASE_URL = module.secrets.secret_arns["db-url"]
+  }
+
+  # migration_rds_connect_policy_arn grants rds-db:connect as migration_task
+  # (a DDL-capable PostgreSQL user). Service task roles do NOT receive this policy.
+  migration_rds_connect_policy_arn = module.rds_proxy.migration_rds_connect_policy_arn
 
   common_tags = local.common_tags
 }

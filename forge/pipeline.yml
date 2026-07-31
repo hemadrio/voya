@@ -209,8 +209,153 @@ stages:
     blocking: true
     description: "ESLint static analysis gate for the contracts package"
 
+  # ── 8a. Migration lint gate (WO-086) ─────────────────────────────────────
+  #   Inspects every new migration SQL file on this branch and fails on
+  #   destructive DDL (DROP COLUMN, DROP TABLE, RENAME COLUMN, type narrowing,
+  #   NOT NULL without DEFAULT, CREATE INDEX CONCURRENTLY) unless a matching
+  #   expand-phase entry exists in prisma/expand-registry.yaml with a valid
+  #   prior release tag.
+  - name: migration:lint
+    run: >
+      npx tsx tools/ci/migration-lint.ts
+      --base origin/main
+      --registry prisma/expand-registry.yaml
+    dependsOn: [build]
+    blocking: true
+    description: >
+      Expand-contract linter — rejects destructive DDL without a matching
+      expand-registry entry. Blocks the pipeline; a failed lint means the
+      migration is not backward compatible for one release.
+
+  # ── 8b. Migration compatibility gate (WO-086) ────────────────────────────
+  #   Spins up an ephemeral Postgres, applies all Prisma migrations including
+  #   the newly added one, then runs the previous release's @travel/contracts
+  #   test suite against the migrated schema. A failing contract test proves
+  #   the migration breaks backward compatibility.
+  #
+  #   PREVIOUS_RELEASE must be set to the git tag of the release currently
+  #   deployed to the target environment (e.g. "v1.4.2").
+  - name: migration:compat-gate
+    run: >
+      bash tools/ci/compat-gate.sh "${PREVIOUS_RELEASE:-skip}"
+    dependsOn: [migration:lint]
+    blocking: true
+    description: >
+      Ephemeral schema compatibility check — applies migrations to a fresh
+      Postgres container, runs the previous release's contract tests, fails on
+      incompatibility. PREVIOUS_RELEASE env var must be set to the deployed tag.
+
+  # ── 8c. ECS migration task — run before service rollout (WO-086) ─────────
+  #   Invokes the migration-runner ECS task via RunTask, waits for exit, and
+  #   propagates the exit code. The pipeline aborts the deploy stage on any
+  #   non-zero exit without proceeding to service rollout.
+  #
+  #   Concurrency guard: an SSM Parameter (/<env>/migration/lock) acts as a
+  #   pipeline mutex. Prisma's internal advisory lock is the second layer.
+  #
+  #   Credential safety: DATABASE_URL is injected from Secrets Manager by the
+  #   ECS agent (never in plain env); migration output is streamed to
+  #   CloudWatch under /ecs/<environment>/migration-runner.
+  - name: migrate
+    run: |
+      set -euo pipefail
+      ENVIRONMENT="${ENVIRONMENT:-staging}"
+      CLUSTER="${ENVIRONMENT}-travel-platform"
+      TASK_DEF="${ENVIRONMENT}-migration-runner"
+      LOCK_PARAM="/${ENVIRONMENT}/migration/lock"
+      LOCK_VALUE="pipeline-$$-$(date +%s)"
+      LOG_GROUP="/ecs/${ENVIRONMENT}/migration-runner"
+
+      # ── Acquire pipeline mutex ────────────────────────────────────────────
+      if aws ssm put-parameter \
+          --name "${LOCK_PARAM}" \
+          --value "${LOCK_VALUE}" \
+          --type String \
+          --overwrite \
+          --no-cli-pager 2>/dev/null; then
+        echo "[migrate] Acquired pipeline mutex ${LOCK_PARAM}"
+      else
+        EXISTING=$(aws ssm get-parameter --name "${LOCK_PARAM}" \
+          --query 'Parameter.Value' --output text 2>/dev/null || echo "unknown")
+        echo "[migrate] ERROR: Migration lock already held: ${EXISTING}" >&2
+        echo "  Release manually: aws ssm delete-parameter --name ${LOCK_PARAM}" >&2
+        exit 1
+      fi
+
+      release_lock() {
+        aws ssm delete-parameter --name "${LOCK_PARAM}" --no-cli-pager 2>/dev/null || true
+        echo "[migrate] Released pipeline mutex ${LOCK_PARAM}"
+      }
+      trap release_lock EXIT
+
+      # ── Resolve network config ────────────────────────────────────────────
+      SUBNET_ID=$(aws ec2 describe-subnets \
+        --filters "Name=tag:Environment,Values=${ENVIRONMENT}" "Name=tag:Tier,Values=private-app" \
+        --query 'Subnets[0].SubnetId' --output text)
+      SG_ID=$(aws ec2 describe-security-groups \
+        --filters "Name=tag:Environment,Values=${ENVIRONMENT}" "Name=tag:Purpose,Values=ecs-tasks" \
+        --query 'SecurityGroups[0].GroupId' --output text)
+
+      # ── Resolve task definition ARN ───────────────────────────────────────
+      TASK_DEF_ARN=$(aws ecs describe-task-definition \
+        --task-definition "${TASK_DEF}" \
+        --query 'taskDefinition.taskDefinitionArn' \
+        --output text)
+      echo "[migrate] Task definition: ${TASK_DEF_ARN}"
+
+      # ── Launch the migration task ─────────────────────────────────────────
+      TASK_ARN=$(aws ecs run-task \
+        --cluster "${CLUSTER}" \
+        --task-definition "${TASK_DEF_ARN}" \
+        --launch-type FARGATE \
+        --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_ID}],securityGroups=[${SG_ID}],assignPublicIp=DISABLED}" \
+        --query 'tasks[0].taskArn' \
+        --output text)
+      echo "[migrate] Task ARN: ${TASK_ARN}"
+
+      # ── Poll until task exits (max 30 min) ────────────────────────────────
+      TIMEOUT_SECONDS=$((${MIGRATION_TIMEOUT_MINUTES:-30} * 60))
+      ELAPSED=0
+      until [[ "$(aws ecs describe-tasks --cluster "${CLUSTER}" --tasks "${TASK_ARN}" \
+          --query 'tasks[0].lastStatus' --output text)" == "STOPPED" ]]; do
+        if [[ ${ELAPSED} -ge ${TIMEOUT_SECONDS} ]]; then
+          echo "[migrate] ERROR: Migration task timed out after ${MIGRATION_TIMEOUT_MINUTES:-30} minutes." >&2
+          aws ecs stop-task --cluster "${CLUSTER}" --task "${TASK_ARN}" \
+            --reason "Pipeline timeout" --no-cli-pager || true
+          exit 1
+        fi
+        echo "[migrate] Waiting... (${ELAPSED}s)"
+        sleep 10; ELAPSED=$((ELAPSED + 10))
+      done
+
+      # ── Extract exit code and stream logs ─────────────────────────────────
+      EXIT_CODE=$(aws ecs describe-tasks --cluster "${CLUSTER}" --tasks "${TASK_ARN}" \
+        --query 'tasks[0].containers[0].exitCode' --output text)
+      STREAM="${TASK_ARN##*/}"
+      echo "[migrate] --- Migration log (last 100 lines) ---"
+      aws logs get-log-events \
+        --log-group-name "${LOG_GROUP}" \
+        --log-stream-name "migration/${STREAM}" \
+        --limit 100 \
+        --query 'events[*].message' --output text 2>/dev/null || true
+      echo "[migrate] --- End log (exit code: ${EXIT_CODE}) ---"
+
+      [[ "${EXIT_CODE}" == "0" ]] || { echo "[migrate] Migration FAILED (exit ${EXIT_CODE})" >&2; exit "${EXIT_CODE}"; }
+      echo "[migrate] Migration completed successfully."
+    dependsOn:
+      - migration:lint
+      - migration:compat-gate
+      - scan:gitleaks
+      - scan:semgrep
+      - scan:snyk
+    blocking: true
+    description: >
+      Run prisma migrate deploy via the dedicated migration-runner ECS task
+      (DDL-only role, credential-redacted CloudWatch logs). Acquires pipeline
+      mutex via SSM. Aborts deploy on non-zero exit.
+
   # ── 9. Deploy (gated) ────────────────────────────────────────────────────
-  #   Only reached when all prior stages pass, including all parallel scans.
+  #   Only reached when all prior stages pass, including migration.
   - name: deploy
     run: echo "Deploy stage — wired in WO-006 service scaffold"
     dependsOn:
@@ -230,7 +375,8 @@ stages:
       - scan:sonarqube
       - scan:grype
       - static-analysis
-    description: "Package and deploy — blocked until all gates pass"
+      - migrate
+    description: "Package and deploy — blocked until all gates pass including migration"
 
   # ── 9b. Post-deploy: generic contract smoke tests ────────────────────────
   #   Runs the @travel/contract-tests suite (tests/contract/) against the

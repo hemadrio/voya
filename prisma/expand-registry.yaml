@@ -1,0 +1,40 @@
+# Expand-contract registry for database schema migrations — WO-086.
+#
+# Purpose:
+#   Records each destructive DDL change that was first shipped in an expand
+#   release (adding the new shape while keeping the old one compatible with
+#   the previously deployed code). The migration linter (tools/ci/migration-lint.ts)
+#   reads this file at CI time and permits a destructive migration ONLY when a
+#   matching entry exists here.
+#
+# How to use:
+#   1. Ship an expand migration that adds the new shape (new column, new table,
+#      or a copy of the data to be renamed/dropped). Commit the migration.
+#   2. Add an entry to this file in the SAME commit as the expand migration,
+#      referencing the release tag that will be cut from this commit (e.g. "v1.5.0").
+#   3. Deploy the expand release. Verify the old application code still works.
+#   4. In a subsequent release, ship the contract migration (DROP COLUMN, DROP TABLE,
+#      RENAME COLUMN, etc.). The linter will look up the entry here and allow it.
+#   5. Set contract_release on the entry once the contract migration ships.
+#
+# Schema (per entry):
+#   change_id:        Unique identifier for this change (kebab-case, globally unique).
+#   table:            PostgreSQL table name affected.
+#   column:           Column name (omit for table-level changes like DROP TABLE).
+#   expand_release:   Git tag of the release in which the expand migration shipped.
+#   contract_release: Git tag of the release in which the contract migration shipped
+#                     (fill this in after the contract migration deploys).
+#   description:      Human-readable description of the change and its motivation.
+#
+# Validation rules (enforced by migration-lint.ts):
+#   - change_id must be unique across all entries.
+#   - change_id, table, and expand_release are required fields.
+#   - The migration linter verifies expand_release exists as a git tag at lint time.
+#
+# Recovery contract:
+#   If rollback is required after a contract migration, re-deploy the previous
+#   task definition revision. The schema will be in the expanded state (old + new
+#   shapes both present) which is compatible with the previous release's code.
+#   Down migrations are not used — see docs/runbooks/migrations.md.
+
+entries: []

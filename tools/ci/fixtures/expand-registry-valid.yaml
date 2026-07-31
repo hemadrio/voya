@@ -1,0 +1,13 @@
+entries:
+  - change_id: "bookings-drop-old-notes"
+    table: "bookings"
+    column: "old_notes"
+    expand_release: "v1.5.0"
+    description: "Drop the deprecated free-text notes column after migrating data to structured fields."
+
+  - change_id: "users-rename-email-address"
+    table: "users"
+    column: "email_address"
+    expand_release: "v1.6.0"
+    contract_release: "v1.7.0"
+    description: "Rename email_address to email. Expand phase added email column; contract phase drops email_address."

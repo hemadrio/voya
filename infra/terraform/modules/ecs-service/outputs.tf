@@ -32,3 +32,18 @@ output "autoscaling_target_resource_id" {
   description = "App Auto Scaling resource ID for the ECS service. Empty string when enable_autoscaling=false."
   value       = var.enable_autoscaling ? aws_appautoscaling_target.this[0].resource_id : ""
 }
+
+output "migration_task_definition_arn" {
+  description = "ARN of the migration-runner ECS task definition. Empty string when enable_migration_task=false. Pass to the pipeline RunTask step."
+  value       = var.enable_migration_task ? aws_ecs_task_definition.migration_runner[0].arn : ""
+}
+
+output "migration_task_role_arn" {
+  description = "ARN of the migration-runner task IAM role (DDL-capable). Empty string when enable_migration_task=false."
+  value       = var.enable_migration_task ? aws_iam_role.migration_task_role[0].arn : ""
+}
+
+output "migration_log_group_name" {
+  description = "CloudWatch log group for migration runner output. Empty string when enable_migration_task=false."
+  value       = var.enable_migration_task ? aws_cloudwatch_log_group.migration[0].name : ""
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@travel/ci-tools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CI pipeline tools — migration linter and compatibility gate.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
+  },
+  "scripts": {
+    "lint": "echo 'no lint for ci-tools'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

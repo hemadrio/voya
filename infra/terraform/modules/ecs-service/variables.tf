@@ -330,3 +330,41 @@ variable "consumer_scale_in_threshold" {
   description = "SQS ApproximateNumberOfMessagesVisible value below which consumer scale-in fires."
   default     = 20
 }
+
+# ── Migration task variables (WO-086) ─────────────────────────────────────────
+
+variable "enable_migration_task" {
+  type        = bool
+  description = "When true, creates a dedicated migration-runner ECS task definition with its own DDL-capable IAM role. Set on the production migration-runner module instantiation only."
+  default     = false
+}
+
+variable "migration_container_image" {
+  type        = string
+  description = "Container image for the migration runner. Defaults to var.container_image (same monorepo image). Override when the migration image is tagged separately."
+  default     = ""
+}
+
+variable "migration_cpu" {
+  type        = number
+  description = "CPU units for the migration runner task (1 vCPU = 1024 units)."
+  default     = 1024
+}
+
+variable "migration_memory" {
+  type        = number
+  description = "Memory in MiB for the migration runner task."
+  default     = 2048
+}
+
+variable "migration_secret_refs" {
+  type        = map(string)
+  description = "Map of environment variable name → Secrets Manager ARN for the migration runner. Must include DATABASE_URL pointing to the RDS Proxy endpoint."
+  default     = {}
+}
+
+variable "migration_rds_connect_policy_arn" {
+  type        = string
+  description = "ARN of the IAM policy granting rds-db:connect for the DDL-capable migration database user. From module.rds_proxy.migration_rds_connect_policy_arn. Must be set when enable_migration_task = true."
+  default     = ""
+}

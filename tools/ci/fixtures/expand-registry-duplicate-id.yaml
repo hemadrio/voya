@@ -1,0 +1,10 @@
+entries:
+  - change_id: "bookings-drop-old-notes"
+    table: "bookings"
+    column: "old_notes"
+    expand_release: "v1.5.0"
+
+  - change_id: "bookings-drop-old-notes"
+    table: "bookings"
+    column: "old_notes"
+    expand_release: "v1.5.0"

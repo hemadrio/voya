@@ -1,0 +1,4 @@
+entries:
+  - change_id: "incomplete-entry"
+    table: "bookings"
+    # Missing required expand_release field
