@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "INTERNAL_ERROR",
+    "message": "An unexpected error occurred. Please contact support with the reference identifier."
+  },
+  "reference": "fixture-500-ref"
+}

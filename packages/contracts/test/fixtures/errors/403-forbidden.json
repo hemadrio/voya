@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Access denied"
+  },
+  "reference": "fixture-403-ref"
+}

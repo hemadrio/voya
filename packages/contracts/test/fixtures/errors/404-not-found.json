@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Resource not found"
+  },
+  "reference": "fixture-404-ref"
+}

@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "SUPPLIER_TIMEOUT",
+    "message": "Supplier request timed out. Please try again."
+  },
+  "reference": "fixture-504-ref"
+}

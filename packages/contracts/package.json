@@ -47,6 +47,11 @@
       "import": "./dist/events/index.js",
       "default": "./dist/events/index.js"
     },
+    "./errors": {
+      "types": "./dist/errors/index.d.ts",
+      "import": "./dist/errors/index.js",
+      "default": "./dist/errors/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

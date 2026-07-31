@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Too many requests. Please try again later."
+  },
+  "reference": "fixture-429-ref"
+}

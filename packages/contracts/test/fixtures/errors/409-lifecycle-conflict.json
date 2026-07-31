@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "LIFECYCLE_CONFLICT",
+    "message": "Booking is CONFIRMED; permitted transitions are CANCELLED or REFUNDED"
+  },
+  "reference": "fixture-409-ref"
+}

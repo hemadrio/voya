@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Airport code must be a valid 3-letter IATA code",
+    "field": "origin"
+  },
+  "reference": "fixture-400-ref"
+}

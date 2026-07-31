@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "SUPPLIER_UNAVAILABLE",
+    "message": "Supplier is currently unavailable. Please try again."
+  },
+  "reference": "fixture-502-ref"
+}

@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "UNAUTHENTICATED",
+    "message": "Authentication required"
+  },
+  "reference": "fixture-401-ref"
+}

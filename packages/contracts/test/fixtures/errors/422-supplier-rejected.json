@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "SUPPLIER_REJECTED",
+    "message": "Offer has expired and is no longer available for booking"
+  },
+  "reference": "fixture-422-ref"
+}
