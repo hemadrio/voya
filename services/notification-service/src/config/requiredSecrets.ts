@@ -1,16 +1,11 @@
 import type { SecretDescriptor } from '@travel/observability';
 
 /**
- * Required secrets for notification-service (email consumer).
+ * Required secrets for notification-service.
  *
- * notification-service consumes domain events from SQS and dispatches
- * transactional emails via Amazon SES. SES authentication uses the ECS task
- * role (IAM), not API keys. The consumer does need the queue URL and,
- * in production, a valid SES configuration set name.
- *
- * Note: SQS_QUEUE_URL and SES_FROM_ADDRESS are operational config, not
- * secrets, but they are required for the service to function and are
- * injected via the task definition.
+ * SES authentication uses the ECS task IAM role — no API keys needed.
+ * Operational config (queue URL, from address, configuration set) is
+ * injected via task-definition environment variables.
  */
 export const REQUIRED_SECRETS: ReadonlyArray<SecretDescriptor> = [
   {
@@ -18,6 +13,27 @@ export const REQUIRED_SECRETS: ReadonlyArray<SecretDescriptor> = [
     description:
       'SQS FIFO queue URL for domain event consumption. ' +
       'Injected from the Terraform SQS module output at runtime.',
+    minLength: 20,
+  },
+  {
+    envVar: 'SES_FROM_ADDRESS',
+    description:
+      'Verified SES sender address (e.g. noreply@travel.example.com). ' +
+      'Must be a verified identity in SES.',
+    minLength: 5,
+  },
+  {
+    envVar: 'REDIS_URL',
+    description:
+      'Redis connection URL for the idempotency hot-path cache. ' +
+      'Format: redis://host:port',
+    minLength: 10,
+  },
+  {
+    envVar: 'DATABASE_URL',
+    description:
+      'PostgreSQL connection string via RDS Proxy (connection_limit=5). ' +
+      'Injected from the Terraform RDS Proxy module at runtime.',
     minLength: 20,
   },
 ];

@@ -10,6 +10,16 @@
 // that Prisma cannot express are delivered as raw SQL appended to the
 // generated migration file.
 
+// ---------------------------------------------------------------------------
+// SuppressionReason — email suppression source (WO-052)
+// ---------------------------------------------------------------------------
+
+enum SuppressionReason {
+  BOUNCE
+  COMPLAINT
+  MANUAL
+}
+
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client"
@@ -210,4 +220,49 @@ model ProcessedEvent {
   @@unique([provider, eventId], map: "uq_processed_events_provider_event")
   @@index([receivedAt], map: "idx_processed_events_received_at")
   @@map("processed_events")
+}
+
+// ---------------------------------------------------------------------------
+// NotificationProcessedEvent — exactly-once authority for notification consumer (WO-052)
+// ---------------------------------------------------------------------------
+
+/// Durable idempotency store for the notification consumer.
+///
+/// The unique constraint on (provider, event_id) is the authority for
+/// exactly-once SES delivery: a P2002 insert conflict means the event was
+/// already handled and the current delivery is a duplicate; the consumer acks
+/// without sending a second email.
+///
+/// This is a separate model from ProcessedEvent (payment webhooks) so the
+/// notification consumer can be migrated, retained, and archived independently.
+model NotificationProcessedEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  provider      String   @db.VarChar(64)
+  eventId       String   @map("event_id") @db.VarChar(256)
+  handler       String   @db.VarChar(128)
+  correlationId String   @map("correlation_id") @db.VarChar(256)
+  processedAt   DateTime @default(now()) @map("processed_at") @db.Timestamptz
+
+  @@unique([provider, eventId], map: "uq_notification_processed_event_provider_event")
+  @@index([processedAt], map: "idx_notification_processed_event_processed_at")
+  @@map("notification_processed_events")
+}
+
+// ---------------------------------------------------------------------------
+// EmailSuppression — bounce/complaint suppression list (WO-052)
+// ---------------------------------------------------------------------------
+
+/// Hard suppression list maintained by the SNS bounce/complaint handler.
+///
+/// emailHash is the hex-encoded SHA-256 of the lowercase email address so
+/// PII is never stored in this table. The hash is compared before every SES
+/// send; a match causes the send to be skipped and logged rather than
+/// attempted.
+model EmailSuppression {
+  emailHash     String            @id @map("email_hash") @db.VarChar(64)
+  reason        SuppressionReason
+  sourceEventId String?           @map("source_event_id") @db.VarChar(256)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("email_suppressions")
 }

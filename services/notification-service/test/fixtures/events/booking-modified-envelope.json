@@ -1,0 +1,15 @@
+{
+  "eventId": "00000000-0000-4000-8000-000000000021",
+  "eventType": "booking.modified",
+  "occurredAt": "2026-01-15T12:00:00.000Z",
+  "correlationId": "corr-test-0021",
+  "schemaVersion": 1,
+  "userId": "00000000-0000-4000-8000-000000000002",
+  "payload": {
+    "correlationId": "corr-test-0021",
+    "bookingId": "00000000-0000-4000-8000-000000000003",
+    "userId": "00000000-0000-4000-8000-000000000002",
+    "contactEmail": "synthetic-traveller-01@example.test",
+    "occurredAt": "2026-01-15T12:00:00.000Z"
+  }
+}

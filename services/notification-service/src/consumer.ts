@@ -1,28 +1,29 @@
 /**
  * Notification consumer — subscribes to domain events and dispatches emails.
  *
- * Context restoration: each message arrives with a correlationId (from the
- * QueueMessageEnvelope) and an optional W3C traceparent (from the TraceContext
- * extracted by the queue adapter).  The consumer calls runWithCorrelation() to
- * re-establish AsyncLocalStorage context before any domain work so every log
- * line emitted by the handler shares the originating request's correlation ID,
- * making the async queue hop fully traceable end-to-end.
+ * Retry/DLQ contract:
+ *   - Non-retryable failures (PayloadValidationError, UnknownEventTypeError,
+ *     SesPermanentRejectionError) → nack(false) → DLQ immediately.
+ *   - Retryable failures that exhaust MAX_DELIVERY_ATTEMPTS → nack(false) → DLQ.
+ *   - All other transient errors → nack(true) → requeue for retry.
  *
- * SES dispatch is stubbed — the concrete email transport is wired in WO-049.
- *
- * Health: a minimal HTTP server is created on HEALTH_PORT (default 8081) so ECS
- * can health-check this non-request-serving process via /health/live and
- * /health/ready.  The server is returned from startNotificationConsumer() so
- * the caller can close it on graceful shutdown.
+ * Observability: each handler run emits a Pino child logger bound to
+ * correlationId, eventId, and eventType so every log line is traceable
+ * end-to-end. OTel span is linked to the publisher span via traceparent.
  */
 
-import * as http from "node:http";
-import type { QueuePort, MessageHandler } from "@travel/queue";
-import type { QueueMessageEnvelope } from "@travel/contracts";
-import type { HealthHandlers } from "@travel/observability";
+import * as http from 'node:http';
+import type { QueuePort, MessageHandler } from '@travel/queue';
+import type { QueueMessageEnvelope } from '@travel/contracts';
+import type { HealthHandlers } from '@travel/observability';
+import {
+  PayloadValidationError,
+  UnknownEventTypeError,
+  SesPermanentRejectionError,
+} from './domain/backoff.js';
 
 // ---------------------------------------------------------------------------
-// Minimal logger interface (duck-typed against pino.Logger)
+// Logger interface
 // ---------------------------------------------------------------------------
 
 interface ConsumerLogger {
@@ -33,39 +34,7 @@ interface ConsumerLogger {
 }
 
 // ---------------------------------------------------------------------------
-// Context restoration helper
-// ---------------------------------------------------------------------------
-
-/**
- * Run `fn` inside an AsyncLocalStorage context bound to the given correlation
- * ID so getCorrelationId() returns the original request's ID for the duration
- * of the handler, including any awaited work.
- *
- * The AsyncLocalStorage instance is imported from @travel/observability when
- * that package is available.  If the import fails (e.g. in a minimal test
- * environment) the function falls through and runs `fn` without a context.
- */
-async function runWithCorrelation<T>(
-  correlationId: string,
-  fn: () => Promise<T>,
-): Promise<T> {
-  try {
-    // Dynamic import keeps @travel/observability out of notification-service's
-    // hard dependencies until the full observability stack is wired.
-    const obs = await import("@travel/observability");
-    // createCorrelationIdMiddleware is the public surface; we need raw ALS
-    // access.  For now we rely on the fact that the correlationId is visible
-    // via the envelope field and set in the child logger bindings below.
-    // A future WO will expose runInCorrelationContext() from the package.
-    void obs; // imported for side-effect tree-shaking acknowledgement
-  } catch {
-    // @travel/observability not available — run without ALS context
-  }
-  return fn();
-}
-
-// ---------------------------------------------------------------------------
-// Notification dispatcher (stub)
+// NotificationDispatcher port — injected by index.ts
 // ---------------------------------------------------------------------------
 
 export interface NotificationDispatcher {
@@ -73,7 +42,7 @@ export interface NotificationDispatcher {
 }
 
 // ---------------------------------------------------------------------------
-// Consumer factory
+// Consumer factory options
 // ---------------------------------------------------------------------------
 
 export interface NotificationConsumerOptions {
@@ -81,11 +50,13 @@ export interface NotificationConsumerOptions {
   readonly topic: string;
   readonly dispatcher?: NotificationDispatcher | undefined;
   readonly logger: ConsumerLogger;
-  /** Health handlers for the side-channel HTTP health-check port. */
   readonly healthHandlers?: HealthHandlers | undefined;
-  /** Port for the health HTTP server (default 8081). */
   readonly healthPort?: number | undefined;
 }
+
+// ---------------------------------------------------------------------------
+// Health server
+// ---------------------------------------------------------------------------
 
 function startHealthServer(
   handlers: HealthHandlers,
@@ -116,9 +87,13 @@ function startHealthServer(
   return server;
 }
 
+// ---------------------------------------------------------------------------
+// startNotificationConsumer
+// ---------------------------------------------------------------------------
+
 /**
- * Start the notification consumer.  Returns a cleanup function that closes
- * the queue subscription and health server gracefully on shutdown.
+ * Start the notification consumer. Returns a cleanup function for graceful
+ * shutdown.
  */
 export async function startNotificationConsumer(
   options: NotificationConsumerOptions,
@@ -126,11 +101,8 @@ export async function startNotificationConsumer(
   const { queue, topic, dispatcher, logger, healthHandlers, healthPort = 8081 } = options;
 
   const handler: MessageHandler = async (envelope, handle, traceContext) => {
-    // Re-establish correlation context from message attributes.
     const correlationId = traceContext.correlationId ?? envelope.correlationId;
 
-    // Create a request-scoped child logger carrying the correlation ID so
-    // every log line in the handler is correlated to the originating request.
     const handlerLogger = logger.child({
       correlationId,
       eventId: envelope.eventId,
@@ -140,31 +112,49 @@ export async function startNotificationConsumer(
         : {}),
     });
 
-    await runWithCorrelation(correlationId, async () => {
-      handlerLogger.info({ userId: envelope.userId }, "Processing notification event");
+    handlerLogger.info({ userId: envelope.userId }, 'Processing notification event');
 
-      try {
-        if (dispatcher !== undefined) {
-          await dispatcher.dispatch(envelope, correlationId);
-        } else {
-          handlerLogger.warn(
-            { eventType: envelope.eventType },
-            "No dispatcher configured — notification skipped",
-          );
-        }
-        await handle.ack();
-        handlerLogger.info({}, "Notification event processed successfully");
-      } catch (err) {
-        handlerLogger.error({ err }, "Notification dispatch failed — nacking for retry");
+    if (dispatcher === undefined) {
+      handlerLogger.warn(
+        { eventType: envelope.eventType },
+        'No dispatcher configured — notification skipped',
+      );
+      await handle.ack();
+      return;
+    }
+
+    try {
+      await dispatcher.dispatch(envelope, correlationId);
+      await handle.ack();
+      handlerLogger.info({}, 'Notification event processed successfully');
+    } catch (err) {
+      if (isNonRetryable(err)) {
+        handlerLogger.error(
+          {
+            event: 'notification.dlq',
+            errName: err instanceof Error ? err.name : 'UnknownError',
+            err: err instanceof Error ? err.message : String(err),
+          },
+          'Non-retryable failure — routing to DLQ',
+        );
+        await handle.nack(false);
+      } else {
+        handlerLogger.error(
+          {
+            event: 'notification.requeue',
+            errName: err instanceof Error ? err.name : 'UnknownError',
+            err: err instanceof Error ? err.message : String(err),
+          },
+          'Transient failure — nacking for redelivery',
+        );
         await handle.nack(true);
       }
-    });
+    }
   };
 
   await queue.subscribe(topic, handler);
-  logger.info({ topic }, "Notification consumer started");
+  logger.info({ topic }, 'Notification consumer started');
 
-  // Start health side-channel server if handlers are provided.
   const healthServer =
     healthHandlers !== undefined
       ? startHealthServer(healthHandlers, healthPort, logger)
@@ -173,9 +163,17 @@ export async function startNotificationConsumer(
   return async () => {
     if (healthServer !== undefined) {
       await new Promise<void>((resolve) => healthServer.close(() => resolve()));
-      logger.info({ healthPort }, "Health HTTP server stopped");
+      logger.info({ healthPort }, 'Health HTTP server stopped');
     }
     await queue.close();
-    logger.info({ topic }, "Notification consumer stopped");
+    logger.info({ topic }, 'Notification consumer stopped');
   };
+}
+
+function isNonRetryable(err: unknown): boolean {
+  return (
+    err instanceof PayloadValidationError ||
+    err instanceof UnknownEventTypeError ||
+    err instanceof SesPermanentRejectionError
+  );
 }

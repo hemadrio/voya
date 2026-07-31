@@ -1,0 +1,11 @@
+{
+  "Type": "Notification",
+  "MessageId": "sns-msg-complaint-001",
+  "TopicArn": "arn:aws:sns:eu-west-1:123456789012:travel-ses-notifications",
+  "Message": "{\"notificationType\":\"Complaint\",\"complaint\":{\"complainedRecipients\":[{\"emailAddress\":\"synthetic-complaint@example.test\"}],\"complaintFeedbackType\":\"abuse\",\"timestamp\":\"2026-01-15T11:05:00.000Z\",\"feedbackId\":\"feedback-complaint-001\"},\"mail\":{\"timestamp\":\"2026-01-15T11:00:00.000Z\",\"messageId\":\"ses-msg-002\",\"source\":\"noreply@travel.example.test\",\"destination\":[\"synthetic-complaint@example.test\"]}}",
+  "Timestamp": "2026-01-15T11:05:01.000Z",
+  "SignatureVersion": "1",
+  "Signature": "EXAMPLE",
+  "SigningCertURL": "https://sns.eu-west-1.amazonaws.com/SimpleNotificationService-example.pem",
+  "UnsubscribeURL": "https://sns.eu-west-1.amazonaws.com/?Action=Unsubscribe"
+}

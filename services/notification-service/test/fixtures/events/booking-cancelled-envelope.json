@@ -1,0 +1,16 @@
+{
+  "eventId": "00000000-0000-4000-8000-000000000011",
+  "eventType": "booking.cancelled",
+  "occurredAt": "2026-01-15T11:00:00.000Z",
+  "correlationId": "corr-test-0011",
+  "schemaVersion": 1,
+  "userId": "00000000-0000-4000-8000-000000000002",
+  "payload": {
+    "correlationId": "corr-test-0011",
+    "bookingId": "00000000-0000-4000-8000-000000000003",
+    "userId": "00000000-0000-4000-8000-000000000002",
+    "contactEmail": "synthetic-traveller-01@example.test",
+    "reason": "Customer requested cancellation",
+    "occurredAt": "2026-01-15T11:00:00.000Z"
+  }
+}

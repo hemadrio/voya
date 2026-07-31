@@ -2,16 +2,19 @@
   "name": "notification-service",
   "version": "0.1.0",
   "private": true,
-  "description": "Notification service \u2014 consumes SQS events and dispatches emails.",
+  "description": "Notification service — consumes SQS events and dispatches emails via SES.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "catalog:",
+    "@prisma/client": "catalog:",
     "@travel/contracts": "workspace:*",
     "@travel/observability": "workspace:*",
-    "@travel/queue": "workspace:*"
+    "@travel/queue": "workspace:*",
+    "ioredis": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
