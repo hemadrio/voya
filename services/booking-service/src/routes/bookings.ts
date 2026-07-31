@@ -1,9 +1,9 @@
 /**
- * Booking service routes — create, read, cancel.
+ * Booking service routes — create, read, cancel, history.
  *
  * Authorization:
  *   - All routes require an authenticated actor (requireRole guard).
- *   - traveler: create, read own bookings, cancel own bookings.
+ *   - traveler: create, read own bookings, cancel own bookings, read own history.
  *   - support_agent: read and cancel any booking (no identity-doc access).
  *   - system: no access to booking routes (system operates via queue only).
  *
@@ -19,6 +19,11 @@
  *
  * Idempotency-key header is validated before CreateBookingRequest body so
  * the header presence is asserted at the schema boundary.
+ *
+ * WO-101 additions:
+ *   - GET /:bookingId/history — returns the redacted audit trail for a booking.
+ *     Gated by ownership (traveler) or support_agent role; identity-doc fields
+ *     are never exposed in the changeSummary.
  */
 import { Router } from "express";
 import { z } from "zod";
@@ -42,6 +47,30 @@ const validateCreate = validateRequest({
 });
 const validateBookingId = validateRequest({ params: BookingIdParamsSchema });
 
+// ---------------------------------------------------------------------------
+// AuditLogRepository — injectable interface for reading audit history
+// ---------------------------------------------------------------------------
+
+/** One audit history item as returned by the /history endpoint. */
+export interface AuditHistoryItem {
+  id: string;
+  action: string;
+  actorRole: string;
+  occurredAt: string;
+  correlationId?: string;
+  /** Redacted change summary — no identity-doc fields (passportNumber, dateOfBirth, etc.). */
+  changeSummary?: Record<string, unknown>;
+}
+
+/** Injectable reader for booking_audit_log history queries. */
+export interface AuditLogRepository {
+  /**
+   * Return audit entries for the given booking, ordered oldest-first.
+   * Must never return rows containing credential material or identity-document fields.
+   */
+  getHistory(bookingId: string): Promise<AuditHistoryItem[]>;
+}
+
 export interface BookingDomain {
   create(idempotencyKey: string, body: unknown, userId: string): Promise<unknown>;
   getById(bookingId: string, actorId: string, actorRole: string): Promise<unknown>;
@@ -52,11 +81,13 @@ export interface BookingDomain {
 registerRouteGuard('POST', '/', 'requireRole', ['traveler']);
 registerRouteGuard('GET', '/:bookingId', 'requireRole', ['traveler', 'support_agent']);
 registerRouteGuard('POST', '/:bookingId/cancel', 'requireRole', ['traveler', 'support_agent']);
+registerRouteGuard('GET', '/:bookingId/history', 'requireRole', ['traveler', 'support_agent']);
 
 export function createBookingRouter(
   domain: BookingDomain,
   securityEventWriter?: SecurityEventWriter,
   bookingRepo?: BookingRepository,
+  auditLogRepo?: AuditLogRepository,
 ): Router {
   const router = Router();
 
@@ -148,6 +179,61 @@ export function createBookingRouter(
         }
         throw err;
       }
+    },
+  );
+
+  // ── GET /:bookingId/history ─────────────────────────────────────────────
+  // WO-101: Returns the redacted audit trail for a booking.
+  //   - traveler: must own the booking (ownership check via bookingRepo).
+  //   - support_agent: may read any booking's history without ownership check.
+  //   - Identity-document fields are never included in changeSummary (enforced
+  //     at the AuditLogRepository layer and in PrismaAuditWriter redaction).
+  //   - Returns 404 when the booking does not exist.
+  //   - Returns 403 for a non-owner without the support_agent role.
+  //   - Returns 501 when auditLogRepo is not wired (configuration error).
+  router.get(
+    "/:bookingId/history",
+    requireRole('traveler', 'support_agent'),
+    validateBookingId,
+    async (req: Request, res: Response): Promise<void> => {
+      const { bookingId } = req.validated?.params as { bookingId: string };
+      const actor = (req as Request & { actor?: { sub: string; roles: string[] } }).actor;
+      const actorId = actor?.sub ?? '';
+      const actorRole = actor?.roles[0] ?? 'traveler';
+      const reference = (req as Request & { correlationId?: string }).correlationId;
+
+      if (!auditLogRepo) {
+        res.status(501).json({
+          error: { code: 'NOT_IMPLEMENTED', message: 'Audit log repository not configured' },
+          reference,
+        });
+        return;
+      }
+
+      // Ownership gate for traveler role — support_agent bypasses this.
+      if (actorRole === 'traveler' && bookingRepo) {
+        try {
+          await bookingRepo.findOwnedBookingOrThrow(bookingId, actorId);
+        } catch (err) {
+          if (err instanceof OwnershipError) {
+            await denyWithAudit(
+              res, req, 'booking', bookingId, 'READ_HISTORY', 'OWNERSHIP_PREDICATE_FAILED',
+            );
+            return;
+          }
+          throw err;
+        }
+      } else if (actorRole === 'traveler' && !bookingRepo) {
+        // bookingRepo not wired — cannot enforce ownership, deny by default
+        res.status(403).json({
+          error: { code: 'FORBIDDEN', message: 'Access denied' },
+          reference,
+        });
+        return;
+      }
+
+      const items = await auditLogRepo.getHistory(bookingId);
+      res.json({ items });
     },
   );
 

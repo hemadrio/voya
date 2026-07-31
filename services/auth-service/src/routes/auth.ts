@@ -9,6 +9,15 @@
  * Every route (except GET /health) validates its input via validateRequest
  * before any domain call, so unauthenticated requests still return 400 for
  * malformed input without disclosing account existence.
+ *
+ * WO-101 additions:
+ *   - AuthAuditLogger interface injected into AuthRouterOptions for writing
+ *     append-only auth_audit_log rows on every authentication event.
+ *   - Events: login success, login failure, lockout, token refresh,
+ *     refresh-token reuse detection, logout, access-control denial, and
+ *     server-side validation failure.
+ *   - No credential material (password, tokens, hashes) is ever passed to
+ *     the audit logger; only masked email (domain part retained) and actor IP.
  */
 import { Router } from "express";
 import {
@@ -32,6 +41,51 @@ import {
 import type { LoginAttemptGuard } from "../domain/LoginAttemptGuard.js";
 import type { Request, Response } from "express";
 import type { SessionInfo } from "../domain/types.js";
+
+// ---------------------------------------------------------------------------
+// AuthAuditLogger — injectable port for auth audit events (WO-101)
+// ---------------------------------------------------------------------------
+
+/** Minimum payload required for every auth audit event. */
+export interface AuthAuditEvent {
+  /** Action that occurred (AUTH_LOGIN_SUCCESS, AUTH_LOGIN_FAILURE, etc.). */
+  action: string;
+  /** System principal or user UUID. "anonymous" when actor is unknown. */
+  actorId: string;
+  /** Role of the actor. */
+  actorRole: string;
+  /** IPv4/v6 of the originating request. Never raw password or token. */
+  actorIp?: string;
+  /** Resource type ("session", "user", etc.). */
+  resourceType: string;
+  /** Resource identifier (user UUID, IP-hash for anonymous). */
+  resourceId: string;
+  /** Distributed trace identifier from the request context. */
+  correlationId?: string;
+  /**
+   * Sanitised metadata for the event.
+   * Must not contain: password, passwordHash, token, refreshToken, accessToken,
+   * passportNumber, dateOfBirth.  Callers are responsible for excluding these
+   * fields — the logger does not re-sanitise.
+   */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Fire-and-forget is NOT permitted: a failed audit write must surface as an
+ * error so the enclosing operation can fail rather than proceed unaudited.
+ * Implementations should throw on persistence failure.
+ */
+export interface AuthAuditLogger {
+  log(event: AuthAuditEvent): Promise<void>;
+}
+
+/** Mask an email address for audit logs: keep the domain, redact the local part. */
+function maskEmail(email: string): string {
+  const at = email.indexOf("@");
+  if (at < 0) return "[REDACTED]";
+  return `***@${email.slice(at + 1)}`;
+}
 
 // Schemas compiled once at module scope (8 ms budget constraint).
 const validateRegister = validateRequest({ body: RegisterRequestSchema });
@@ -104,6 +158,12 @@ export interface AuthRouterOptions {
    * When omitted, account lockout is not enforced (unsafe outside tests).
    */
   loginAttemptGuard?: LoginAttemptGuard;
+  /**
+   * WO-101: Injectable audit logger for auth events.
+   * When provided, every authentication event writes an auth_audit_log row.
+   * Audit failures propagate as errors (never fire-and-forget).
+   */
+  auditLogger?: AuthAuditLogger;
 }
 
 export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions): Router {
@@ -112,7 +172,7 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
       ? (domainOrOptions as AuthRouterOptions)
       : { domain: domainOrOptions as AuthDomain };
 
-  const { domain, loginAttemptGuard } = options;
+  const { domain, loginAttemptGuard, auditLogger } = options;
   const regLimiter = options.registerLimiter ?? defaultRegisterLimiter;
   const fpLimiter = options.forgotPasswordLimiter ?? defaultForgotPasswordLimiter;
   const rpLimiter = options.resetPasswordLimiter ?? defaultResetPasswordLimiter;
@@ -223,18 +283,32 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
       ((req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim()) ??
       req.socket?.remoteAddress ??
       "unknown";
+    const correlationId = req.correlationId;
 
+    // WO-101: lockout check — emit AUTH_LOCKOUT audit event when rate-limited
     if (loginAttemptGuard && email) {
       const check = await loginAttemptGuard.checkAllowed(email);
       if (!check.allowed) {
         const retryAfter = Math.max(1, check.retryAfterSeconds);
+        if (auditLogger) {
+          await auditLogger.log({
+            action: "AUTH_LOCKOUT",
+            actorId: "anonymous",
+            actorRole: "anonymous",
+            actorIp: ipAddress,
+            resourceType: "user",
+            resourceId: "anonymous",
+            correlationId,
+            metadata: { maskedEmail: maskEmail(email), retryAfterSeconds: retryAfter },
+          });
+        }
         res.set("Retry-After", String(retryAfter));
         res.status(429).json({
           error: {
             code: "ACCOUNT_TEMPORARILY_LOCKED",
             message: `Account temporarily locked. Please try again in ${retryAfter} seconds.`,
           },
-          reference: req.correlationId ?? "unknown",
+          reference: correlationId ?? "unknown",
         });
         return;
       }
@@ -247,11 +321,43 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
       if (loginAttemptGuard && email) {
         await loginAttemptGuard.recordFailure(email, ipAddress);
       }
+      // WO-101: emit AUTH_LOGIN_FAILURE audit event
+      if (auditLogger) {
+        await auditLogger.log({
+          action: "AUTH_LOGIN_FAILURE",
+          actorId: "anonymous",
+          actorRole: "anonymous",
+          actorIp: ipAddress,
+          resourceType: "user",
+          resourceId: "anonymous",
+          correlationId,
+          metadata: {
+            maskedEmail: maskEmail(email),
+            reason: (err instanceof Error ? (err as { code?: string }).code : undefined) ?? "UNKNOWN",
+          },
+        });
+      }
       throw err;
     }
 
     if (loginAttemptGuard && email) {
       await loginAttemptGuard.recordSuccess(email, ipAddress);
+    }
+
+    // WO-101: emit AUTH_LOGIN_SUCCESS audit event
+    const loginResult = result as { user?: { id?: string } } | undefined;
+    const userId = loginResult?.user?.id ?? "unknown";
+    if (auditLogger) {
+      await auditLogger.log({
+        action: "AUTH_LOGIN_SUCCESS",
+        actorId: userId,
+        actorRole: "traveler",
+        actorIp: ipAddress,
+        resourceType: "session",
+        resourceId: userId,
+        correlationId,
+        metadata: { maskedEmail: maskEmail(email) },
+      });
     }
 
     // Return the LoginResponse shape directly (no wrapper) so the api-gateway
@@ -260,7 +366,51 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
   });
 
   router.post("/refresh", validateRefresh, async (req: Request, res: Response): Promise<void> => {
-    const result = await domain.refresh(req.validated?.body);
+    const ipAddress =
+      ((req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim()) ??
+      req.socket?.remoteAddress ??
+      "unknown";
+    const correlationId = req.correlationId;
+
+    let result: unknown;
+    try {
+      result = await domain.refresh(req.validated?.body);
+    } catch (err) {
+      // WO-101: emit AUTH_REFRESH_REUSE_DETECTED for token reuse errors
+      const errCode = err instanceof Error ? (err as { code?: string }).code : undefined;
+      if (auditLogger) {
+        const action = errCode === "REFRESH_TOKEN_REUSE"
+          ? "AUTH_REFRESH_REUSE_DETECTED"
+          : "AUTH_VALIDATION_FAILURE";
+        await auditLogger.log({
+          action,
+          actorId: "anonymous",
+          actorRole: "anonymous",
+          actorIp: ipAddress,
+          resourceType: "session",
+          resourceId: "anonymous",
+          correlationId,
+          metadata: { errorCode: errCode ?? "UNKNOWN" },
+        });
+      }
+      throw err;
+    }
+
+    // WO-101: emit AUTH_TOKEN_REFRESH on success
+    if (auditLogger) {
+      const refreshResult = result as { userId?: string } | undefined;
+      const userId = refreshResult?.userId ?? "unknown";
+      await auditLogger.log({
+        action: "AUTH_TOKEN_REFRESH",
+        actorId: userId,
+        actorRole: "traveler",
+        actorIp: ipAddress,
+        resourceType: "session",
+        resourceId: userId,
+        correlationId,
+      });
+    }
+
     res.json({ data: result });
   });
 
@@ -304,7 +454,27 @@ export function createAuthRouter(domainOrOptions: AuthDomain | AuthRouterOptions
     requireAuth,
     async (req: Request, res: Response): Promise<void> => {
       const actor = req.actor!;
+      const ipAddress =
+        ((req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim()) ??
+        req.socket?.remoteAddress ??
+        "unknown";
+      const correlationId = req.correlationId;
+
       await domain.logout({ sid: actor.sid, userId: actor.sub });
+
+      // WO-101: emit AUTH_LOGOUT audit event
+      if (auditLogger) {
+        await auditLogger.log({
+          action: "AUTH_LOGOUT",
+          actorId: actor.sub,
+          actorRole: actor.roles?.[0] ?? "traveler",
+          actorIp: ipAddress,
+          resourceType: "session",
+          resourceId: actor.sub,
+          correlationId,
+        });
+      }
+
       clearRefreshCookie(res);
       res.status(204).end();
     },

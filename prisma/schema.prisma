@@ -302,10 +302,60 @@ model BookingAuditLog {
   /// Monotonically ordered identity column for deterministic replay.
   sequence     BigInt?  @map("sequence")
 
+  // WO-101 additions — hash-chain columns
+  /// SHA-256 hash of the previous entry for the same resource stream.
+  /// GENESIS_HASH sentinel ("0000...") for the first entry.
+  prevHash      String?  @map("prev_hash") @db.Char(64)
+  /// SHA-256 hash of canonical(payload) + prev_hash.
+  entryHash     String?  @map("entry_hash") @db.Char(64)
+  /// Distributed trace / request correlation identifier.
+  correlationId String?  @map("correlation_id") @db.VarChar(128)
+  /// IPv4/IPv6 of the actor's originating request.
+  actorIp       String?  @map("actor_ip") @db.VarChar(64)
+
   booking Booking @relation(fields: [bookingId], references: [id])
 
   @@index([resourceId, occurredAt], map: "idx_audit_resource_occurred")
+  @@index([actorId, occurredAt], map: "idx_booking_audit_actor_occurred")
   @@map("booking_audit_log")
+}
+
+// ---------------------------------------------------------------------------
+// AuthAuditLog — append-only authentication audit trail (WO-101)
+// ---------------------------------------------------------------------------
+
+/// Immutable audit trail for every authentication and authorization event.
+///
+/// Append-only enforcement mirrors booking_audit_log:
+///   - REVOKE UPDATE, DELETE from application role (migration 0012).
+///   - BEFORE UPDATE/DELETE trigger raises EXCEPTION as defence in depth.
+///
+/// Hash chain: entry_hash = SHA-256(canonical(payload) + prev_hash).
+/// Stream key: resource_id (user UUID), or actor_ip hash for anonymous events.
+///
+/// Excluded from GDPR erasure; erasure pseudonymises actor_id instead.
+model AuthAuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  actorId       String   @map("actor_id") @db.VarChar(128)
+  actorRole     String   @map("actor_role") @db.VarChar(32)
+  /// IPv4/IPv6 of the actor's originating request.
+  actorIp       String?  @map("actor_ip") @db.VarChar(64)
+  action        String
+  resourceType  String   @map("resource_type") @db.VarChar(64)
+  resourceId    String   @map("resource_id") @db.VarChar(128)
+  previousState Json?    @map("previous_state") @db.JsonB
+  newState      Json?    @map("new_state") @db.JsonB
+  correlationId String?  @map("correlation_id") @db.VarChar(128)
+  occurredAt    DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  sequence      BigInt?  @map("sequence")
+  /// SHA-256 hash of the previous entry for the same resource stream.
+  prevHash      String?  @map("prev_hash") @db.Char(64)
+  /// SHA-256 hash of canonical(payload) + prev_hash.
+  entryHash     String?  @map("entry_hash") @db.Char(64)
+
+  @@index([resourceId, occurredAt], map: "idx_auth_audit_resource_occurred")
+  @@index([actorId, occurredAt], map: "idx_auth_audit_actor_occurred")
+  @@map("auth_audit_log")
 }
 
 // ---------------------------------------------------------------------------
