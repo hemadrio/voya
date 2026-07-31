@@ -20,6 +20,12 @@ locals {
     ManagedBy   = "terraform"
   }
 
+  # ── Autoscaling thresholds (WO-082) ────────────────────────────────────────
+  # ALB step-scaling trigger: RequestCountPerTarget sum over one 60-second period.
+  # ~60 rps per search task × 10 tasks = 600 rps steady-state; 1000 provides 67%
+  # headroom before acceleration kicks in.
+  threshold_alb_request_count_per_target = 1000
+
   service_secret_map = {
     "auth-service"          = ["jwt-signing-key", "google-oauth-client-id", "google-oauth-client-secret"]
     "booking-service"       = ["db-url", "redis-auth-token"]
@@ -122,13 +128,20 @@ data "aws_sns_topic" "alarms" {
   name = "${local.environment}-travel-platform-alarms"
 }
 
+# On-call paging topic — used by DLQ alarms in addition to the ticket topic.
+# Created by infra/terraform/sns.tf in the root monitoring stack.
+data "aws_sns_topic" "platform_page" {
+  name = "${local.environment}-platform-page"
+}
+
 module "sqs" {
   source = "../../modules/sqs"
 
-  environment   = local.environment
-  kms_key_arn   = module.kms.key_arns["sqs"]
-  alarm_sns_arn = data.aws_sns_topic.alarms.arn
-  common_tags   = local.common_tags
+  environment    = local.environment
+  kms_key_arn    = module.kms.key_arns["sqs"]
+  alarm_sns_arn  = data.aws_sns_topic.alarms.arn
+  oncall_sns_arn = data.aws_sns_topic.platform_page.arn
+  common_tags    = local.common_tags
 }
 
 # ── RDS Proxy module ──────────────────────────────────────────────────────────

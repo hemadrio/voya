@@ -27,3 +27,8 @@ output "log_group_name" {
   description = "Name of the CloudWatch log group created for this service."
   value       = aws_cloudwatch_log_group.service.name
 }
+
+output "autoscaling_target_resource_id" {
+  description = "App Auto Scaling resource ID for the ECS service. Empty string when enable_autoscaling=false."
+  value       = var.enable_autoscaling ? aws_appautoscaling_target.this[0].resource_id : ""
+}

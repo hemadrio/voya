@@ -228,7 +228,8 @@ resource "aws_cloudwatch_metric_alarm" "dlq_depth" {
     QueueName = aws_sqs_queue.dlq.name
   }
 
-  alarm_actions = [var.alarm_sns_arn]
+  # Notify ticket topic always; also page on-call when oncall_sns_arn is provided.
+  alarm_actions = compact([var.alarm_sns_arn, var.oncall_sns_arn])
 
   tags = var.common_tags
 }
@@ -389,7 +390,7 @@ resource "aws_cloudwatch_metric_alarm" "booking_events_dlq_depth" {
     QueueName = aws_sqs_queue.booking_events_dlq.name
   }
 
-  alarm_actions = [var.alarm_sns_arn]
+  alarm_actions = compact([var.alarm_sns_arn, var.oncall_sns_arn])
   tags          = var.common_tags
 }
 
@@ -409,7 +410,7 @@ resource "aws_cloudwatch_metric_alarm" "payment_events_dlq_depth" {
     QueueName = aws_sqs_queue.payment_events_dlq.name
   }
 
-  alarm_actions = [var.alarm_sns_arn]
+  alarm_actions = compact([var.alarm_sns_arn, var.oncall_sns_arn])
   tags          = var.common_tags
 }
 
@@ -429,6 +430,6 @@ resource "aws_cloudwatch_metric_alarm" "notifications_dlq_depth" {
     QueueName = aws_sqs_queue.notifications_dlq.name
   }
 
-  alarm_actions = [var.alarm_sns_arn]
+  alarm_actions = compact([var.alarm_sns_arn, var.oncall_sns_arn])
   tags          = var.common_tags
 }

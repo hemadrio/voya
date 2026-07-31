@@ -1,0 +1,8 @@
+{
+  "pickupLocation": "JFK",
+  "dropoffLocation": "JFK",
+  "pickupDate": "2099-08-20T10:00:00.000Z",
+  "dropoffDate": "2099-08-23T10:00:00.000Z",
+  "carClass": "ECONOMY",
+  "currency": "USD"
+}

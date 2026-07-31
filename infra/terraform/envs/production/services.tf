@@ -89,6 +89,14 @@ module "api_gateway" {
   # ai-orchestration streaming: keep idle timeout above SSE window
   health_check_start_period = 45
 
+  # Autoscaling: min 4 / max 24 (WO-082)
+  enable_autoscaling          = true
+  cluster_name                = module.ecs_cluster.cluster_name
+  autoscaling_min_capacity    = 4
+  autoscaling_max_capacity    = 24
+  enable_request_scaling      = true
+  autoscaling_request_threshold = local.threshold_alb_request_count_per_target
+
   common_tags = local.common_tags
 }
 
@@ -134,6 +142,11 @@ module "auth_service" {
   service_connect_namespace_arn  = module.ecs_cluster.service_connect_namespace_arn
   service_connect_discovery_name = "auth-service"
 
+  enable_autoscaling       = true
+  cluster_name             = module.ecs_cluster.cluster_name
+  autoscaling_min_capacity = 2
+  autoscaling_max_capacity = 10
+
   common_tags = local.common_tags
 }
 
@@ -175,6 +188,11 @@ module "user_service" {
   enable_service_connect         = true
   service_connect_namespace_arn  = module.ecs_cluster.service_connect_namespace_arn
   service_connect_discovery_name = "user-service"
+
+  enable_autoscaling       = true
+  cluster_name             = module.ecs_cluster.cluster_name
+  autoscaling_min_capacity = 2
+  autoscaling_max_capacity = 10
 
   common_tags = local.common_tags
 }
@@ -218,6 +236,14 @@ module "flight_service" {
   service_connect_namespace_arn  = module.ecs_cluster.service_connect_namespace_arn
   service_connect_discovery_name = "flight-service"
 
+  # Autoscaling: search service min 3 / max 20 (WO-082)
+  enable_autoscaling            = true
+  cluster_name                  = module.ecs_cluster.cluster_name
+  autoscaling_min_capacity      = 3
+  autoscaling_max_capacity      = 20
+  enable_request_scaling        = true
+  autoscaling_request_threshold = local.threshold_alb_request_count_per_target
+
   common_tags = local.common_tags
 }
 
@@ -260,6 +286,14 @@ module "hotel_service" {
   service_connect_namespace_arn  = module.ecs_cluster.service_connect_namespace_arn
   service_connect_discovery_name = "hotel-service"
 
+  # Autoscaling: search service min 3 / max 20 (WO-082)
+  enable_autoscaling            = true
+  cluster_name                  = module.ecs_cluster.cluster_name
+  autoscaling_min_capacity      = 3
+  autoscaling_max_capacity      = 20
+  enable_request_scaling        = true
+  autoscaling_request_threshold = local.threshold_alb_request_count_per_target
+
   common_tags = local.common_tags
 }
 
@@ -301,6 +335,14 @@ module "car_service" {
   enable_service_connect         = true
   service_connect_namespace_arn  = module.ecs_cluster.service_connect_namespace_arn
   service_connect_discovery_name = "car-service"
+
+  # Autoscaling: search service min 3 / max 20 (WO-082)
+  enable_autoscaling            = true
+  cluster_name                  = module.ecs_cluster.cluster_name
+  autoscaling_min_capacity      = 3
+  autoscaling_max_capacity      = 20
+  enable_request_scaling        = true
+  autoscaling_request_threshold = local.threshold_alb_request_count_per_target
 
   common_tags = local.common_tags
 }
@@ -349,6 +391,11 @@ module "booking_service" {
   enable_service_connect         = true
   service_connect_namespace_arn  = module.ecs_cluster.service_connect_namespace_arn
   service_connect_discovery_name = "booking-service"
+
+  enable_autoscaling       = true
+  cluster_name             = module.ecs_cluster.cluster_name
+  autoscaling_min_capacity = 2
+  autoscaling_max_capacity = 10
 
   common_tags = local.common_tags
 }
@@ -399,6 +446,11 @@ module "payment_service" {
   service_connect_namespace_arn  = module.ecs_cluster.service_connect_namespace_arn
   service_connect_discovery_name = "payment-service"
 
+  enable_autoscaling       = true
+  cluster_name             = module.ecs_cluster.cluster_name
+  autoscaling_min_capacity = 2
+  autoscaling_max_capacity = 10
+
   common_tags = local.common_tags
 }
 
@@ -447,6 +499,11 @@ module "ai_orchestration" {
   # Extend start period for model-client initialisation
   health_check_start_period = 60
 
+  enable_autoscaling       = true
+  cluster_name             = module.ecs_cluster.cluster_name
+  autoscaling_min_capacity = 2
+  autoscaling_max_capacity = 10
+
   common_tags = local.common_tags
 }
 
@@ -494,6 +551,16 @@ module "notification_consumer" {
   # notification-consumer does not register with Service Connect as a server
   # (no inbound HTTP), but uses Service Connect as a client to reach other services.
   enable_service_connect        = false
+
+  # SQS-based autoscaling only — no CPU target tracking, no ALB step scaling (WO-082 AC4).
+  # Queue depth > 100 triggers scale-out; < 20 for two periods triggers scale-in.
+  enable_autoscaling              = true
+  cluster_name                    = module.ecs_cluster.cluster_name
+  autoscaling_min_capacity        = 3
+  autoscaling_max_capacity        = 20
+  consumer_scaling_queue_name     = module.sqs.notifications_queue_name
+  consumer_scale_out_threshold    = 100
+  consumer_scale_in_threshold     = 20
 
   common_tags = local.common_tags
 }

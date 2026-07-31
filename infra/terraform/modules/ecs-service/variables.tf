@@ -212,3 +212,121 @@ variable "health_check_start_period" {
   description = "Seconds ECS waits before the container healthCheck starts counting failures. Must exceed Prisma client init time."
   default     = 45
 }
+
+# ── Autoscaling ───────────────────────────────────────────────────────────────
+
+variable "enable_autoscaling" {
+  type        = bool
+  description = "Enable App Auto Scaling for this ECS service. Requires cluster_name to be set."
+  default     = false
+}
+
+variable "cluster_name" {
+  type        = string
+  description = "Name of the ECS cluster (e.g. production-travel-platform). Required when enable_autoscaling=true; used to build the App Auto Scaling resource_id."
+  default     = ""
+}
+
+variable "autoscaling_min_capacity" {
+  type        = number
+  description = "Minimum number of running tasks. Scale-in will never reduce below this value."
+  default     = 1
+
+  validation {
+    condition     = var.autoscaling_min_capacity >= 1
+    error_message = "autoscaling_min_capacity must be at least 1."
+  }
+}
+
+variable "autoscaling_max_capacity" {
+  type        = number
+  description = "Maximum number of running tasks. Must not exceed the account Fargate task quota."
+  default     = 10
+
+  validation {
+    condition     = var.autoscaling_max_capacity >= var.autoscaling_min_capacity
+    error_message = "autoscaling_max_capacity must be >= autoscaling_min_capacity."
+  }
+}
+
+variable "autoscaling_cpu_target" {
+  type        = number
+  description = "Target CPU utilization percentage for the target-tracking scaling policy."
+  default     = 60
+
+  validation {
+    condition     = var.autoscaling_cpu_target > 0 && var.autoscaling_cpu_target <= 100
+    error_message = "autoscaling_cpu_target must be between 1 and 100."
+  }
+}
+
+variable "autoscaling_scale_out_cooldown" {
+  type        = number
+  description = "Scale-out cooldown in seconds. Short to react quickly to demand spikes."
+  default     = 60
+}
+
+variable "autoscaling_scale_in_cooldown" {
+  type        = number
+  description = "Scale-in cooldown in seconds. Must be longer than scale-out to prevent thrashing during fan-out latency windows."
+  default     = 300
+
+  validation {
+    condition     = var.autoscaling_scale_in_cooldown >= var.autoscaling_scale_out_cooldown
+    error_message = "autoscaling_scale_in_cooldown must be >= autoscaling_scale_out_cooldown to prevent thrashing."
+  }
+}
+
+variable "enable_request_scaling" {
+  type        = bool
+  description = "Attach an ALB RequestCountPerTarget step-scaling policy in addition to CPU target tracking. Only meaningful when target_group_arn is set."
+  default     = false
+}
+
+variable "autoscaling_request_threshold" {
+  type        = number
+  description = "ALB RequestCountPerTarget threshold (sum per evaluation period) that triggers step-scale-out."
+  default     = 1000
+}
+
+variable "autoscaling_request_alarm_period" {
+  type        = number
+  description = "CloudWatch alarm evaluation period in seconds for the RequestCountPerTarget alarm."
+  default     = 60
+}
+
+variable "autoscaling_request_eval_periods" {
+  type        = number
+  description = "Consecutive evaluation periods that must breach before the step-scaling alarm fires."
+  default     = 2
+}
+
+variable "autoscaling_step_cooldown" {
+  type        = number
+  description = "Cooldown in seconds for the ALB request-count step-scaling policy."
+  default     = 120
+}
+
+variable "autoscaling_step_min_adjustment" {
+  type        = number
+  description = "MinAdjustmentMagnitude: minimum number of tasks to add regardless of the percentage calculation."
+  default     = 1
+}
+
+variable "consumer_scaling_queue_name" {
+  type        = string
+  description = "SQS queue name that drives step scaling for queue-consumer services. When non-empty, CPU and request-based scaling are disabled — the consumer scales only on queue depth."
+  default     = ""
+}
+
+variable "consumer_scale_out_threshold" {
+  type        = number
+  description = "SQS ApproximateNumberOfMessagesVisible value above which consumer scale-out fires."
+  default     = 100
+}
+
+variable "consumer_scale_in_threshold" {
+  type        = number
+  description = "SQS ApproximateNumberOfMessagesVisible value below which consumer scale-in fires."
+  default     = 20
+}

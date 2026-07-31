@@ -89,3 +89,8 @@ output "notifications_dlq_arn" {
   description = "ARN of the notifications DLQ."
   value       = aws_sqs_queue.notifications_dlq.arn
 }
+
+output "notifications_queue_name" {
+  description = "Name of the notifications standard queue. Use as consumer_scaling_queue_name for notification-consumer autoscaling."
+  value       = aws_sqs_queue.notifications.name
+}

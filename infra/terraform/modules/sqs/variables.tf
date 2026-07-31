@@ -44,3 +44,9 @@ variable "max_receive_count" {
     error_message = "max_receive_count must be between 1 and 1000."
   }
 }
+
+variable "oncall_sns_arn" {
+  type        = string
+  description = "ARN of the on-call paging SNS topic. When set, DLQ alarms notify both alarm_sns_arn (ticket) and this topic (page). Leave empty to notify the ticket topic only."
+  default     = ""
+}

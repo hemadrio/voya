@@ -1,0 +1,127 @@
+# scaling-profile.yaml — Synthetic load profile for autoscaling validation (WO-082).
+#
+# Constraint (BR-18): this profile targets the STAGING environment only.
+# Staging holds synthetic data exclusively. Never run against production.
+#
+# Goal: demonstrate that the fleet reaches ≥3x steady-state task count within
+# ten minutes of a sustained 3x request rate, with no capacity-attributable 5xx
+# and search p95 < 5000 ms throughout the ramp.
+#
+# Fargate quota check:
+#   Before running, verify account-level Fargate task quota:
+#     aws service-quotas get-service-quota \
+#       --service-code fargate \
+#       --quota-code L-790BEEDA  # ECS tasks per region
+#   Required headroom: sum(all service max_capacity) = 24+20+20+20+10+10+10+10+10+20 = 154 tasks
+#   If quota < 154, request an increase at:
+#     https://console.aws.amazon.com/servicequotas/home/services/fargate/quotas
+#
+# SQS metric publication lag:
+#   ApproximateNumberOfMessagesVisible is published every ~60 seconds.
+#   Consumer scaling reacts approximately one period (60 s) later than
+#   request-handler scaling. The queue-flood fixture accounts for this lag.
+
+profile:
+  name: "3x-scaling-ramp"
+  environment: staging
+  description: "Ramp to 3x steady-state request rate; verify fleet reaches 3x task count within 10 minutes"
+
+steady_state:
+  duration_seconds: 120
+  target_rps: 100
+  endpoints:
+    - method: POST
+      path: /v1/flights/search
+      weight: 40
+      body_fixture: fixtures/flight-search-request.json
+    - method: POST
+      path: /v1/hotels/search
+      weight: 35
+      body_fixture: fixtures/hotel-search-request.json
+    - method: POST
+      path: /v1/cars/search
+      weight: 25
+      body_fixture: fixtures/car-search-request.json
+
+ramp_phase:
+  description: "Ramp from steady-state to 3x over 2 minutes"
+  start_rps: 100
+  end_rps: 300
+  ramp_duration_seconds: 120
+
+sustained_phase:
+  description: "Hold at 3x for 10 minutes to allow autoscaling to stabilise"
+  target_rps: 300
+  duration_seconds: 600
+
+scale_in_phase:
+  description: "Drop to 0.5x to verify conservative scale-in behaviour"
+  target_rps: 50
+  duration_seconds: 300
+
+acceptance_criteria:
+  max_time_to_3x_tasks_seconds: 600          # Fleet must reach 3x within 10 minutes
+  max_5xx_rate_pct: 0                         # Zero capacity-attributable 5xx
+  max_search_p95_ms: 5000                     # Hard threshold from WO-011
+  task_count_metric: "ECS/RunningTaskCount"
+  cloudwatch_namespace: "ECS/ContainerInsights"
+
+evidence_collection:
+  task_count_series: true          # Export CloudWatch RunningTaskCount per service
+  p95_latency_series: true         # Export p95 from travel/search namespace
+  scale_event_timestamps: true     # Record exact timestamps of scaling events
+  output_dir: "docs/reliability/scaling-evidence"
+
+# ── Queue-flood fixture ────────────────────────────────────────────────────────
+# Sends > 100 synthetic notification messages to the staging notifications queue.
+# Verifies that notification-consumer scales while request-handler counts stay flat.
+#
+# Run separately from the request-based ramp:
+#   aws sqs send-message-batch \
+#     --queue-url https://sqs.eu-west-1.amazonaws.com/{account}/staging-notifications \
+#     --entries file://tools/loadtest/fixtures/notification-flood-batch.json
+#
+# After flooding, watch notification-consumer RunningTaskCount via:
+#   aws cloudwatch get-metric-statistics \
+#     --namespace ECS/ContainerInsights \
+#     --metric-name RunningTaskCount \
+#     --dimensions Name=ClusterName,Value=staging-travel-platform \
+#                  Name=ServiceName,Value=staging-notification-consumer \
+#     --start-time $(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%SZ) \
+#     --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+#     --period 60 \
+#     --statistics Maximum
+
+queue_flood:
+  queue_name: "staging-notifications"
+  message_count: 150
+  batch_size: 10
+  synthetic_message_fixture: fixtures/notification-flood-batch.json
+  acceptance_criteria:
+    consumer_task_increase: true        # Consumer must scale up
+    request_handler_task_stable: true   # flight/hotel/car task counts must not change
+
+# ── DLQ poison-message test ───────────────────────────────────────────────────
+# Proves that a deliberately poisoned message reaches the DLQ and triggers both
+# the ticket SNS topic and the on-call page SNS topic (WO-082 AC5).
+#
+# Steps:
+#   1. Send a message with Body=POISON_PILL_FORCE_DLQ to the notifications queue.
+#   2. The consumer must fail to process it maxReceiveCount (5) times.
+#   3. SQS routes it to the notifications DLQ after the fifth failure.
+#   4. The CloudWatch alarm fires within 2 minutes.
+#   5. Both SNS topics receive the alarm notification.
+#
+# Verify DLQ alarm fired:
+#   aws cloudwatch describe-alarm-history \
+#     --alarm-name staging-notifications-dlq-depth \
+#     --history-item-type StateUpdate \
+#     --start-date $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)
+
+dlq_poison_test:
+  queue_name: "staging-notifications"
+  poison_body: "POISON_PILL_FORCE_DLQ"
+  expected_dlq_alarm: "staging-notifications-dlq-depth"
+  expected_sns_topics:
+    - "${environment}-travel-platform-alarms"
+    - "${environment}-platform-page"

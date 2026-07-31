@@ -1,0 +1,12 @@
+[
+  {"Id": "msg-001", "MessageBody": "{\"type\":\"booking.confirmed\",\"bookingId\":\"synth-001\",\"userId\":\"synth-user-001\",\"synthetic\":true}", "MessageGroupId": "flood-001", "MessageDeduplicationId": "flood-001-001"},
+  {"Id": "msg-002", "MessageBody": "{\"type\":\"booking.confirmed\",\"bookingId\":\"synth-002\",\"userId\":\"synth-user-002\",\"synthetic\":true}", "MessageGroupId": "flood-002", "MessageDeduplicationId": "flood-002-001"},
+  {"Id": "msg-003", "MessageBody": "{\"type\":\"booking.confirmed\",\"bookingId\":\"synth-003\",\"userId\":\"synth-user-003\",\"synthetic\":true}", "MessageGroupId": "flood-003", "MessageDeduplicationId": "flood-003-001"},
+  {"Id": "msg-004", "MessageBody": "{\"type\":\"payment.confirmed\",\"paymentId\":\"synth-pay-001\",\"userId\":\"synth-user-004\",\"synthetic\":true}", "MessageGroupId": "flood-004", "MessageDeduplicationId": "flood-004-001"},
+  {"Id": "msg-005", "MessageBody": "{\"type\":\"payment.confirmed\",\"paymentId\":\"synth-pay-002\",\"userId\":\"synth-user-005\",\"synthetic\":true}", "MessageGroupId": "flood-005", "MessageDeduplicationId": "flood-005-001"},
+  {"Id": "msg-006", "MessageBody": "{\"type\":\"booking.confirmed\",\"bookingId\":\"synth-006\",\"userId\":\"synth-user-006\",\"synthetic\":true}", "MessageGroupId": "flood-006", "MessageDeduplicationId": "flood-006-001"},
+  {"Id": "msg-007", "MessageBody": "{\"type\":\"booking.confirmed\",\"bookingId\":\"synth-007\",\"userId\":\"synth-user-007\",\"synthetic\":true}", "MessageGroupId": "flood-007", "MessageDeduplicationId": "flood-007-001"},
+  {"Id": "msg-008", "MessageBody": "{\"type\":\"payment.confirmed\",\"paymentId\":\"synth-pay-003\",\"userId\":\"synth-user-008\",\"synthetic\":true}", "MessageGroupId": "flood-008", "MessageDeduplicationId": "flood-008-001"},
+  {"Id": "msg-009", "MessageBody": "{\"type\":\"booking.confirmed\",\"bookingId\":\"synth-009\",\"userId\":\"synth-user-009\",\"synthetic\":true}", "MessageGroupId": "flood-009", "MessageDeduplicationId": "flood-009-001"},
+  {"Id": "msg-010", "MessageBody": "{\"type\":\"booking.confirmed\",\"bookingId\":\"synth-010\",\"userId\":\"synth-user-010\",\"synthetic\":true}", "MessageGroupId": "flood-010", "MessageDeduplicationId": "flood-010-001"}
+]
