@@ -26,6 +26,10 @@
       "dependsOn": ["@travel/contracts#build"],
       "cache": false,
       "outputs": []
+    },
+    "@travel/observability#test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
     }
   }
 }

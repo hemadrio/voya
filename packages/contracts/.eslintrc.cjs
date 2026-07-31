@@ -27,6 +27,7 @@ module.exports = {
   rules: {
     "@typescript-eslint/no-explicit-any": "error",
     "@typescript-eslint/no-unsafe-assignment": "off",
+    "no-console": "error",
     "no-restricted-imports": [
       "error",
       {
