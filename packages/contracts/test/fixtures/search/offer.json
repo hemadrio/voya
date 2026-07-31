@@ -1,0 +1,17 @@
+{
+  "id": "offer_01HZY",
+  "provenance": "AMADEUS",
+  "bookable": true,
+  "title": "Nonstop JFK to LAX",
+  "price": "412.50",
+  "currency": "USD",
+  "rating": 4.5,
+  "reviews": 1280,
+  "details": {
+    "airline": "Delta",
+    "flightNumber": "DL123",
+    "durationMinutes": 330
+  },
+  "expiresAt": "2030-06-01T00:15:00.000Z",
+  "freshness": "FRESH"
+}

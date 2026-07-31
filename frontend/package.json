@@ -1,0 +1,15 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Next.js 14 App Router web client. Only lib/schemas.ts is scaffolded as part of WO-001, wiring the frontend onto @travel/contracts as its single source of truth for request/response validation.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@travel/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3"
+  }
+}
