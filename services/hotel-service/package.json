@@ -12,14 +12,21 @@
   "dependencies": {
     "@travel/contracts": "workspace:*",
     "@travel/observability": "workspace:*",
+    "@travel/offer-normaliser": "workspace:*",
+    "@travel/search-cache": "workspace:*",
     "@travel/supplier-port": "workspace:*",
+    "@travel/supplier-resilience": "workspace:*",
     "@travel/suppliers": "workspace:*",
     "@opentelemetry/api": "catalog:",
+    "express": "catalog:",
     "pino": "catalog:"
   },
   "devDependencies": {
     "@travel/test-config": "workspace:*",
+    "@types/express": "catalog:",
     "@types/node": "catalog:",
+    "@types/supertest": "catalog:",
+    "supertest": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

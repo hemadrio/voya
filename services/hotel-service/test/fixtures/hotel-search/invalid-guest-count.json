@@ -1,0 +1,7 @@
+{
+  "location": "New York",
+  "checkInDate": "2099-07-10T14:00:00.000Z",
+  "checkOutDate": "2099-07-13T11:00:00.000Z",
+  "guests": 0,
+  "currency": "USD"
+}
