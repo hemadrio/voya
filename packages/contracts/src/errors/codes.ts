@@ -46,6 +46,10 @@ export const ErrorCode = {
   /** 422 — the selected offer is not bookable (ILLUSTRATIVE, expired, or
    *  from an unrecognised provenance channel). */
   OFFER_NOT_BOOKABLE: "OFFER_NOT_BOOKABLE",
+  /** 401 — a valid token that was explicitly revoked (logout, reuse detection). */
+  TOKEN_REVOKED: "TOKEN_REVOKED",
+  /** 403 — state-changing request lacks a valid CSRF double-submit token. */
+  CSRF_FAILED: "CSRF_FAILED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -77,6 +81,8 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   INTERNAL_ERROR: 500,
   EGRESS_DENIED: 502,
   OFFER_NOT_BOOKABLE: 422,
+  TOKEN_REVOKED: 401,
+  CSRF_FAILED: 403,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

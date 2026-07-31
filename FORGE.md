@@ -140,3 +140,10 @@
 - **Files:** 23 (+1001/-0)
 - **Duration:** 983ss
 - **Approach:** Built a pure, dependency-injectable SecretValidator module in @travel/observability with exact-match placeholder blocklist, per-field minLength rules, allowEmptyInDev exemptions, and relaxed-dev-mode support. The pure validate(manifest, env, opts) function is fully unit-testable with no process control; assertSecretsOrExit wraps it with process.env access, Pino-compatible logging (key names only — never values), and process.exit(1) in strict mode. Declarative per-service manifests enumerate each service's required secrets with typed SecretDescriptor. Added createValidatorProbe to the health builder using dynamic import to avoid circular graph. Extended Pino redaction paths to cover 20+ secret/token/key/password field patterns. Wired assertSecretsOrExit into all 9 service index.ts files after the tracing bootstrap, gated with NODE_ENV !== 'test' so unit test suites importing createApp continue to work.
+
+## WO-017: User Story: WO-017 - Gateway Edge Hardening: Headers, CORS, Cookies, CSRF
+- **Status:** completed
+- **Commit:** `7732e5a`
+- **Files:** 19 (+1705/-0)
+- **Duration:** 914ss
+- **Approach:** Created the api-gateway service from scratch with a layered edge security middleware stack mounted in deliberate order. Added TOKEN_REVOKED and CSRF_FAILED to the shared error contracts (with exhaustive ERROR_STATUS_MAP entries). The middleware chain strips inbound x-internal-actor headers first, then sets security headers, enforces CORS via a per-environment typed allow-list, routes /webhooks/stripe through a raw body handler before the global JSON parser, and authenticates requests using RS256 JWT verification through the KeyProvider verification key set with Redis jti denylist and conservative deny-on-unavailability policy. CSRF uses the double-submit cookie pattern with Origin and Sec-Fetch-Site defense-in-depth; the webhook route is exempt. JWT verification uses Node.js built-in crypto (RSA-SHA256) with no new external dependency. Comprehensive unit tests run fully offline using ephemeral RSA key pairs generated at test runtime.
