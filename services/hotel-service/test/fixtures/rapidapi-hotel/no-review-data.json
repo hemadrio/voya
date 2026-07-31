@@ -1,0 +1,14 @@
+{
+  "result": [
+    {
+      "hotel_id": "2222222",
+      "hotel_name": "Business Suites Downtown",
+      "class": 4,
+      "review_score": null,
+      "review_nr": null,
+      "min_total_price": 300,
+      "currencycode": "USD",
+      "rate_plan_code": "CORPORATE"
+    }
+  ]
+}

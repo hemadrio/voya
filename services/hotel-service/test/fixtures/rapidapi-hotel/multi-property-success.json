@@ -1,0 +1,24 @@
+{
+  "result": [
+    {
+      "hotel_id": "1234567",
+      "hotel_name": "Grand Hotel Times Square",
+      "class": 4,
+      "review_score": 8.7,
+      "review_nr": 2847,
+      "min_total_price": 450,
+      "currencycode": "USD",
+      "rate_plan_code": "NR-FLEX"
+    },
+    {
+      "hotel_id": "7654321",
+      "hotel_name": "Budget Inn Midtown",
+      "class": 3,
+      "review_score": 7.2,
+      "review_nr": 1203,
+      "min_total_price": 240,
+      "currencycode": "USD",
+      "rate_plan_code": "STANDARD"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "result": [
+    {
+      "hotel_id": "3333333",
+      "hotel_name": "Boutique Hotel Park Side",
+      "class": "4.5",
+      "review_score": 9.1,
+      "review_nr": 543,
+      "min_total_price": 390,
+      "currencycode": "USD",
+      "rate_plan_code": "BB-FLEX"
+    }
+  ]
+}
