@@ -5,15 +5,15 @@ terraform {
     region         = "eu-west-1"
     encrypt        = true
     kms_key_id     = "alias/staging/platform/secretsmanager"
-    dynamodb_table = "travel-platform-tfstate-lock"
+    dynamodb_table = "travel-platform-tfstate-lock-staging"
   }
 
-  required_version = ">= 1.6"
+  required_version = "~> 1.15"
 
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 5.0"
+      version = "~> 5.0"
     }
   }
 }
@@ -23,9 +23,11 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "travel-platform"
-      Environment = "staging"
-      ManagedBy   = "terraform"
+      Service            = var.tags.Service
+      Environment        = var.tags.Environment
+      CostCentre         = var.tags.CostCentre
+      Owner              = var.tags.Owner
+      DataClassification = var.tags.DataClassification
     }
   }
 }

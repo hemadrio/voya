@@ -1,11 +1,11 @@
 terraform {
   backend "s3" {
-    bucket         = "travel-platform-tfstate-production"
-    key            = "production/terraform.tfstate"
+    bucket         = "travel-platform-tfstate-dev"
+    key            = "dev/terraform.tfstate"
     region         = "eu-west-1"
     encrypt        = true
-    kms_key_id     = "alias/production/platform/secretsmanager"
-    dynamodb_table = "travel-platform-tfstate-lock-production"
+    kms_key_id     = "alias/dev/platform/secretsmanager"
+    dynamodb_table = "travel-platform-tfstate-lock-dev"
   }
 
   required_version = "~> 1.15"
