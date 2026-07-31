@@ -1,0 +1,169 @@
+{
+  "description": "Test fixtures for purge_after derivation — nine retention categories with edge dates. Used by unit tests and the backfill reconciliation step.",
+  "retentionConfig": {
+    "accountIdentityDays": 30,
+    "transactionYears": 7,
+    "identityDocumentDays": 90,
+    "sessionDays": 7,
+    "itineraryYears": 7,
+    "preferenceDays": 365,
+    "conversationDays": 90,
+    "auditDays": 365
+  },
+  "categories": {
+    "accountIdentity": {
+      "description": "users.erasure_requested_at + 30 days; null when no erasure request",
+      "cases": [
+        {
+          "id": "live-account",
+          "description": "Live account — no erasure request",
+          "erasureRequestedAt": null,
+          "expectedPurgeAfter": null
+        },
+        {
+          "id": "erasure-requested",
+          "description": "Standard erasure request",
+          "erasureRequestedAt": "2025-01-01T00:00:00.000Z",
+          "expectedPurgeAfter": "2025-01-31T00:00:00.000Z"
+        },
+        {
+          "id": "erasure-month-boundary",
+          "description": "Erasure at Jan 31 → Feb 28 (leap year guard)",
+          "erasureRequestedAt": "2024-01-31T00:00:00.000Z",
+          "expectedPurgeAfter": "2024-03-01T00:00:00.000Z"
+        }
+      ]
+    },
+    "authSession": {
+      "description": "sessions.expires_at + 7 days",
+      "cases": [
+        {
+          "id": "standard-session",
+          "description": "Typical short-lived session",
+          "expiresAt": "2025-03-01T00:00:00.000Z",
+          "expectedPurgeAfter": "2025-03-08T00:00:00.000Z"
+        },
+        {
+          "id": "already-expired-session",
+          "description": "Session expired long ago — purge_after also in the past (row is eligible for deletion)",
+          "expiresAt": "2020-01-01T00:00:00.000Z",
+          "expectedPurgeAfter": "2020-01-08T00:00:00.000Z"
+        }
+      ]
+    },
+    "oneTimeToken": {
+      "description": "one_time_tokens.expires_at + sessionDays (7) days",
+      "cases": [
+        {
+          "id": "standard-token",
+          "description": "One-time password-reset token",
+          "expiresAt": "2025-06-01T00:00:00.000Z",
+          "expectedPurgeAfter": "2025-06-08T00:00:00.000Z"
+        }
+      ]
+    },
+    "bookingTransaction": {
+      "description": "bookings.created_at + 7 years",
+      "cases": [
+        {
+          "id": "recent-booking",
+          "description": "Recently created booking",
+          "createdAt": "2024-05-15T00:00:00.000Z",
+          "expectedPurgeAfter": "2031-05-15T00:00:00.000Z"
+        },
+        {
+          "id": "cancelled-booking",
+          "description": "Cancelled booking keeps full transaction horizon for audit/dispute",
+          "createdAt": "2024-01-01T00:00:00.000Z",
+          "status": "CANCELLED",
+          "expectedPurgeAfter": "2031-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "old-booking-eligible",
+          "description": "Booking from 8 years ago — purge_after is in the past",
+          "createdAt": "2016-01-01T00:00:00.000Z",
+          "expectedPurgeAfter": "2023-01-01T00:00:00.000Z"
+        }
+      ]
+    },
+    "travelerIdentityDocuments": {
+      "description": "booking_travelers.trip_completed_at + 90 days; null for future/in-flight trips",
+      "cases": [
+        {
+          "id": "future-trip",
+          "description": "Trip not yet completed — purge_after must be null (in-flight guard)",
+          "tripCompletedAt": null,
+          "expectedPurgeAfter": null
+        },
+        {
+          "id": "completed-trip",
+          "description": "Trip completed; passport copy eligible for deletion 90 days later",
+          "tripCompletedAt": "2025-04-10T00:00:00.000Z",
+          "expectedPurgeAfter": "2025-07-09T00:00:00.000Z"
+        },
+        {
+          "id": "recently-returned",
+          "description": "Traveler returned yesterday — purge horizon is 89 days out",
+          "tripCompletedAt": "2025-07-30T00:00:00.000Z",
+          "expectedPurgeAfter": "2025-10-28T00:00:00.000Z"
+        }
+      ]
+    },
+    "itinerary": {
+      "description": "itineraries.created_at + 7 years",
+      "cases": [
+        {
+          "id": "new-itinerary",
+          "description": "Fresh itinerary",
+          "createdAt": "2024-08-01T00:00:00.000Z",
+          "expectedPurgeAfter": "2031-08-01T00:00:00.000Z"
+        }
+      ]
+    },
+    "travelPreferences": {
+      "description": "travel_preferences.updated_at + 365 days",
+      "cases": [
+        {
+          "id": "recently-updated",
+          "description": "Preferences just updated",
+          "updatedAt": "2024-07-01T00:00:00.000Z",
+          "expectedPurgeAfter": "2025-07-01T00:00:00.000Z"
+        },
+        {
+          "id": "stale-preferences",
+          "description": "Preferences not updated in 2 years — purge_after is in the past",
+          "updatedAt": "2022-01-01T00:00:00.000Z",
+          "expectedPurgeAfter": "2023-01-01T00:00:00.000Z"
+        }
+      ]
+    },
+    "conversationHistory": {
+      "description": "Redis TTL: last_message_at + 90 days (no Postgres row in this phase)",
+      "cases": [
+        {
+          "id": "active-conversation",
+          "description": "Conversation with recent activity",
+          "lastMessageAt": "2025-01-01T00:00:00.000Z",
+          "expectedPurgeAfter": "2025-04-01T00:00:00.000Z"
+        }
+      ]
+    },
+    "auditRecord": {
+      "description": "booking_audit_log.occurred_at + 365 days (erasure-excluded; minimum 365 days)",
+      "cases": [
+        {
+          "id": "recent-audit",
+          "description": "Recent audit entry — still within retention window",
+          "occurredAt": "2024-01-01T00:00:00.000Z",
+          "expectedPurgeAfter": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "old-audit-eligible",
+          "description": "Audit entry over 365 days old — eligible for deletion under the long-horizon sweep",
+          "occurredAt": "2022-01-01T00:00:00.000Z",
+          "expectedPurgeAfter": "2023-01-01T00:00:00.000Z"
+        }
+      ]
+    }
+  }
+}

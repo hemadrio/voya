@@ -20,6 +20,17 @@ enum SuppressionReason {
   MANUAL
 }
 
+// ---------------------------------------------------------------------------
+// DataClassification — four-tier classification enum (WO-074)
+// ---------------------------------------------------------------------------
+
+enum DataClassification {
+  PUBLIC
+  INTERNAL
+  CONFIDENTIAL
+  RESTRICTED
+}
+
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client"
@@ -46,10 +57,22 @@ model User {
   failedAttemptCount Int       @default(0) @map("failed_attempt_count")
   lockedUntil        DateTime? @map("locked_until") @db.Timestamptz
 
+  // WO-074 additions — data classification and purge metadata
+  /// Data classification tier for this row (RESTRICTED for identity data).
+  classification     DataClassification @default(RESTRICTED) @map("classification")
+  /// Timestamp when a GDPR erasure request was received; null while account is live.
+  /// purge_after = erasure_requested_at + RETENTION_ACCOUNT_IDENTITY_DAYS days.
+  erasureRequestedAt DateTime?  @map("erasure_requested_at") @db.Timestamptz
+  /// Computed purge timestamp; null until an erasure request is fulfilled.
+  purgeAfter         DateTime?  @map("purge_after") @db.Timestamptz
+
   bookings      Booking[]
   sessions      Session[]
   oneTimeTokens OneTimeToken[]
+  preferences   TravelPreference?
+  itineraries   Itinerary[]
 
+  @@index([purgeAfter], map: "idx_users_purge_after")
   @@map("users")
 }
 
@@ -68,9 +91,16 @@ model Session {
   userAgent        String?   @map("user_agent") @db.VarChar(512)
   lastSeenAt       DateTime? @map("last_seen_at") @db.Timestamptz
 
+  // WO-074 additions
+  /// Data classification tier (RESTRICTED — contains token hashes and IP).
+  classification DataClassification @default(RESTRICTED) @map("classification")
+  /// purge_after = expires_at + RETENTION_SESSION_DAYS days.
+  purgeAfter     DateTime?          @map("purge_after") @db.Timestamptz
+
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, revokedAt], map: "idx_sessions_user_revoked")
+  @@index([purgeAfter], map: "idx_sessions_purge_after")
   @@map("sessions")
 }
 
@@ -94,9 +124,15 @@ model OneTimeToken {
   consumedAt DateTime? @map("consumed_at") @db.Timestamptz
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
+  // WO-074 additions
+  classification DataClassification @default(RESTRICTED) @map("classification")
+  /// purge_after = expires_at + RETENTION_SESSION_DAYS days.
+  purgeAfter     DateTime?          @map("purge_after") @db.Timestamptz
+
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, purpose, consumedAt], map: "idx_ott_user_purpose_consumed")
+  @@index([purgeAfter], map: "idx_ott_purge_after")
   @@map("one_time_tokens")
 }
 
@@ -143,9 +179,17 @@ model Booking {
   // processed by the backfill.
   travelersMigratedAt DateTime? @map("travelers_migrated_at") @db.Timestamptz
 
+  // WO-074 additions
+  /// Data classification tier (CONFIDENTIAL — booking transaction data).
+  classification DataClassification @default(CONFIDENTIAL) @map("classification")
+  /// purge_after = created_at + RETENTION_TRANSACTION_YEARS years.
+  /// A cancelled booking keeps the same horizon (tax/dispute retention).
+  purgeAfter     DateTime?          @map("purge_after") @db.Timestamptz
+
   @@index([userId])
   @@index([status])
   @@index([travelersMigratedAt], map: "idx_bookings_travelers_migrated_at")
+  @@index([purgeAfter], map: "idx_bookings_purge_after")
   @@map("bookings")
 }
 
@@ -302,10 +346,74 @@ model BookingTraveler {
 
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
+  // WO-074 additions
+  /// Data classification tier (RESTRICTED — identity documents).
+  classification DataClassification @default(RESTRICTED) @map("classification")
+  /// purge_after = trip_completed_at + RETENTION_IDENTITY_DOCUMENT_DAYS days.
+  /// Null until the trip has been completed (must not default to now + 90 days).
+  purgeAfter     DateTime?          @map("purge_after") @db.Timestamptz
+  /// Wall-clock time the associated trip was completed; set by the itinerary service
+  /// when the last leg departs. Drives purge_after derivation.
+  tripCompletedAt DateTime?         @map("trip_completed_at") @db.Timestamptz
+
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
 
   @@index([bookingId], map: "idx_booking_travelers_booking_id")
+  @@index([purgeAfter], map: "idx_booking_travelers_purge_after")
   @@map("booking_travelers")
+}
+
+// ---------------------------------------------------------------------------
+// Itinerary — multi-booking trip plan (WO-074: includes purge metadata)
+// ---------------------------------------------------------------------------
+
+/// A named collection of bookings representing a complete trip.
+/// Created by the traveler or assembled by the AI assistant.
+model Itinerary {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String   @db.VarChar(256)
+  notes     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // WO-074: data classification and purge metadata
+  classification DataClassification @default(CONFIDENTIAL) @map("classification")
+  /// purge_after = created_at + RETENTION_ITINERARY_YEARS years.
+  purgeAfter     DateTime?          @map("purge_after") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([purgeAfter], map: "idx_itineraries_purge_after")
+  @@map("itineraries")
+}
+
+// ---------------------------------------------------------------------------
+// TravelPreference — per-user travel preferences (WO-074: includes purge metadata)
+// ---------------------------------------------------------------------------
+
+/// Stored travel preferences per user: seat class, currency, airlines, dietary.
+/// One row per user (one-to-one with users).
+model TravelPreference {
+  id                   String   @id @default(uuid()) @db.Uuid
+  userId               String   @unique @map("user_id") @db.Uuid
+  preferredSeatClass   String?  @map("preferred_seat_class") @db.VarChar(32)
+  preferredCurrency    String?  @map("preferred_currency") @db.Char(3)
+  preferredAirlines    String[] @map("preferred_airlines")
+  dietaryRestrictions  String[] @map("dietary_restrictions")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // WO-074: data classification and purge metadata
+  classification DataClassification @default(CONFIDENTIAL) @map("classification")
+  /// purge_after = updated_at + RETENTION_PREFERENCE_DAYS days.
+  purgeAfter     DateTime?          @map("purge_after") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([purgeAfter], map: "idx_travel_preferences_purge_after")
+  @@map("travel_preferences")
 }
 
 // ---------------------------------------------------------------------------

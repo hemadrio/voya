@@ -1,0 +1,32 @@
+{
+  "name": "@travel/retention",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Pure purge_after derivation functions and retention configuration validator for the travel platform. No database or AWS dependency — injectable per the DI policy.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "engines": { "node": ">=20.0.0 <21.0.0" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@travel/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "5.5.3",
+    "vitest": "^1.6.0"
+  }
+}
