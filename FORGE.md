@@ -315,3 +315,10 @@
 - **Files:** 15 (+1540/-0)
 - **Duration:** 742ss
 - **Approach:** Created new @travel/search-cache package. keyBuilder.ts implements canonicalJson() — recursive key sort, string trim+uppercase (covers IATA/location codes), date normalisation to YYYY-MM-DD, string-array sorting — then sha256 of the result to produce search:{category}:{hash} / search:lock:{category}:{hash} keys. SearchCacheRepository provides get/set/getWithRefresh: set uses per-category TTL from injected config (300s/900s/1800s); get does freshness check via clock.now() - payload.generatedAt vs freshnessWindowSeconds*1000 and returns stale flag; getWithRefresh emits 4 OTel metrics and, on a stale hit, issues a SET NX PX single-flight lock before spawning a detached background refresh. Lock is always released in a finally block and self-expires at lockTtlMs to survive process death. Schema version mismatch and corrupt/incomplete payloads are treated as misses. All Redis and serialisation errors are caught and logged, never propagated as request failures. FakeRedis implements clock-injected TTL expiry for deterministic unit tests. SpyCacheMetrics captures all 4 counter emissions.
+
+## WO-066: User Story: WO-066 - Implement search results page with filters and map
+- **Status:** completed
+- **Commit:** `e7a83d1`
+- **Files:** 22 (+2666/-106)
+- **Duration:** 902ss
+- **Approach:** Implemented the full search results page using a two-tier architecture: an async Next.js 14 Server Component (page.tsx) fetches the first page server-side for SSR/SEO and passes initialData + parsed criteria to SearchPageClient. SearchPageClient is a 'use client' component that owns all subsequent interaction: it holds filter state via useReducer (filterReducer in lib/search/params.ts), syncs changes to the URL via debounced (300ms) router.replace inside useTransition, and refetches client-side with AbortController-backed fetch for stale-response discarding. The map (ResultsMapInner) is code-split via next/dynamic with ssr:false so it is absent from the initial bundle. All filter/sort/pagination state is encoded in the URL — no state lives only in components.
