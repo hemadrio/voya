@@ -62,6 +62,11 @@
       "import": "./dist/retention/index.js",
       "default": "./dist/retention/index.js"
     },
+    "./openapi": {
+      "types": "./dist/openapi/registry.d.ts",
+      "import": "./dist/openapi/registry.js",
+      "default": "./dist/openapi/registry.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

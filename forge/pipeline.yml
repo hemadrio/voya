@@ -87,6 +87,34 @@ stages:
       version gate.  Blocking — a failing contract check prevents the deploy
       stage from running.
 
+  # ── 4b. OpenAPI drift check ───────────────────────────────────────────────
+  #   Regenerates the OpenAPI spec from Zod schemas and diffs against the
+  #   committed docs/api/openapi.yaml.  Fails the build if they differ, so
+  #   no schema change can ship undocumented (ADR-0005).
+  - name: openapi:drift-check
+    run: >
+      npx tsx scripts/generate-openapi.ts --out /tmp/openapi-check.yaml &&
+      diff docs/api/openapi.yaml /tmp/openapi-check.yaml ||
+      (echo "ERROR: docs/api/openapi.yaml is out of date. Run 'npx tsx scripts/generate-openapi.ts' and commit the result." && exit 1)
+    dependsOn: [build]
+    blocking: true
+    description: >
+      Regenerates the OpenAPI specification from Zod schemas and diffs
+      against the committed docs/api/openapi.yaml.  A non-zero diff fails
+      the build — schema changes must be accompanied by a regenerated spec.
+
+  # ── 4c. OpenAPI publish ───────────────────────────────────────────────────
+  #   Publishes the versioned OpenAPI spec as a pipeline artefact on merge
+  #   to main.  The artefact is uploaded to S3 alongside the coverage reports
+  #   for SOC 2 change-management evidence.
+  - name: openapi:publish
+    run: >
+      cp docs/api/openapi.yaml openapi-$(git rev-parse --short HEAD).yaml
+    dependsOn: [openapi:drift-check]
+    description: >
+      Copies the OpenAPI spec to a versioned artefact file for upload to
+      S3 (travel-platform-ci-artefacts/openapi/<git-sha>/openapi.yaml).
+
   # ── 5. Lint ──────────────────────────────────────────────────────────────
   - name: lint
     run: pnpm turbo lint --affected
@@ -173,6 +201,7 @@ stages:
       - test
       - coverage:check
       - contracts-check
+      - openapi:drift-check
       - lint
       - scan:no-direct-fetch
       - scan-deps
