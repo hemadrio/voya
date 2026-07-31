@@ -1,0 +1,36 @@
+{
+  "name": "@travel/crypto",
+  "version": "0.1.0",
+  "private": false,
+  "description": "KMS envelope encryption utilities for the travel platform. Exposes an injectable EnvelopeCipher interface with a KMS implementation and an in-memory test double.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-kms": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "5.5.3",
+    "vitest": "^1.6.0"
+  }
+}

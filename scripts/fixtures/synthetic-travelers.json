@@ -1,0 +1,75 @@
+{
+  "_comment": "Synthetic traveler seed fixtures for staging/CI. No real PII. Generated for WO-073.",
+  "_privacy": "All data is entirely synthetic. No production restore or real identity data permitted.",
+  "travelers": [
+    {
+      "givenName": "Alex",
+      "familyName": "Smith",
+      "email": "alex.smith0@synthetic.example.com",
+      "dateOfBirth": "1978-03-12",
+      "passportReference": "SY1234567"
+    },
+    {
+      "givenName": "Jordan",
+      "familyName": "Johnson",
+      "email": "jordan.johnson1@synthetic.example.com",
+      "dateOfBirth": "1985-07-24",
+      "passportReference": "SY2345678"
+    },
+    {
+      "givenName": "Taylor",
+      "familyName": "Williams",
+      "email": "taylor.williams2@synthetic.example.com",
+      "dateOfBirth": "1992-11-08",
+      "passportReference": null
+    },
+    {
+      "givenName": "Morgan",
+      "familyName": "Brown",
+      "email": "morgan.brown3@synthetic.example.com",
+      "dateOfBirth": "1969-05-30",
+      "passportReference": "SY4567890"
+    },
+    {
+      "givenName": "Casey",
+      "familyName": "Jones",
+      "email": null,
+      "dateOfBirth": "2001-02-14",
+      "passportReference": "SY5678901"
+    },
+    {
+      "givenName": "Riley",
+      "familyName": "Garcia",
+      "email": "riley.garcia5@synthetic.example.com",
+      "dateOfBirth": "1990-09-19",
+      "passportReference": null
+    },
+    {
+      "givenName": "Jamie",
+      "familyName": "Miller",
+      "email": "jamie.miller6@synthetic.example.com",
+      "dateOfBirth": "1975-12-25",
+      "passportReference": "SY7890123"
+    },
+    {
+      "givenName": "Avery",
+      "familyName": "Davis",
+      "email": null,
+      "dateOfBirth": "1988-06-17",
+      "passportReference": "SY8901234"
+    },
+    {
+      "givenName": "Reese",
+      "familyName": "Wilson",
+      "email": "reese.wilson8@synthetic.example.com",
+      "dateOfBirth": "1995-04-03",
+      "passportReference": null
+    }
+  ],
+  "bookingVariants": {
+    "onePassenger": ["travelers[0]"],
+    "threePassengers": ["travelers[1]", "travelers[2]", "travelers[3]"],
+    "ninePassengers": ["travelers[0]", "travelers[1]", "travelers[2]", "travelers[3]", "travelers[4]", "travelers[5]", "travelers[6]", "travelers[7]", "travelers[8]"],
+    "emptyPassengers": []
+  }
+}

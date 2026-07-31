@@ -52,6 +52,11 @@
       "import": "./dist/errors/index.js",
       "default": "./dist/errors/index.js"
     },
+    "./traveler": {
+      "types": "./dist/traveler.d.ts",
+      "import": "./dist/traveler.js",
+      "default": "./dist/traveler.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

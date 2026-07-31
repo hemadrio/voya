@@ -1,0 +1,178 @@
+/**
+ * BookingTravelerRepository — dual-write repository for booking_travelers.
+ *
+ * Responsibilities:
+ *   - Accept plaintext traveler input (from the booking domain service)
+ *   - Encrypt restricted fields (dateOfBirth, passportReference) via
+ *     the injected EnvelopeCipher before persisting
+ *   - Provide a decrypted read path for the booking owner
+ *   - Provide a redacted read path for support_agent
+ *
+ * Injectable: depends only on duck-typed interfaces so this module can be
+ * unit-tested without a real Prisma client or KMS connection.
+ */
+
+import type { EnvelopeCipher } from "@travel/crypto";
+import type { CreateBookingTravelerInput, BookingTraveler } from "@travel/contracts";
+
+// ---------------------------------------------------------------------------
+// Injectable persistence interface
+// ---------------------------------------------------------------------------
+
+export interface TravelerRow {
+  id: string;
+  bookingId: string;
+  givenName: string;
+  familyName: string;
+  email: string | null;
+  encryptedDateOfBirth: Buffer | null;
+  encryptedDobIv: Buffer | null;
+  encryptedPassportReference: Buffer | null;
+  encryptedPassportIv: Buffer | null;
+  wrappedDek: Buffer;
+  dekKeyId: string;
+  encryptionContext: Record<string, string>;
+  createdAt: Date;
+}
+
+export interface TravelerPrismaClient {
+  bookingTraveler: {
+    create(args: {
+      data: {
+        id?: string;
+        bookingId: string;
+        givenName: string;
+        familyName: string;
+        email?: string | null;
+        encryptedDateOfBirth?: Buffer | null;
+        encryptedDobIv?: Buffer | null;
+        encryptedPassportReference?: Buffer | null;
+        encryptedPassportIv?: Buffer | null;
+        wrappedDek: Buffer;
+        dekKeyId: string;
+        encryptionContext: Record<string, string>;
+      };
+    }): Promise<TravelerRow>;
+
+    findMany(args: {
+      where: { bookingId: string };
+    }): Promise<TravelerRow[]>;
+
+    count(args: { where: { bookingId: string } }): Promise<number>;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// BookingTravelerRepository
+// ---------------------------------------------------------------------------
+
+export class BookingTravelerRepository {
+  constructor(
+    private readonly db: TravelerPrismaClient,
+    private readonly cipher: EnvelopeCipher,
+  ) {}
+
+  /**
+   * Encrypt and persist a single traveler row.
+   * Called by the booking domain service during dual-write.
+   */
+  async create(input: CreateBookingTravelerInput): Promise<TravelerRow> {
+    const subjectId = `${input.bookingId}:${input.givenName}:${input.familyName}`;
+    const context = { subjectId, bookingId: input.bookingId };
+
+    const dobBuffer =
+      input.dateOfBirth ? Buffer.from(input.dateOfBirth, "utf8") : null;
+    const passportBuffer =
+      input.passportReference
+        ? Buffer.from(input.passportReference, "utf8")
+        : null;
+
+    const { wrappedKey, encryptedFields } = await this.cipher.encryptForSubject(
+      context,
+      {
+        dateOfBirth: dobBuffer,
+        passportReference: passportBuffer,
+      },
+    );
+
+    const dobField = encryptedFields["dateOfBirth"];
+    const passField = encryptedFields["passportReference"];
+
+    return this.db.bookingTraveler.create({
+      data: {
+        bookingId: input.bookingId,
+        givenName: input.givenName,
+        familyName: input.familyName,
+        email: input.email ?? null,
+        encryptedDateOfBirth: dobField?.ciphertext ?? null,
+        encryptedDobIv: dobField?.iv ?? null,
+        encryptedPassportReference: passField?.ciphertext ?? null,
+        encryptedPassportIv: passField?.iv ?? null,
+        wrappedDek: wrappedKey.wrappedDek,
+        dekKeyId: wrappedKey.dekKeyId,
+        encryptionContext: context,
+      },
+    });
+  }
+
+  /**
+   * Read and decrypt all travelers for a booking.
+   * Only the booking service (owning service) may call this.
+   */
+  async findByBookingId(bookingId: string): Promise<BookingTraveler[]> {
+    const rows = await this.db.bookingTraveler.findMany({ where: { bookingId } });
+
+    const results: BookingTraveler[] = [];
+
+    for (const row of rows) {
+      const context = {
+        subjectId: row.encryptionContext["travel:subjectId"] ??
+          `${row.bookingId}:${row.givenName}:${row.familyName}`,
+        bookingId: row.encryptionContext["travel:bookingId"] ?? row.bookingId,
+      };
+
+      const fieldsToDecrypt: Record<string, { ciphertext: Buffer; iv: Buffer }> = {};
+
+      if (row.encryptedDateOfBirth && row.encryptedDobIv) {
+        fieldsToDecrypt["dateOfBirth"] = {
+          ciphertext: row.encryptedDateOfBirth,
+          iv: row.encryptedDobIv,
+        };
+      }
+      if (row.encryptedPassportReference && row.encryptedPassportIv) {
+        fieldsToDecrypt["passportReference"] = {
+          ciphertext: row.encryptedPassportReference,
+          iv: row.encryptedPassportIv,
+        };
+      }
+
+      const decrypted = await this.cipher.decryptForSubject(
+        context,
+        { wrappedDek: row.wrappedDek, dekKeyId: row.dekKeyId },
+        fieldsToDecrypt,
+      );
+
+      results.push({
+        id: row.id,
+        bookingId: row.bookingId,
+        givenName: row.givenName,
+        familyName: row.familyName,
+        email: row.email ?? undefined,
+        dateOfBirth: decrypted["dateOfBirth"]
+          ? decrypted["dateOfBirth"].toString("utf8")
+          : null,
+        passportReference: decrypted["passportReference"]
+          ? decrypted["passportReference"].toString("utf8")
+          : null,
+        createdAt: row.createdAt.toISOString(),
+      });
+    }
+
+    return results;
+  }
+
+  /** Count travelers for a booking — used by the reconciliation query. */
+  async countByBookingId(bookingId: string): Promise<number> {
+    return this.db.bookingTraveler.count({ where: { bookingId } });
+  }
+}

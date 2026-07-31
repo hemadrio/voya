@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@travel/contracts": "workspace:*",
+    "@travel/crypto": "workspace:*",
     "@travel/observability": "workspace:*",
     "express": "catalog:"
   },

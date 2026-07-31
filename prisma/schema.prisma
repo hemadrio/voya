@@ -136,9 +136,16 @@ model Booking {
 
   user       User              @relation(fields: [userId], references: [id])
   auditLogs  BookingAuditLog[]
+  travelers  BookingTraveler[]
+
+  // WO-073: nullable marker set by the backfill job when all passengers have
+  // been migrated to booking_travelers; null means the row has not yet been
+  // processed by the backfill.
+  travelersMigratedAt DateTime? @map("travelers_migrated_at") @db.Timestamptz
 
   @@index([userId])
   @@index([status])
+  @@index([travelersMigratedAt], map: "idx_bookings_travelers_migrated_at")
   @@map("bookings")
 }
 
@@ -246,6 +253,59 @@ model NotificationProcessedEvent {
   @@unique([provider, eventId], map: "uq_notification_processed_event_provider_event")
   @@index([processedAt], map: "idx_notification_processed_event_processed_at")
   @@map("notification_processed_events")
+}
+
+// ---------------------------------------------------------------------------
+// BookingTraveler — normalized traveler identity with KMS envelope encryption
+// (WO-073)
+// ---------------------------------------------------------------------------
+
+/// Per-booking traveler row extracted from the legacy Booking.passengers JSON.
+///
+/// The two Restricted fields (date of birth, passport reference) are stored as
+/// KMS-enveloped AES-256-GCM ciphertext.  The wrapped DEK is scoped
+/// per-subject (one per row) so cryptographic erasure is achieved by
+/// overwriting or deleting `wrapped_dek` — no CMK rotation required.
+///
+/// Column-level access:
+///   booking-service role: full access (SELECT, INSERT)
+///   support_agent role:   SELECT on all columns EXCEPT encrypted_date_of_birth
+///                         and encrypted_passport_reference (enforced by migration)
+///
+/// The legacy Booking.passengers column is NOT dropped in this story.
+model BookingTraveler {
+  id          String   @id @default(uuid()) @db.Uuid
+  bookingId   String   @map("booking_id") @db.Uuid
+
+  /// Plaintext traveler name fields (not Restricted under PII policy)
+  givenName   String   @map("given_name")
+  familyName  String   @map("family_name")
+  email       String?
+
+  /// AES-256-GCM ciphertext of the date of birth string (YYYY-MM-DD).
+  /// Null when the source passenger had no dateOfBirth (should not occur but
+  /// the backfill must not crash on a malformed element).
+  encryptedDateOfBirth      Bytes? @map("encrypted_date_of_birth")
+  encryptedDobIv            Bytes? @map("encrypted_dob_iv")
+
+  /// AES-256-GCM ciphertext of the passport number.
+  /// Null when the source passenger had no passportNumber.
+  encryptedPassportReference Bytes? @map("encrypted_passport_reference")
+  encryptedPassportIv        Bytes? @map("encrypted_passport_iv")
+
+  /// KMS-wrapped data encryption key (output of GenerateDataKey CiphertextBlob).
+  wrappedDek  Bytes    @map("wrapped_dek")
+  /// ARN/ID of the KMS CMK used to wrap the DEK.
+  dekKeyId    String   @map("dek_key_id") @db.VarChar(2048)
+  /// Encryption context bound at encrypt time — must match verbatim on Decrypt.
+  encryptionContext Json @map("encryption_context") @db.JsonB
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId], map: "idx_booking_travelers_booking_id")
+  @@map("booking_travelers")
 }
 
 // ---------------------------------------------------------------------------
