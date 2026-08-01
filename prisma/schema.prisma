@@ -899,3 +899,80 @@ model ReconciliationException {
   @@index([detectedAt(sort: Desc)], map: "idx_reconciliation_unresolved")
   @@map("reconciliation_exceptions")
 }
+
+// ---------------------------------------------------------------------------
+// CheckoutSaga / CheckoutSagaLeg — commit-or-compensate saga state (WO-048)
+// ---------------------------------------------------------------------------
+
+/// Persisted saga instance for a multi-leg itinerary checkout.
+///
+/// status values:
+///   RUNNING      — saga is actively committing legs
+///   COMPLETED    — all legs reached COMMITTED; booking is CONFIRMED
+///   COMPENSATING — a leg failed; compensation is in progress
+///   COMPENSATED  — all committed legs cancelled/refunded; booking CANCELLED
+///   FAILED       — compensation itself failed; manual reconciliation required
+///
+/// policy controls the partial-failure behaviour (default: FAIL_WHOLE).
+/// Stored per-row so future policies can be added without code changes.
+model CheckoutSaga {
+  id            String   @id @default(uuid()) @db.Uuid
+  bookingId     String   @map("booking_id") @db.Uuid
+  itineraryId   String?  @map("itinerary_id") @db.Uuid
+  /// Saga lifecycle status (see values above).
+  status        String   @db.VarChar(32)
+  /// Partial-failure policy. FAIL_WHOLE = compensate everything on any leg failure.
+  policy        String   @default("FAIL_WHOLE") @map("policy") @db.VarChar(32)
+  correlationId String   @map("correlation_id") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  legs CheckoutSagaLeg[]
+
+  /// Composite index for the resume job: finds RUNNING sagas with stale updated_at.
+  @@index([status, updatedAt], map: "idx_checkout_sagas_status_updated_at")
+  @@map("checkout_sagas")
+}
+
+/// Per-supplier-leg state within a checkout saga.
+///
+/// status values:
+///   PENDING     — not yet attempted
+///   RESERVED    — hold placed (reserve-then-confirm only)
+///   COMMITTED   — supplier confirmed booking
+///   FAILED      — unrecoverable supplier error on this leg
+///   COMPENSATED — committed or reserved leg cancelled/released
+///
+/// supplier_reference holds the opaque provider reference returned by the
+/// supplier on reserve() or commit().  It is persisted before the next step
+/// so a crash cannot lose knowledge of an outstanding hold.
+///
+/// idempotency_reference is derived from this row's id and passed verbatim
+/// to the supplier adapter so a retry cannot double-book.
+model CheckoutSagaLeg {
+  id                  String   @id @default(uuid()) @db.Uuid
+  sagaId              String   @map("saga_id") @db.Uuid
+  offerId             String   @map("offer_id") @db.Text
+  supplier            String   @db.VarChar(64)
+  /// 'instant' | 'reserveThenConfirm'
+  flowType            String   @map("flow_type") @db.VarChar(32)
+  /// Travel category for traveler-facing error messages ('flight'|'hotel'|'car').
+  travelCategory      String   @map("travel_category") @db.VarChar(32)
+  status              String   @db.VarChar(32)
+  /// Opaque provider reference (PNR, reservation token, etc.).
+  supplierReference   String?  @map("supplier_reference") @db.Text
+  /// Amount in the currency's minor unit. Used to compute refund amounts.
+  amountMinor         BigInt   @map("amount_minor")
+  currency            String   @db.Char(3)
+  attemptCount        Int      @default(0) @map("attempt_count")
+  /// Last error message for diagnostics. Must never contain secret values.
+  lastError           String?  @map("last_error") @db.Text
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  saga CheckoutSaga @relation(fields: [sagaId], references: [id])
+
+  /// Each offer can appear at most once per saga.
+  @@unique([sagaId, offerId], map: "idx_checkout_saga_legs_saga_offer_unique")
+  @@index([sagaId, status], map: "idx_checkout_saga_legs_saga_status")
+  @@map("checkout_saga_legs")
+}

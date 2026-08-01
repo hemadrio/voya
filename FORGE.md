@@ -616,3 +616,10 @@
 - **Files:** 13 (+1094/-33)
 - **Duration:** 1326ss
 - **Approach:** Implemented mandatory Stripe webhook signature verification by: (1) adding a new SIGNATURE_VERIFICATION_FAILED error code to @travel/contracts with its factory function; (2) fixing the critical Express middleware ordering bug where express.json() was consuming the body stream before express.raw() could capture it for HMAC; (3) overhauling the webhook route handler to pre-check missing signatures and use a rejectWithSignatureFailure() helper that emits the STRIPE_SIGNATURE_INVALID structured log event for the pre-existing CloudWatch metric filter; (4) updating WebhookVerifier to throw the correct error code; (5) adding an injectable webhookHandler to the api-gateway for testability; and (6) creating comprehensive test fixtures and test suites covering all failure modes.
+
+## WO-048: User Story: WO-048 - Commit-or-compensate checkout saga across supplier legs
+- **Status:** completed
+- **Commit:** `3965e25`
+- **Files:** 9 (+1857/-0)
+- **Duration:** 1092ss
+- **Approach:** Implemented the commit-or-compensate checkout saga orchestrator by: (1) adding CheckoutSaga and CheckoutSagaLeg Prisma models with per-leg status, supplier reference persistence for crash safety, and resume/status indexes; (2) defining three hexagonal port interfaces — CheckoutSupplierPort (with flowType discriminant, idempotency-ref parameters), SagaRepositoryPort (persist-before-call semantics), and RefundPort; (3) implementing CheckoutSagaOrchestrator as a class with injected registry/repo/refund/lifecycle/audit dependencies that branches on flowType only (never on supplier identity), persists reserve tokens before confirm, replays committed legs as no-ops, compensates in reverse order with refunds, and guards against duplicate saga starts; (4) adding a saga resume job following the expirySweep pattern; (5) adding GET /:bookingId/saga with ownership/support_agent entitlement; (6) comprehensive unit tests and fixtures.

@@ -99,6 +99,29 @@ registerRouteGuard('POST', '/:bookingId/cancel', 'requireRole', ['traveler', 'su
 registerRouteGuard('GET', '/:bookingId/history', 'requireRole', ['traveler', 'support_agent']);
 registerRouteGuard('POST', '/:bookingId/revalidate', 'requireRole', ['traveler']);
 registerRouteGuard('POST', '/:bookingId/accept-price', 'requireRole', ['traveler']);
+registerRouteGuard('GET', '/:bookingId/saga', 'requireRole', ['traveler', 'support_agent']);
+
+// ---------------------------------------------------------------------------
+// SagaViewPort — injectable for GET /:bookingId/saga
+// ---------------------------------------------------------------------------
+
+export interface SagaViewPort {
+  getView(bookingId: string): Promise<{
+    sagaId: string;
+    bookingId: string;
+    status: string;
+    legs: Array<{
+      legId: string;
+      offerId: string;
+      supplier: string;
+      travelCategory: string;
+      status: string;
+      supplierReference: string | null;
+      lastError: string | null;
+      attemptCount: number;
+    }>;
+  } | null>;
+}
 
 export function createBookingRouter(
   domain: BookingDomain,
@@ -106,6 +129,7 @@ export function createBookingRouter(
   bookingRepo?: BookingRepository,
   auditLogRepo?: AuditLogRepository,
   priceRevalidationService?: PriceRevalidationService,
+  sagaViewPort?: SagaViewPort,
 ): Router {
   const router = Router();
 
@@ -414,6 +438,53 @@ export function createBookingRouter(
         data: { payableUntil: result.payableUntil.toISOString() },
         reference,
       });
+    },
+  );
+
+  // ── GET /:bookingId/saga — return saga status for owner or support_agent ──
+  //
+  // Returns the saga state including per-leg status, supplier, category, and
+  // the last error for any failed leg.  The failing leg is identified by name
+  // for the traveler (AC5).
+  router.get(
+    "/:bookingId/saga",
+    requireRole('traveler', 'support_agent'),
+    validateBookingId,
+    async (req: Request, res: Response): Promise<void> => {
+      const { bookingId } = req.validated?.params as { bookingId: string };
+      const reference = (req as Request & { correlationId?: string }).correlationId;
+      const actor = (req as Request & { actor?: { sub: string; roles: string[] } }).actor;
+
+      if (!sagaViewPort) {
+        res.status(501).json({
+          error: { code: 'NOT_IMPLEMENTED', message: 'Saga view is not configured' },
+          reference,
+        });
+        return;
+      }
+
+      // Ownership check: traveler may only read their own saga; support_agent reads any.
+      const roles = actor?.roles ?? [];
+      const isTravelerOnly = roles.includes('traveler') && !roles.includes('support_agent');
+      if (isTravelerOnly && bookingRepo) {
+        const owner = await bookingRepo.findBookingOwner(bookingId);
+        if (!owner) {
+          res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Booking not found' }, reference });
+          return;
+        }
+        if (owner.userId !== actor?.sub) {
+          await denyWithAudit(res, req, 'checkout_saga', bookingId, 'READ_SAGA', 'OWNERSHIP_PREDICATE_FAILED');
+          return;
+        }
+      }
+
+      const view = await sagaViewPort.getView(bookingId);
+      if (!view) {
+        res.status(404).json({ error: { code: 'NOT_FOUND', message: 'No active saga for this booking' }, reference });
+        return;
+      }
+
+      res.json({ data: view, reference });
     },
   );
 
