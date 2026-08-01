@@ -95,6 +95,11 @@ export const ErrorCode = {
   /** 502 — the payment provider (Stripe) returned an error or is unreachable.
    *  The same idempotency key should be reused on retry. */
   PROVIDER_UNAVAILABLE: "PROVIDER_UNAVAILABLE",
+  /** 400 — the Stripe webhook stripe-signature header is absent, malformed,
+   *  or the HMAC does not match the payload (possible replay or forgery).
+   *  Distinct from VALIDATION_FAILED — no state change has occurred and no
+   *  event detail is echoed. */
+  SIGNATURE_VERIFICATION_FAILED: "SIGNATURE_VERIFICATION_FAILED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -148,6 +153,7 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   BOOKING_NOT_PAYABLE: 409,
   UNSUPPORTED_CURRENCY: 422,
   PROVIDER_UNAVAILABLE: 502,
+  SIGNATURE_VERIFICATION_FAILED: 400,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

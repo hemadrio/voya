@@ -51,6 +51,7 @@ export {
   bookingNotPayable,
   unsupportedCurrency,
   providerUnavailable,
+  signatureVerificationFailed,
 } from "./domain-errors.js";
 
 export { serialiseError, RESTRICTED_FIELDS } from "./serialise.js";

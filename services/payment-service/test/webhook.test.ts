@@ -14,7 +14,11 @@ import { createErrorHandler } from "../../../shared/middleware/errorHandler.js";
 
 function makeApp(domain: PaymentDomain) {
   const app = express();
-  // JSON parser on the app level (all routes except webhook get this)
+  // Raw body parser for webhook MUST come before the global JSON parser
+  // (matches the ordering in app.ts).  If express.json() runs first it
+  // consumes the body stream and express.raw() receives an empty buffer,
+  // breaking Stripe HMAC verification.
+  app.use("/payments/webhook", express.raw({ type: "application/json" }));
   app.use(express.json({ limit: "64kb" }));
   app.use("/payments", createPaymentRouter(domain));
   app.use(createErrorHandler());
@@ -35,8 +39,9 @@ describe("POST /payments/webhook — raw body preservation (AC7)", () => {
       .send(JSON.stringify({ type: "payment_intent.succeeded" }));
 
     expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe("VALIDATION_FAILED");
-    expect(res.body.error.field).toBe("stripe-signature");
+    // AC4: missing header must return SIGNATURE_VERIFICATION_FAILED (not VALIDATION_FAILED)
+    // All signature failures (missing, malformed, invalid HMAC) use this single code.
+    expect(res.body.error.code).toBe("SIGNATURE_VERIFICATION_FAILED");
     // handleWebhook was never called
     expect(domain.handleWebhook).not.toHaveBeenCalled();
   });

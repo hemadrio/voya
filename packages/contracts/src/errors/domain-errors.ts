@@ -284,3 +284,17 @@ export function providerUnavailable(
 ): DomainError {
   return new DomainErrorImpl("PROVIDER_UNAVAILABLE", message);
 }
+
+/**
+ * 400 — the Stripe webhook stripe-signature header is absent, malformed, or
+ * its HMAC does not match the raw payload (possible replay or forgery).
+ *
+ * The message must NOT contain the signing secret or the raw body.
+ * The response to the client is always a generic "signature verification
+ * failed" — no failure detail is echoed to prevent oracle attacks.
+ */
+export function signatureVerificationFailed(
+  message = "Webhook signature verification failed.",
+): DomainError {
+  return new DomainErrorImpl("SIGNATURE_VERIFICATION_FAILED", message);
+}

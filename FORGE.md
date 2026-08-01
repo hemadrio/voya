@@ -609,3 +609,10 @@
 - **Files:** 8 (+1054/-1)
 - **Duration:** 1151ss
 - **Approach:** Implemented deny-by-default server-side entitlement for booking read, modify, and cancel operations using a layered defence approach: (1) declarative requireRole middleware at route registration, (2) requireOwnership middleware as second line of defence writing security events on DENY, (3) pure domain BookingEntitlementService re-deriving entitlement from DB ownership metadata independently. Added PatchBookingRequestSchema to @travel/contracts, SupportBookingRow repository projection excluding identity-doc and payment-credential columns at the query level, findBookingOwner (owner lookup without ownership predicate), findForSupport (narrow select for support agents), and a full PATCH /v1/bookings/:id route.
+
+## WO-046: User Story: WO-046 - Mandatory Stripe webhook signature verification and secret validation
+- **Status:** completed
+- **Commit:** `0ecd077`
+- **Files:** 13 (+1094/-33)
+- **Duration:** 1326ss
+- **Approach:** Implemented mandatory Stripe webhook signature verification by: (1) adding a new SIGNATURE_VERIFICATION_FAILED error code to @travel/contracts with its factory function; (2) fixing the critical Express middleware ordering bug where express.json() was consuming the body stream before express.raw() could capture it for HMAC; (3) overhauling the webhook route handler to pre-check missing signatures and use a rejectWithSignatureFailure() helper that emits the STRIPE_SIGNATURE_INVALID structured log event for the pre-existing CloudWatch metric filter; (4) updating WebhookVerifier to throw the correct error code; (5) adding an injectable webhookHandler to the api-gateway for testability; and (6) creating comprehensive test fixtures and test suites covering all failure modes.

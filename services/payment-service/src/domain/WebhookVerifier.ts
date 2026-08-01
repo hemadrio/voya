@@ -13,14 +13,14 @@
  *   5. Reject if the timestamp is older than toleranceSeconds (default 300 s).
  *
  * On failure the verifier:
- *   - Throws a DomainError with code VALIDATION_FAILED (400-class).
+ *   - Throws a DomainError with code SIGNATURE_VERIFICATION_FAILED (400-class).
  *   - Calls the injected security logger exactly once with actor and reason.
  *
  * Security invariant: the signing secret is never logged, even on failure.
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { validationFailed } from "@travel/contracts/errors";
+import { signatureVerificationFailed } from "@travel/contracts/errors";
 import type { DomainError } from "@travel/contracts/errors";
 
 // ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ export class WebhookVerifier {
   /**
    * Verify the raw webhook body against its Stripe-Signature header.
    *
-   * @throws {DomainError} VALIDATION_FAILED (400) on any verification failure.
+   * @throws {DomainError} SIGNATURE_VERIFICATION_FAILED (400) on any verification failure.
    *   The message describes the failure reason without disclosing the secret.
    */
   verify(
@@ -182,6 +182,6 @@ export class WebhookVerifier {
       requestId: context.requestId,
       ipAddress: context.ipAddress,
     });
-    throw validationFailed(`Webhook verification failed: ${reason}`) as DomainError;
+    throw signatureVerificationFailed(`Webhook verification failed: ${reason}`) as DomainError;
   }
 }

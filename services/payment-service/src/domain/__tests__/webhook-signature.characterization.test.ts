@@ -151,14 +151,14 @@ describe("WebhookVerifier — valid signature", () => {
 // ---------------------------------------------------------------------------
 
 describe("WebhookVerifier — missing signature header", () => {
-  it("throws VALIDATION_FAILED for undefined header", () => {
+  it("throws SIGNATURE_VERIFICATION_FAILED for undefined header", () => {
     const { logger, calls } = makeSecurityLogger();
     const verifier = makeVerifier(undefined, logger);
 
     expect(() => verifier.verify(WEBHOOK_BODY, undefined)).toThrow();
     const err = getError(() => verifier.verify(WEBHOOK_BODY, undefined));
     expect(err).not.toBeNull();
-    expect((err as Record<string, unknown>)["code"]).toBe("VALIDATION_FAILED");
+    expect((err as Record<string, unknown>)["code"]).toBe("SIGNATURE_VERIFICATION_FAILED");
   });
 
   it("emits exactly one security event for missing header", () => {
@@ -187,7 +187,7 @@ describe("WebhookVerifier — missing signature header", () => {
 // ---------------------------------------------------------------------------
 
 describe("WebhookVerifier — tampered body", () => {
-  it("throws VALIDATION_FAILED when body is mutated after signing", () => {
+  it("throws SIGNATURE_VERIFICATION_FAILED when body is mutated after signing", () => {
     const { logger, calls } = makeSecurityLogger();
     const verifier = makeVerifier(undefined, logger);
     // Header is computed over the original body, but we pass the tampered body
@@ -216,7 +216,7 @@ describe("WebhookVerifier — tampered body", () => {
 // ---------------------------------------------------------------------------
 
 describe("WebhookVerifier — wrong signing secret", () => {
-  it("throws VALIDATION_FAILED when verifier uses a different secret", () => {
+  it("throws SIGNATURE_VERIFICATION_FAILED when verifier uses a different secret", () => {
     const { logger, calls } = makeSecurityLogger();
     const header = makeValidHeader(WEBHOOK_BODY, TEST_SECRET, TEST_NOW_SECONDS);
     // Verifier configured with the wrong secret
@@ -242,7 +242,7 @@ describe("WebhookVerifier — wrong signing secret", () => {
 // ---------------------------------------------------------------------------
 
 describe("WebhookVerifier — replayed webhook", () => {
-  it("throws VALIDATION_FAILED for a timestamp 1 hour in the past", () => {
+  it("throws SIGNATURE_VERIFICATION_FAILED for a timestamp 1 hour in the past", () => {
     const { logger, calls } = makeSecurityLogger();
     const verifier = makeVerifier(undefined, logger);
     // Header signed with a timestamp 3600s before "now"

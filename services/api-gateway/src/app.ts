@@ -16,6 +16,7 @@
  */
 
 import express from 'express';
+import type { RequestHandler } from 'express';
 import type { KeyProvider } from '@travel/auth';
 import type { RedisClient } from '@travel/ratelimit';
 import { createCorrelationIdMiddleware } from '@travel/observability';
@@ -47,6 +48,13 @@ export interface GatewayOptions {
   securityHeadersOptions?: SecurityHeadersOptions;
   /** Override NODE_ENV for CORS allow-list lookup. Useful in tests. */
   nodeEnv?: string;
+  /**
+   * Custom handler for POST /webhooks/stripe.
+   * Injected in tests to capture the raw request body and verify
+   * byte-identical forwarding (AC7).  Production deployments use the
+   * default passthrough stub or the real downstream proxy.
+   */
+  webhookHandler?: RequestHandler;
   logger?: {
     warn(obj: Record<string, unknown>, msg: string): void;
     error(obj: Record<string, unknown>, msg: string): void;
@@ -55,7 +63,7 @@ export interface GatewayOptions {
 }
 
 export function createApp(options: GatewayOptions): express.Application {
-  const { keyProvider, denylist, actorContextSecret, rateLimitRedis, healthHandlers, logger, nodeEnv } = options;
+  const { keyProvider, denylist, actorContextSecret, rateLimitRedis, healthHandlers, logger, nodeEnv, webhookHandler } = options;
 
   const corsConfig = getCorsConfig(nodeEnv ?? process.env['NODE_ENV']);
   const app = express();
@@ -108,11 +116,17 @@ export function createApp(options: GatewayOptions): express.Application {
   }
 
   // Stripe webhook — no session auth, no CSRF (HMAC-authenticated)
-  app.post('/webhooks/stripe', (_req, res) => {
-    // Downstream proxy would handle the actual forwarding.
-    // This placeholder acknowledges receipt for the raw-body passthrough test.
-    res.status(200).json({ received: true });
-  });
+  // The raw body parser (step 4 above) ensures req.body is a Buffer here.
+  // webhookHandler is injected in tests to capture the raw request for
+  // byte-identical forwarding assertions (AC7).  Production uses the stub.
+  app.post(
+    '/webhooks/stripe',
+    webhookHandler ?? ((_req, res) => {
+      // Downstream proxy handles actual forwarding in production.
+      // Stub acknowledges receipt for the raw-body passthrough test.
+      res.status(200).json({ received: true });
+    }),
+  );
 
   // All other routes require authentication, rate limiting, and CSRF protection
   app.use(authenticate);

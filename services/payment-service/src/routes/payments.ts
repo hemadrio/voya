@@ -25,6 +25,23 @@ import type { Request, Response } from "express";
 import type { PaymentIntentService } from "../domain/PaymentIntentService.js";
 
 // ---------------------------------------------------------------------------
+// WebhookLogger — minimal structured logger interface for signature events
+// ---------------------------------------------------------------------------
+
+/** Structured logger for webhook security events. The implementation must
+ *  write JSON to the log stream watched by the CloudWatch metric filter
+ *  monitoring-log-filters.tf → "stripe-signature-invalid" filter. */
+export interface WebhookSecurityEventWriter {
+  /** Write a security event. The signing secret and raw body must never appear. */
+  writeSignatureFailure(info: {
+    sourceIp: string;
+    signaturePresent: boolean;
+    correlationId?: string;
+    reason: string;
+  }): void;
+}
+
+// ---------------------------------------------------------------------------
 // Compiled validators (module scope — one-time cost)
 // ---------------------------------------------------------------------------
 
@@ -56,6 +73,7 @@ export interface PaymentDomain {
 export function createPaymentRouter(
   domain: PaymentDomain,
   paymentIntentService?: PaymentIntentService,
+  webhookSecurityEventWriter?: WebhookSecurityEventWriter,
 ): Router {
   const router = Router();
 
@@ -115,22 +133,95 @@ export function createPaymentRouter(
     },
   );
 
-  // ── POST /webhook — RAW body, header-only validation ─────────────────────
+  // ── POST /webhook — RAW body, no Zod header validation ──────────────────
   //
-  // express.raw() is mounted here (path-scoped), NOT at the app level, so
-  // the JSON parser that runs on all other routes does not apply here.
-  // Byte-for-byte body preservation is required for Stripe HMAC verification.
+  // The raw body parser is mounted at the app level (app.ts) BEFORE the
+  // global express.json(), so the byte stream reaches this handler intact.
+  // The expressRaw() call below is kept as a defence-in-depth safeguard for
+  // callers that construct the router in isolation (e.g. tests that bypass
+  // app.ts); body-parser skips re-parsing if req._body is already set.
+  //
+  // Intentionally NOT using validateWebhookHeaders (Zod schema) here — the
+  // Zod validator would return VALIDATION_FAILED for a missing header, but
+  // AC4 requires ALL signature failures (missing, malformed, invalid HMAC,
+  // stale timestamp) to return SIGNATURE_VERIFICATION_FAILED.  WebhookVerifier
+  // handles the missing-header case natively.
+  //
+  // On any verification failure:
+  //   - Returns 400 SIGNATURE_VERIFICATION_FAILED (never 401 or 500)
+  //   - Writes a security event with source IP, header presence, correlation ID
+  //   - Emits structured log with event: "STRIPE_SIGNATURE_INVALID" for the
+  //     CloudWatch metric filter → alarm
+  //   - Zero state changes (domain.handleWebhook is never called on failure)
   router.post(
     "/webhook",
     expressRaw({ type: "application/json" }),
-    validateWebhookHeaders,
     async (req: Request, res: Response): Promise<void> => {
-      const signature = (req.validated?.headers as { "stripe-signature": string })[
-        "stripe-signature"
-      ];
-      // req.body is a Buffer here (not parsed JSON) — passed directly to Stripe
-      await domain.handleWebhook(req.body as Buffer, signature);
-      res.status(200).json({ received: true });
+      const reference = (req as Request & { correlationId?: string }).correlationId;
+      // May be undefined (missing), a string, or an array (take first element)
+      const rawSig = req.headers["stripe-signature"];
+      const signature = Array.isArray(rawSig) ? rawSig[0] : rawSig;
+
+      // Helper: emit security event + metric log and respond 400.
+      const rejectWithSignatureFailure = (reason: string): void => {
+        const sourceIp = req.ip ?? "unknown";
+        const signaturePresent = !!signature;
+        const logEntry = JSON.stringify({
+          level: 50, // Pino "error" level
+          event: "STRIPE_SIGNATURE_INVALID",
+          sourceIp,
+          signaturePresent,
+          correlationId: reference,
+          reason,
+          msg: "Stripe webhook signature verification failed",
+        });
+        process.stdout.write(logEntry + "\n");
+        webhookSecurityEventWriter?.writeSignatureFailure({
+          sourceIp,
+          signaturePresent,
+          correlationId: reference,
+          reason,
+        });
+        res.status(400).json({
+          error: {
+            code: "SIGNATURE_VERIFICATION_FAILED",
+            message: "Webhook signature verification failed.",
+          },
+          reference,
+        });
+      };
+
+      // Pre-check: missing or empty signature header before reaching domain.
+      if (!signature || signature.trim().length === 0) {
+        rejectWithSignatureFailure("Missing or empty Stripe-Signature header");
+        return;
+      }
+
+      try {
+        // req.body is a Buffer here (not parsed JSON) — passed directly
+        await domain.handleWebhook(req.body as Buffer, signature);
+        res.status(200).json({ received: true });
+      } catch (err: unknown) {
+        const isDomainError =
+          err !== null &&
+          typeof err === "object" &&
+          "code" in err;
+
+        const code = isDomainError ? (err as { code: string }).code : null;
+
+        if (
+          code === "SIGNATURE_VERIFICATION_FAILED" ||
+          code === "VALIDATION_FAILED"
+        ) {
+          // Reason must never contain the signing secret or raw body content.
+          const reason = (err as { message?: string }).message ?? "verification failed";
+          rejectWithSignatureFailure(reason);
+          return;
+        }
+
+        // Unknown errors propagate to the error handler
+        throw err;
+      }
     },
   );
 
