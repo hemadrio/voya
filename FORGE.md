@@ -651,3 +651,10 @@
 - **Files:** 21 (+3236/-0)
 - **Duration:** 1179ss
 - **Approach:** Implemented the full authenticated account area as a Next.js App Router route group app/(account)/account/ with server-rendered pages for flash-free first paint. All account API calls are wrapped in lib/api/account.ts using the shared apiClient. Booking tab grouping uses timezone-aware date math (Intl.DateTimeFormat with IANA timezone for DST-correct in-progress detection) in lib/bookings/status.ts. Cancellation uses an idempotency key generated per dialog open and renders refund amounts exclusively from the backend preview endpoint. Modification validates availability and shows backend-sourced price differences. Wishlist uses optimistic removal with useState rollback and toast on failure. Profile uses React Hook Form + Zod with server field-error binding. ICS generation follows RFC 5545 with VALUE=DATE all-day events and 75-octet line folding. No TanStack Query — all mutations use useState/useCallback with explicit rollback patterns.
+
+## WO-107: User Story: WO-107 - Meter and alarm assistant cost per completed booking
+- **Status:** completed
+- **Commit:** `71c5234`
+- **Files:** 9 (+1662/-0)
+- **Duration:** 679ss
+- **Approach:** Layered durable cost metering on top of the existing BudgetGuard pre-call enforcement without relaxing any caps. Three new domain modules: priceTable.ts (versioned static price table with effectiveFrom dates and PriceLookupError on unknown models), CostGovernor.ts (reconcile hook writing PII-free cost records after every turn, catching all failures to avoid aborting assistant responses), and CostMeteringService.ts (scheduled attribution service with four injected ports — CostRecordStore, BookingLookupPort, Clock, MetricPublisher — implementing the 7-day attribution window and rolling ratio computation). A Prisma migration adds the assistant_cost_record table and adds conversation_id/confirmed_at columns to bookings for the attribution join. EMF helpers added to packages/observability for all five required metrics. Four Terraform CloudWatch alarms wired to existing SNS severity topics.

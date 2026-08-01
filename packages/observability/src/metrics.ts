@@ -122,3 +122,78 @@ export function recordAccessControlDenial(environment: string, route: string): v
 export function recordIllustrativeResultExposure(environment: string): void {
   emitEmf("travel/security", { illustrative_result_exposures_total: 1 }, { environment });
 }
+
+// ---------------------------------------------------------------------------
+// Assistant cost governance metrics (WO-107)
+//
+// Namespace: travel/assistant
+// Dimensions: environment (string), model (string) — both low-cardinality.
+// conversationId is NEVER a dimension.
+// ---------------------------------------------------------------------------
+
+/**
+ * Publish the rolling cost-per-completed-booking ratio.
+ * Emitted by the scheduled metering job after the attribution pass.
+ * @param costPerBookingUsd Attributed spend ÷ confirmed booking count.
+ */
+export function recordAssistantCostPerBooking(
+  environment: string,
+  model: string,
+  costPerBookingUsd: number,
+): void {
+  emitEmf(
+    "travel/assistant",
+    { assistant_cost_per_completed_booking_usd: costPerBookingUsd },
+    { environment, model },
+  );
+}
+
+/** Publish total assistant spend (attributed + unattributed) in the metering window. */
+export function recordAssistantSpendTotal(
+  environment: string,
+  model: string,
+  totalUsd: number,
+  unattributedUsd: number,
+): void {
+  emitEmf(
+    "travel/assistant",
+    {
+      assistant_spend_total_usd: totalUsd,
+      assistant_spend_unattributed_usd: unattributedUsd,
+    },
+    { environment, model },
+  );
+}
+
+/**
+ * Increment when a per-conversation budget cap is breached (8 tool calls or
+ * 60,000 tokens).  Logged at warn level in CostGovernor.reconcile.
+ */
+export function recordAssistantCapBreach(
+  environment: string,
+  model: string,
+  capKind: string,
+): void {
+  emitEmf(
+    "travel/assistant",
+    { assistant_cap_breach_count: 1 },
+    { environment, model, cap: capKind },
+  );
+}
+
+/**
+ * Heartbeat emitted at the end of every successful metering run.
+ * Absence of this metric within the expected interval triggers the
+ * metering-heartbeat alarm.
+ */
+export function recordMeteringHeartbeat(environment: string): void {
+  emitEmf("travel/assistant", { assistant_metering_heartbeat: 1 }, { environment });
+}
+
+/**
+ * Emit when the metering pipeline degrades (store unavailable, price-table miss, etc.).
+ * The assistant continues to serve requests; this metric triggers the degraded alarm.
+ */
+export function recordMeteringDegraded(environment: string, reason: string): void {
+  emitEmf("travel/assistant", { assistant_metering_degraded: 1 }, { environment, reason });
+}

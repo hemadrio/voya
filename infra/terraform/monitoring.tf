@@ -209,3 +209,208 @@ resource "aws_cloudwatch_metric_alarm" "purge_run_not_started" {
   treat_missing_data  = "breaching"
   alarm_actions       = local.alarm_actions
 }
+
+# ===========================================================================
+# WO-107: Assistant cost governance alarms
+#
+# Metrics emitted by the CostMeteringService scheduled job via EMF.
+# Namespace: travel/assistant
+# Dimensions: environment, model (both low-cardinality; never conversationId).
+#
+# All thresholds are defined in locals.tf.
+# Severity mapping:
+#   USD 0.60/booking warning → HIGH  (platform_ticket)
+#   USD 0.75/booking critical → CRITICAL (platform_page)
+#   Cap breach rate           → HIGH  (platform_ticket)
+#   Metering heartbeat absent → HIGH  (platform_ticket)
+#   Metering degraded         → HIGH  (platform_ticket)
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Threshold locals for assistant cost governance
+# (appended to locals block via separate resource to avoid editing existing block)
+# ---------------------------------------------------------------------------
+
+locals {
+  assistant_namespace = "travel/assistant"
+
+  # USD 0.75 per completed booking is the platform ceiling (BR-cost-01).
+  # Warning fires at 80% (USD 0.60); critical fires at 100% (USD 0.75).
+  threshold_assistant_cost_per_booking_warning_usd  = 0.60
+  threshold_assistant_cost_per_booking_critical_usd = 0.75
+
+  # Cap breach rate: alarm when more than this fraction of turns breach a cap.
+  threshold_assistant_cap_breach_rate = 0.10
+
+  # Metering heartbeat: alarm when no heartbeat within 2 reporting periods.
+  # The metering job runs every 15 minutes; 2 periods = 30 minutes.
+  assistant_heartbeat_period_seconds = 1800
+}
+
+# ---------------------------------------------------------------------------
+# WARNING alarm: cost per completed booking ≥ USD 0.60 (80% of ceiling)
+# ---------------------------------------------------------------------------
+resource "aws_cloudwatch_metric_alarm" "assistant_cost_per_booking_warning" {
+  alarm_name          = "HIGH-assistant-cost-per-booking-warning"
+  alarm_description   = "Assistant spend per completed booking exceeded USD 0.60 (80% of USD 0.75 ceiling). Review conversation lengths and tool call patterns."
+
+  namespace           = local.assistant_namespace
+  metric_name         = "assistant_cost_per_completed_booking_usd"
+  statistic           = "Average"
+  period              = 900   # 15-minute job interval
+  evaluation_periods  = 3
+  datapoints_to_alarm = 2     # 2 of 3 consecutive periods
+
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = local.threshold_assistant_cost_per_booking_warning_usd
+  treat_missing_data  = "notBreaching" # zero confirmed bookings → no-data, not alarm
+
+  alarm_actions = local.platform_ticket_actions
+  ok_actions    = local.platform_ticket_actions
+
+  tags = {
+    Severity  = "HIGH"
+    Component = "assistant"
+    WO        = "WO-107"
+  }
+}
+
+# ---------------------------------------------------------------------------
+# CRITICAL alarm: cost per completed booking ≥ USD 0.75 (ceiling breach)
+# ---------------------------------------------------------------------------
+resource "aws_cloudwatch_metric_alarm" "assistant_cost_per_booking_critical" {
+  alarm_name          = "CRITICAL-assistant-cost-per-booking-ceiling-breach"
+  alarm_description   = "CRITICAL: Assistant spend per completed booking has reached or exceeded the USD 0.75 platform ceiling. Immediate review required."
+
+  namespace           = local.assistant_namespace
+  metric_name         = "assistant_cost_per_completed_booking_usd"
+  statistic           = "Average"
+  period              = 900
+  evaluation_periods  = 2
+  datapoints_to_alarm = 2
+
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = local.threshold_assistant_cost_per_booking_critical_usd
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = local.platform_page_actions
+  ok_actions    = local.platform_page_actions
+
+  tags = {
+    Severity  = "CRITICAL"
+    Component = "assistant"
+    WO        = "WO-107"
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Log metric filter: per-conversation cap breaches (8 tool calls or 60k tokens)
+# Logged at WARN by CostGovernor.reconcile with conversationId and correlationId.
+# ---------------------------------------------------------------------------
+resource "aws_cloudwatch_log_metric_filter" "assistant_cap_breach" {
+  name           = "assistant-cap-breach"
+  log_group_name = local.log_group_assistant
+  pattern        = "{ $.event = \"cost_governor.cap_breach\" }"
+
+  metric_transformation {
+    name      = "assistant_cap_breach_count"
+    namespace = local.assistant_namespace
+    value     = "1"
+  }
+}
+
+# HIGH alarm: cap breach rate — fires when ≥ 10% of turns breach a cap
+resource "aws_cloudwatch_metric_alarm" "assistant_cap_breach_rate" {
+  alarm_name          = "HIGH-assistant-cap-breach-rate"
+  alarm_description   = "More than 10% of assistant turns are breaching per-conversation caps (tool calls or tokens). Investigate conversation patterns."
+
+  namespace           = local.assistant_namespace
+  metric_name         = "assistant_cap_breach_count"
+  statistic           = "Sum"
+  period              = 900
+  evaluation_periods  = 3
+  datapoints_to_alarm = 2
+
+  comparison_operator = "GreaterThanThreshold"
+  # 10% of expected ~50 turns per 15-min period = 5 breaches
+  threshold           = 5
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = local.platform_ticket_actions
+  ok_actions    = local.platform_ticket_actions
+
+  tags = {
+    Severity  = "HIGH"
+    Component = "assistant"
+    WO        = "WO-107"
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Metering heartbeat absence alarm (AC6 — fail closed on metering failure)
+# The scheduled job emits assistant_metering_heartbeat once per run.
+# Absence means the job has not run within the expected window.
+# ---------------------------------------------------------------------------
+resource "aws_cloudwatch_metric_alarm" "assistant_metering_heartbeat_absent" {
+  alarm_name          = "HIGH-assistant-metering-heartbeat-absent"
+  alarm_description   = "The assistant cost metering job has not published a heartbeat in the expected window. Cost-per-booking metric may be stale."
+
+  namespace           = local.assistant_namespace
+  metric_name         = "assistant_metering_heartbeat"
+  statistic           = "Sum"
+  period              = local.assistant_heartbeat_period_seconds
+  evaluation_periods  = 1
+
+  comparison_operator = "LessThanThreshold"
+  threshold           = 1
+  treat_missing_data  = "breaching" # absence = alarm, not green
+
+  alarm_actions = local.platform_ticket_actions
+  ok_actions    = local.platform_ticket_actions
+
+  tags = {
+    Severity  = "HIGH"
+    Component = "assistant"
+    WO        = "WO-107"
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Metering degraded alarm (AC6 — store/publisher unavailable)
+# ---------------------------------------------------------------------------
+resource "aws_cloudwatch_log_metric_filter" "assistant_metering_degraded_filter" {
+  name           = "assistant-metering-degraded"
+  log_group_name = local.log_group_assistant
+  pattern        = "{ $.event = \"metering_attribution_failure\" || $.event = \"cost_record_store_failure\" }"
+
+  metric_transformation {
+    name      = "assistant_metering_degraded"
+    namespace = local.assistant_namespace
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "assistant_metering_degraded" {
+  alarm_name          = "HIGH-assistant-metering-degraded"
+  alarm_description   = "The assistant cost metering pipeline is degraded (store or publisher unavailable). The cost-per-booking metric may be inaccurate. Pre-call caps remain enforced."
+
+  namespace           = local.assistant_namespace
+  metric_name         = "assistant_metering_degraded"
+  statistic           = "Sum"
+  period              = 900
+  evaluation_periods  = 2
+  datapoints_to_alarm = 1
+
+  comparison_operator = "GreaterThanThreshold"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = local.platform_ticket_actions
+  ok_actions    = local.platform_ticket_actions
+
+  tags = {
+    Severity  = "HIGH"
+    Component = "assistant"
+    WO        = "WO-107"
+  }
+}

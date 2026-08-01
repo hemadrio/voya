@@ -1013,3 +1013,38 @@ model TripDocument {
   @@index([purgeAfter], map: "idx_trip_documents_purge_after")
   @@map("trip_documents")
 }
+
+// ---------------------------------------------------------------------------
+// AssistantCostRecord — durable per-call cost record (WO-107)
+// ---------------------------------------------------------------------------
+
+/// PII-free, immutable record of a single completed assistant model call.
+///
+/// No prompt text, completion text, or traveler PII is stored.
+/// Only token counts, model identifier, conversation id, and derived cost.
+///
+/// Purge: purge_after = occurred_at + 2 years; swept by the cost-record
+/// maintenance job.  app_role has INSERT + SELECT only.
+model AssistantCostRecord {
+  id                 String   @id @default(uuid()) @db.Uuid
+  /// Conversation that produced this call. Never used as a CloudWatch dimension.
+  conversationId     String   @map("conversation_id") @db.Text
+  /// Anthropic model identifier, e.g. "claude-sonnet-4-6".
+  model              String   @db.Text
+  inputTokens        Int      @map("input_tokens")
+  outputTokens       Int      @map("output_tokens")
+  toolCallCount      Int      @default(0) @map("tool_call_count")
+  /// Cost in USD computed from priceTable.ts at the time of the call.
+  costUsd            Decimal  @map("cost_usd") @db.Decimal(10, 6)
+  /// Identifies the price table version for historical recomputation.
+  priceTableVersion  String   @map("price_table_version") @db.Text
+  occurredAt         DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  /// occurred_at + 2 years; drives the purge sweep.
+  purgeAfter         DateTime @map("purge_after") @db.Timestamptz
+
+  @@index([conversationId], map: "idx_cost_record_conversation_id")
+  @@index([occurredAt], map: "idx_cost_record_occurred_at")
+  @@index([purgeAfter], map: "idx_cost_record_purge_after")
+  @@index([conversationId, occurredAt], map: "idx_cost_record_conv_occurred")
+  @@map("assistant_cost_record")
+}
