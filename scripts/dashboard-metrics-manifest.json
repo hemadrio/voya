@@ -1,0 +1,118 @@
+[
+  {
+    "widgetTitle": "Funnel Conversion: Search-to-Booking Rate",
+    "panelGroup": "funnel-conversion",
+    "metrics": [
+      { "namespace": "travel/funnel", "metricName": "funnel_events_total" }
+    ]
+  },
+  {
+    "widgetTitle": "Funnel Conversion: Assistant-Attributed Conversion",
+    "panelGroup": "funnel-conversion",
+    "metrics": [
+      { "namespace": "travel/funnel", "metricName": "funnel_events_total" }
+    ]
+  },
+  {
+    "widgetTitle": "Funnel Conversion: Multi-Category Attachment & Guest-to-Registration",
+    "panelGroup": "funnel-conversion",
+    "metrics": [
+      { "namespace": "travel/funnel", "metricName": "funnel_events_total" }
+    ]
+  },
+  {
+    "widgetTitle": "Funnel Conversion: Preference Adoption & Conversation Completion",
+    "panelGroup": "funnel-conversion",
+    "metrics": [
+      { "namespace": "travel/funnel", "metricName": "funnel_events_total" }
+    ]
+  },
+  {
+    "widgetTitle": "Latency: Search Cache-Hit p95 vs 180 ms budget",
+    "panelGroup": "latency",
+    "metrics": [
+      { "namespace": "travel/search", "metricName": "SearchCacheHitP95" }
+    ]
+  },
+  {
+    "widgetTitle": "Latency: Search Overall p95 vs 3.0 s / 5.0 s budgets",
+    "panelGroup": "latency",
+    "metrics": [
+      { "namespace": "travel/search", "metricName": "SearchResponseP95" }
+    ]
+  },
+  {
+    "widgetTitle": "Latency: Checkout Acknowledgement p95 vs 5.0 s budget",
+    "panelGroup": "latency",
+    "metrics": [
+      { "namespace": "travel/checkout", "metricName": "CheckoutAckP95" }
+    ]
+  },
+  {
+    "widgetTitle": "Latency: Assistant First Token p95 vs 2.0 s budget",
+    "panelGroup": "latency",
+    "metrics": [
+      { "namespace": "travel/assistant", "metricName": "AssistantFirstTokenP95" }
+    ]
+  },
+  {
+    "widgetTitle": "Availability: Monthly Good-Minutes vs 99.5% SLO",
+    "panelGroup": "availability",
+    "metrics": [
+      { "namespace": "AWS/ApplicationELB", "metricName": "RequestCount" },
+      { "namespace": "AWS/ApplicationELB", "metricName": "HTTPCode_Target_5XX_Count" }
+    ]
+  },
+  {
+    "widgetTitle": "Availability: Remaining Error Budget (minutes out of ~219)",
+    "panelGroup": "availability",
+    "metrics": [
+      { "namespace": "AWS/ApplicationELB", "metricName": "RequestCount" },
+      { "namespace": "AWS/ApplicationELB", "metricName": "HTTPCode_Target_5XX_Count" }
+    ]
+  },
+  {
+    "widgetTitle": "Guardrail: Server Fault Rate vs 1.0% ceiling",
+    "panelGroup": "guardrails",
+    "metrics": [
+      { "namespace": "travel/search", "metricName": "SearchFaultRate" },
+      { "namespace": "travel/checkout", "metricName": "CheckoutFaultRate" },
+      { "namespace": "travel/assistant", "metricName": "AssistantFaultRate" }
+    ]
+  },
+  {
+    "widgetTitle": "Guardrail: Platform-Attributable Checkout Failure Rate vs 0.5% ceiling",
+    "panelGroup": "guardrails",
+    "metrics": [
+      { "namespace": "travel/checkout", "metricName": "PlatformAttributableCheckoutFailureRate" }
+    ]
+  },
+  {
+    "widgetTitle": "Guardrail: Notification Delivery Within 5 Minutes vs 99% target",
+    "panelGroup": "guardrails",
+    "metrics": [
+      { "namespace": "AWS/SQS", "metricName": "ApproximateAgeOfOldestMessage" }
+    ]
+  },
+  {
+    "widgetTitle": "Guardrail: Illustrative Result Exposure Count (target: exactly 0)",
+    "panelGroup": "guardrails",
+    "metrics": [
+      { "namespace": "travel/search", "metricName": "illustrative_offers_served_total" }
+    ]
+  },
+  {
+    "widgetTitle": "Guardrail: Assistant Cost per Completed Booking vs USD 0.75 ceiling",
+    "panelGroup": "guardrails",
+    "metrics": [
+      { "namespace": "travel/assistant", "metricName": "assistant_cost_per_completed_booking_usd" }
+    ]
+  },
+  {
+    "widgetTitle": "Guardrail: Business-Logic Test Coverage vs 60% floor",
+    "panelGroup": "guardrails",
+    "metrics": [
+      { "namespace": "travel/ci", "metricName": "test_coverage_pct" }
+    ]
+  }
+]

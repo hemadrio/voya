@@ -736,3 +736,21 @@ stages:
       Runs gitleaks secret scan on docs/ before upload to ensure no credential
       pattern was accidentally committed to a runbook.
       Artefact retained for 365 days (SOC 2 change-management evidence).
+
+  # ── 15. Dashboard metrics validation (WO-111 AC5) ───────────────────────
+  #   Reads scripts/dashboard-metrics-manifest.json (the typed widget definition
+  #   list) and verifies every {namespace, metricName} pair is catalogued in
+  #   docs/measurement/METRIC_CATALOGUE.md.
+  #
+  #   Blocking: a renamed or removed metric in the funnel, cost, or SLO layer
+  #   must break this step rather than silently blanking a dashboard panel.
+  #   Wired after build so the catalogue and manifest files are present.
+  - name: dashboard-metrics:validate
+    run: npx tsx scripts/validate-dashboard-metrics.ts
+    dependsOn: [build]
+    blocking: true
+    description: >
+      WO-111 AC5 — Validate dashboard metric manifest against the committed
+      metric catalogue. Fails when any widget references a metric not listed in
+      docs/measurement/METRIC_CATALOGUE.md, preventing silent panel blanking
+      from metric renames.
