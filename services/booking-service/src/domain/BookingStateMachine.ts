@@ -14,13 +14,10 @@
 
 import { lifecycleConflict } from "@travel/contracts/errors";
 import type { DomainError } from "@travel/contracts/errors";
-import {
-  isPermittedTransition,
-  PERMITTED_TRANSITIONS,
-} from "./transitions.js";
+import { PERMITTED_TRANSITIONS } from "./transitions.js";
 
 export type { BookingStatus } from "./transitions.js";
-export { PERMITTED_TRANSITIONS, isTerminalStatus as isTerminal } from "./transitions.js";
+export { PERMITTED_TRANSITIONS } from "./transitions.js";
 
 /**
  * Assert that the transition from `current` to `next` is permitted.
@@ -66,5 +63,5 @@ export function getPermittedTransitions(current: string): ReadonlyArray<string> 
 
 /** Returns true when `status` is a terminal state that accepts no transitions. */
 export function isTerminal(status: string): boolean {
-  return !isPermittedTransition || getPermittedTransitions(status).length === 0;
+  return getPermittedTransitions(status).length === 0;
 }
