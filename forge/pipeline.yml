@@ -398,6 +398,85 @@ stages:
       Runs the tests/contract/ offline suite post-deploy. Blocking — a
       contract test failure after deploy blocks the terraform plan stages.
       Results archived as SOC 2 evidence artefacts.
+      Note: E2E and accessibility suites (test:e2e, test:accessibility) depend
+      on this stage via seed:synthetic and also block promotion.
+
+  # ── 9c. Synthetic seed ───────────────────────────────────────────────────
+  #   Runs the seed-synthetic CLI to populate staging with deterministic
+  #   synthetic travelers, offers, bookings, and conversations before E2E.
+  #   BR-18: The CLI refuses to run against production-tagged environments.
+  - name: seed:synthetic
+    run: |
+      set -euo pipefail
+      export E2E_SEED_RUN_ID="${CI_PIPELINE_ID:-local}"
+      export SEED_API_URL="${PLAYWRIGHT_API_URL:-http://localhost:4000}"
+      npx tsx tools/seed-synthetic/index.ts
+    dependsOn: [deploy, test:generic]
+    blocking: true
+    description: >
+      Idempotent synthetic data seeder — creates travelers, offers, bookings,
+      itineraries, and conversations for E2E suites. Refuses to run against
+      production (BR-18). Namespaced per CI_PIPELINE_ID to isolate parallel runs.
+
+  # ── 9d. E2E journey suites ────────────────────────────────────────────────
+  #   Playwright journey suites (search, checkout, cancellation, assistant,
+  #   guest-carryover) run against the deployed staging environment with
+  #   synthetic data seeded in the prior step.
+  #
+  #   retries=0 — negative assertions (no supplier call, no card data) must
+  #   never be retried into a false pass.
+  #
+  #   Artefacts: traces, videos, screenshots, and JUnit XML are archived.
+  - name: test:e2e
+    run: |
+      set -euo pipefail
+      export PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL:-http://localhost:3000}"
+      export PLAYWRIGHT_API_URL="${PLAYWRIGHT_API_URL:-http://localhost:4000}"
+      export E2E_SEED_RUN_ID="${CI_PIPELINE_ID:-local}"
+      npx playwright test \
+        --project=search \
+        --project=checkout \
+        --project=cancellation \
+        --project=assistant \
+        --project=guest-carryover \
+        --reporter=html,junit
+      # Archive traces and test report
+      tar -czf playwright-e2e-artefacts.tar.gz \
+        playwright-report/ \
+        test-results/ 2>/dev/null || true
+    dependsOn: [seed:synthetic]
+    blocking: true
+    description: >
+      Playwright E2E journey suites (search, checkout, cancellation, assistant,
+      guest-carryover) against staging with synthetic data. retries=0 — negative
+      assertions must not retry into false pass. Traces, videos, screenshots, and
+      JUnit XML archived as evidence. Blocks promotion on any failure.
+
+  # ── 9e. Accessibility gate ────────────────────────────────────────────────
+  #   Runs axe-core WCAG 2.2 AA scans over every traveler-facing route in
+  #   both light and dark themes, plus keyboard traversal assertions.
+  #   Fails the pipeline on any critical or serious violation.
+  #   Violation reports archived for audit trail.
+  - name: test:accessibility
+    run: |
+      set -euo pipefail
+      export PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL:-http://localhost:3000}"
+      export E2E_SEED_RUN_ID="${CI_PIPELINE_ID:-local}"
+      npx playwright test \
+        --project=accessibility \
+        --reporter=html,junit
+      # Archive axe violation report alongside test artefacts
+      tar -czf playwright-accessibility-artefacts.tar.gz \
+        playwright-report/ \
+        test-results/ 2>/dev/null || true
+    dependsOn: [seed:synthetic]
+    blocking: true
+    description: >
+      Automated WCAG 2.2 AA gate — axe-core scans all traveler-facing routes
+      (search, comparison, checkout, profile, itinerary, chat) in light and
+      dark themes. Fails on critical or serious violations. Keyboard traversal
+      and live-region announcement assertions included. Violation report archived
+      as pipeline artefact for phase-gate evidence. Blocks promotion.
 
   # ── 10. Terraform plan (non-production) ──────────────────────────────────
   #   Posts plan output to the pull request. Apply requires manual approval.
@@ -407,12 +486,13 @@ stages:
       terraform init -backend=true &&
       terraform validate &&
       terraform plan -out=tfplan.staging -no-color
-    dependsOn: [deploy]
+    dependsOn: [deploy, test:e2e, test:accessibility]
     blocking: true
     description: >
       Terraform validate + plan for staging. Plan output is posted to the PR
       as a comment. Apply requires a separate manual approval step from a
       reviewer who is not the PR author.
+      Gated on E2E journey suites and accessibility scan (test:e2e, test:accessibility).
 
   # ── 11. Terraform plan (production) ──────────────────────────────────────
   - name: tf-plan-production
@@ -421,7 +501,7 @@ stages:
       terraform init -backend=true &&
       terraform validate &&
       terraform plan -out=tfplan.production -no-color
-    dependsOn: [deploy]
+    dependsOn: [deploy, test:e2e, test:accessibility]
     blocking: true
     description: >
       Terraform validate + plan for production. Apply requires manual approval
