@@ -77,6 +77,16 @@
       "import": "./dist/privacy/index.js",
       "default": "./dist/privacy/index.js"
     },
+    "./itineraries": {
+      "types": "./dist/itineraries/index.d.ts",
+      "import": "./dist/itineraries/index.js",
+      "default": "./dist/itineraries/index.js"
+    },
+    "./documents": {
+      "types": "./dist/documents/index.d.ts",
+      "import": "./dist/documents/index.js",
+      "default": "./dist/documents/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

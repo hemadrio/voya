@@ -976,3 +976,40 @@ model CheckoutSagaLeg {
   @@index([sagaId, status], map: "idx_checkout_saga_legs_saga_status")
   @@map("checkout_saga_legs")
 }
+
+// ---------------------------------------------------------------------------
+// TripDocument — generated trip document record (WO-054)
+// ---------------------------------------------------------------------------
+
+/// Persisted record for a generated trip document PDF.
+///
+/// status values:
+///   PENDING — generation queued or in progress
+///   READY   — PDF stored in S3; storageKey and byteSize populated
+///   FAILED  — rendering or storage error; see booking_audit_log for reason
+///
+/// storageKey is the S3 object key: {userId}/{itineraryId}/{id}.pdf
+/// purgeAfter drives the scheduled retention sweep (createdAt + 90 days default).
+/// downloadUrl is never persisted — always issued fresh via signed URL.
+model TripDocument {
+  id            String    @id @default(uuid()) @db.Uuid
+  itineraryId   String    @map("itinerary_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  /// PENDING | READY | FAILED
+  status        String    @db.VarChar(16)
+  /// S3 object key, set when status reaches READY.
+  storageKey    String?   @map("storage_key") @db.Text
+  /// PDF byte size, set when status reaches READY.
+  byteSize      Int?      @map("byte_size")
+  /// Timestamp when the PDF was successfully rendered and stored.
+  generatedAt   DateTime? @map("generated_at") @db.Timestamptz
+  /// Retention purge date (createdAt + retention period). Indexed for sweep job.
+  purgeAfter    DateTime? @map("purge_after") @db.Timestamptz
+  correlationId String    @map("correlation_id") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([itineraryId, generatedAt(sort: Desc)], map: "idx_trip_documents_itinerary_generated_at")
+  @@index([purgeAfter], map: "idx_trip_documents_purge_after")
+  @@map("trip_documents")
+}

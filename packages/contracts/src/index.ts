@@ -27,3 +27,4 @@ export * from "./privacy/index.js";
 export * from "./ai-tools/index.js";
 export * from "./itineraries/index.js";
 export * from "./assistant/index.js";
+export * from "./documents/index.js";
