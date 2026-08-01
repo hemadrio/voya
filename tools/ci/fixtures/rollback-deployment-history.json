@@ -1,0 +1,30 @@
+{
+  "services": [
+    {
+      "serviceName": "production-auth-service",
+      "clusterArn": "arn:aws:ecs:eu-west-1:123456789012:cluster/production-travel-platform",
+      "taskDefinition": "arn:aws:ecs:eu-west-1:123456789012:task-definition/production-auth-service:42",
+      "deployments": [
+        {
+          "id": "ecs-svc-abc123",
+          "status": "PRIMARY",
+          "taskDefinition": "arn:aws:ecs:eu-west-1:123456789012:task-definition/production-auth-service:42",
+          "runningCount": 2,
+          "desiredCount": 2,
+          "createdAt": "2024-06-01T10:00:00Z",
+          "updatedAt": "2024-06-01T10:03:22Z"
+        },
+        {
+          "id": "ecs-svc-def456",
+          "status": "ACTIVE",
+          "taskDefinition": "arn:aws:ecs:eu-west-1:123456789012:task-definition/production-auth-service:41",
+          "runningCount": 0,
+          "desiredCount": 0,
+          "createdAt": "2024-05-31T09:00:00Z",
+          "updatedAt": "2024-06-01T10:03:22Z"
+        }
+      ]
+    }
+  ],
+  "failures": []
+}

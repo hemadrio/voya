@@ -1,0 +1,44 @@
+{
+  "_comment": "Smoke test configuration for the travel platform staging environment. Used by tools/ci/smoke.ts as the --config argument. Baseurl values use the internal service discovery names; replace with real staging FQDNs before use.",
+  "services": [
+    { "name": "auth-service",     "baseUrl": "https://auth.staging.travel-platform.internal" },
+    { "name": "booking-service",  "baseUrl": "https://booking.staging.travel-platform.internal" },
+    { "name": "search-service",   "baseUrl": "https://search.staging.travel-platform.internal" },
+    { "name": "flight-service",   "baseUrl": "https://flights.staging.travel-platform.internal" },
+    { "name": "hotel-service",    "baseUrl": "https://hotels.staging.travel-platform.internal" },
+    { "name": "car-service",      "baseUrl": "https://cars.staging.travel-platform.internal" },
+    { "name": "payment-service",  "baseUrl": "https://payment.staging.travel-platform.internal" },
+    { "name": "user-service",     "baseUrl": "https://users.staging.travel-platform.internal" },
+    { "name": "ai-service",       "baseUrl": "https://ai.staging.travel-platform.internal" }
+  ],
+  "journeys": [
+    {
+      "name": "flight_search",
+      "service": "search-service",
+      "method": "GET",
+      "path": "/v1/search/flights?departureAirport=JFK&arrivalAirport=LAX&departureDate=2030-06-01T00%3A00%3A00.000Z&passengers=1&seatClass=ECONOMY&currency=USD",
+      "expectStatus": 200
+    },
+    {
+      "name": "hotel_search",
+      "service": "search-service",
+      "method": "GET",
+      "path": "/v1/search/hotels?location=Paris&checkInDate=2030-06-01T00%3A00%3A00.000Z&checkOutDate=2030-06-05T00%3A00%3A00.000Z&guests=2&currency=EUR",
+      "expectStatus": 200
+    },
+    {
+      "name": "car_search",
+      "service": "search-service",
+      "method": "GET",
+      "path": "/v1/search/cars?pickupLocation=LAX&dropoffLocation=LAX&pickupDate=2030-06-01T00%3A00%3A00.000Z&dropoffDate=2030-06-05T00%3A00%3A00.000Z&carClass=ECONOMY&currency=USD",
+      "expectStatus": 200
+    },
+    {
+      "name": "auth_health",
+      "service": "auth-service",
+      "method": "GET",
+      "path": "/health/live",
+      "expectStatus": 200
+    }
+  ]
+}

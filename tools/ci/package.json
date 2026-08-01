@@ -14,7 +14,10 @@
     "typecheck": "tsc --noEmit",
     "affected": "tsx affected.ts",
     "coverage-gate": "tsx coverage-gate.ts",
-    "image-tag": "tsx image-tag.ts"
+    "image-tag": "tsx image-tag.ts",
+    "rollback": "tsx rollback.ts",
+    "approval-check": "tsx approval-check.ts",
+    "smoke": "tsx smoke.ts"
   },
   "dependencies": {
     "js-yaml": "^4.1.0"

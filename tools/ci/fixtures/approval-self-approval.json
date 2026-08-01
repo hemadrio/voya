@@ -1,0 +1,8 @@
+{
+  "_comment": "Self-approval rejection fixture: the commit author attempts to approve their own promotion to production. The approval-check script must reject this with SELF_APPROVAL and emit an audit record. This fixture is used in rollback drill tests and pipeline audit evidence (AC2).",
+  "approver": "alice@travel-platform.example.com",
+  "commitAuthor": "alice@travel-platform.example.com",
+  "commitSha": "abc1234",
+  "expectedOutcome": "REJECT",
+  "expectedErrorCode": "SELF_APPROVAL"
+}

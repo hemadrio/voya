@@ -1,0 +1,22 @@
+{
+  "_comment": "First-deploy scenario: only one deployment exists in history. The rollback script must fail with NO_PREVIOUS_REVISION rather than deploying an arbitrary revision.",
+  "services": [
+    {
+      "serviceName": "production-auth-service",
+      "clusterArn": "arn:aws:ecs:eu-west-1:123456789012:cluster/production-travel-platform",
+      "taskDefinition": "arn:aws:ecs:eu-west-1:123456789012:task-definition/production-auth-service:1",
+      "deployments": [
+        {
+          "id": "ecs-svc-firstdeploy",
+          "status": "PRIMARY",
+          "taskDefinition": "arn:aws:ecs:eu-west-1:123456789012:task-definition/production-auth-service:1",
+          "runningCount": 2,
+          "desiredCount": 2,
+          "createdAt": "2024-06-01T10:00:00Z",
+          "updatedAt": "2024-06-01T10:03:00Z"
+        }
+      ]
+    }
+  ],
+  "failures": []
+}

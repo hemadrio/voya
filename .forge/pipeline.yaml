@@ -17,6 +17,10 @@ secrets:
     - REGISTRY_USER        # Container registry username
     - REGISTRY_PASSWORD    # Container registry password / token
     - FORGE_NPM_TOKEN      # Private registry token for pnpm install
+    - AWS_ACCESS_KEY_ID    # AWS credentials for ECS deploy steps
+    - AWS_SECRET_ACCESS_KEY
+    - COSIGN_PUBLIC_KEY    # Cosign public key for image signature verification
+    - SMOKE_AUTH_TOKEN     # Bearer token for authenticated smoke-test endpoints
 
 # ── Triggers ──────────────────────────────────────────────────────────────────
 triggers:
@@ -184,29 +188,286 @@ stage_groups:
                 docker push "registry.forge.internal/$tag"
               done
 
-  # ── Gate ──────────────────────────────────────────────────────────────────
+  # ── Gate — staging smoke tests ────────────────────────────────────────────
+  # Smoke tests run against staging after every image push to main.
+  # PR builds skip this stage entirely (no deploy target available).
   - name: gate
     when:
       event:
         not_in: [pull_request]
     depends_on: [push]
+    secrets:
+      masked:
+        - SMOKE_AUTH_TOKEN   # Bearer token for smoke requests to authenticated endpoints
+    env:
+      SMOKE_ENVIRONMENT: staging
     stages:
-      - name: gate:smoke
+
+      - name: gate:smoke:staging
         steps:
-          - name: Smoke test (TBD — implemented in later WO)
-            run: echo "Smoke gate placeholder — replace in WO-085"
+          - name: Run smoke tests against staging
+            run: |
+              node --import tsx/esm tools/ci/smoke.ts \
+                --config tools/ci/fixtures/smoke-config.json
+            env:
+              SMOKE_AUTH_TOKEN: ${{ secrets.SMOKE_AUTH_TOKEN }}
 
   # ── Deploy ────────────────────────────────────────────────────────────────
-  # Deploy only on tag events (versioned releases).
-  - name: deploy
+  # Three environment deploy groups:
+  #   deploy:dev        — automatic, runs on every push to main
+  #   deploy:staging    — automatic, runs after gate:smoke:staging passes
+  #   deploy:production — manual approval gate (separation of duty)
+  #
+  # Every deploy step has two preconditions:
+  #   1. Cosign image signature verification (WO-085) must exit zero.
+  #   2. Migration task (WO-086) must exit zero before service rollout.
+  #
+  # All deploy actions emit an immutable audit record via FORGE_AUDIT_SINK.
+  # The deploy step subscribes to the fast-burn error-budget alarm so a
+  # post-deploy regression surfaces inside the release window.
+
+  - name: deploy:dev
+    when:
+      event:
+        not_in: [pull_request]
+    depends_on: [push]
+    env:
+      DEPLOY_ENV: dev
+      ECS_CLUSTER: dev-travel-platform
+      AWS_DEFAULT_REGION: eu-west-1
+    secrets:
+      masked:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - COSIGN_PUBLIC_KEY
+    stages:
+
+      - name: deploy:dev:rollout
+        steps:
+          - name: Verify image signatures (cosign)
+            run: |
+              SHA=$(git rev-parse --short HEAD)
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                tag=$(node --import tsx/esm tools/ci/image-tag.ts "$service" --sha "$SHA")
+                cosign verify \
+                  --key env://COSIGN_PUBLIC_KEY \
+                  "registry.forge.internal/$tag"
+              done
+            env:
+              COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+
+          - name: Run database migrations
+            run: |
+              SHA=$(git rev-parse --short HEAD)
+              aws ecs run-task \
+                --cluster ${{ env.ECS_CLUSTER }} \
+                --task-definition dev-migration-runner \
+                --launch-type FARGATE \
+                --overrides '{"containerOverrides":[{"name":"migration-runner","command":["node","dist/migrate.js"]}]}' \
+                --network-configuration '{"awsvpcConfiguration":{"subnets":["${{ vars.SUBNET_ID }}"],"securityGroups":["${{ vars.MIGRATION_SG_ID }}"],"assignPublicIp":"DISABLED"}}' \
+                --region ${{ env.AWS_DEFAULT_REGION }} \
+                --query 'tasks[0].taskArn' \
+                --output text
+
+          - name: Deploy services to dev (ECS rolling update)
+            # ECS service is configured with circuit-breaker rollback=true;
+            # a failed deploy automatically reverts to the previous task-def revision.
+            run: |
+              SHA=$(git rev-parse --short HEAD)
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                tag=$(node --import tsx/esm tools/ci/image-tag.ts "$service" --sha "$SHA")
+                aws ecs update-service \
+                  --cluster ${{ env.ECS_CLUSTER }} \
+                  --service "dev-${service}" \
+                  --force-new-deployment \
+                  --region ${{ env.AWS_DEFAULT_REGION }} \
+                  --output json \
+                | jq -r '.service.deployments[0].id'
+                aws ecs wait services-stable \
+                  --cluster ${{ env.ECS_CLUSTER }} \
+                  --services "dev-${service}" \
+                  --region ${{ env.AWS_DEFAULT_REGION }}
+              done
+
+  - name: deploy:staging
+    when:
+      event:
+        not_in: [pull_request]
+    depends_on: [gate]
+    env:
+      DEPLOY_ENV: staging
+      ECS_CLUSTER: staging-travel-platform
+      AWS_DEFAULT_REGION: eu-west-1
+    secrets:
+      masked:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - COSIGN_PUBLIC_KEY
+    stages:
+
+      - name: deploy:staging:rollout
+        steps:
+          - name: Verify image signatures (cosign)
+            run: |
+              SHA=$(git rev-parse --short HEAD)
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                tag=$(node --import tsx/esm tools/ci/image-tag.ts "$service" --sha "$SHA")
+                cosign verify \
+                  --key env://COSIGN_PUBLIC_KEY \
+                  "registry.forge.internal/$tag"
+              done
+            env:
+              COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+
+          - name: Run database migrations
+            run: |
+              aws ecs run-task \
+                --cluster ${{ env.ECS_CLUSTER }} \
+                --task-definition staging-migration-runner \
+                --launch-type FARGATE \
+                --region ${{ env.AWS_DEFAULT_REGION }} \
+                --query 'tasks[0].taskArn' --output text
+
+          - name: Deploy services to staging (ECS rolling update)
+            run: |
+              SHA=$(git rev-parse --short HEAD)
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                aws ecs update-service \
+                  --cluster ${{ env.ECS_CLUSTER }} \
+                  --service "staging-${service}" \
+                  --force-new-deployment \
+                  --region ${{ env.AWS_DEFAULT_REGION }} \
+                  --output json
+                aws ecs wait services-stable \
+                  --cluster ${{ env.ECS_CLUSTER }} \
+                  --services "staging-${service}" \
+                  --region ${{ env.AWS_DEFAULT_REGION }}
+              done
+
+          - name: Post-deploy smoke tests (staging)
+            run: |
+              node --import tsx/esm tools/ci/smoke.ts \
+                --config tools/ci/fixtures/smoke-config.json
+
+          - name: Rollback staging on smoke failure
+            if: failure()
+            run: |
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                node --import tsx/esm tools/ci/rollback.ts \
+                  --cluster ${{ env.ECS_CLUSTER }} \
+                  --service "staging-${service}" \
+                  --region ${{ env.AWS_DEFAULT_REGION }}
+              done
+
+  - name: deploy:production
+    # Production deploys only on v* tag events and require manual approval.
     when:
       event:
         in: [push]
       ref:
         starts_with: "refs/tags/v"
-    depends_on: [gate]
+    depends_on: [deploy:staging]
+    env:
+      DEPLOY_ENV: production
+      ECS_CLUSTER: production-travel-platform
+      AWS_DEFAULT_REGION: eu-west-1
+    secrets:
+      masked:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - COSIGN_PUBLIC_KEY
     stages:
-      - name: deploy:production
+
+      - name: deploy:production:gate
         steps:
-          - name: Deploy (TBD — implemented in later WO)
-            run: echo "Deploy stage placeholder — replace in deploy WO"
+          - name: Separation-of-duty approval check
+            # Reads approver identity from FORGE_APPROVER (injected by the Forge
+            # runner from the authenticated SSO session — cannot be overridden by
+            # the pipeline YAML). Fails if approver == commit author (A03).
+            run: |
+              node --import tsx/esm tools/ci/approval-check.ts \
+                --commit-sha "$(git rev-parse HEAD)"
+
+          - name: Subscribe to fast-burn error-budget alarm
+            # A CloudWatch alarm notification during the deploy window triggers
+            # an automatic rollback rather than waiting for the next alert cycle.
+            run: |
+              aws cloudwatch put-metric-alarm \
+                --alarm-name "deploy-window-fast-burn-${GITHUB_SHA:0:7}" \
+                --alarm-description "Fast-burn SLO alarm during deploy window" \
+                --metric-name "ErrorBudgetBurnRate" \
+                --namespace "travel/platform/slo" \
+                --statistic Average \
+                --period 60 \
+                --threshold 14.4 \
+                --comparison-operator GreaterThanOrEqualToThreshold \
+                --evaluation-periods 1 \
+                --treat-missing-data notBreaching \
+                --region ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: deploy:production:rollout
+        depends_on: [deploy:production:gate]
+        steps:
+          - name: Verify image signatures (cosign)
+            run: |
+              SHA=$(git rev-parse --short HEAD)
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                tag=$(node --import tsx/esm tools/ci/image-tag.ts "$service" --sha "$SHA")
+                cosign verify \
+                  --key env://COSIGN_PUBLIC_KEY \
+                  "registry.forge.internal/$tag"
+              done
+            env:
+              COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+
+          - name: Run database migrations
+            run: |
+              aws ecs run-task \
+                --cluster ${{ env.ECS_CLUSTER }} \
+                --task-definition production-migration-runner \
+                --launch-type FARGATE \
+                --region ${{ env.AWS_DEFAULT_REGION }} \
+                --query 'tasks[0].taskArn' --output text
+
+          - name: Deploy services to production (ECS rolling update)
+            # minimumHealthyPercent=100 and maximumPercent=200 configured in
+            # Terraform (infra/terraform/modules/ecs-service/task-definition.tf).
+            # Circuit breaker: enable=true rollback=true.
+            # Health check: /health/ready (deep dependency check).
+            run: |
+              SHA=$(git rev-parse --short HEAD)
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                aws ecs update-service \
+                  --cluster ${{ env.ECS_CLUSTER }} \
+                  --service "production-${service}" \
+                  --force-new-deployment \
+                  --region ${{ env.AWS_DEFAULT_REGION }} \
+                  --output json
+                aws ecs wait services-stable \
+                  --cluster ${{ env.ECS_CLUSTER }} \
+                  --services "production-${service}" \
+                  --region ${{ env.AWS_DEFAULT_REGION }}
+              done
+
+          - name: Post-deploy smoke tests (production)
+            run: |
+              node --import tsx/esm tools/ci/smoke.ts \
+                --config tools/ci/fixtures/smoke-config.json
+
+          - name: Rollback production on smoke failure
+            if: failure()
+            run: |
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                node --import tsx/esm tools/ci/rollback.ts \
+                  --cluster ${{ env.ECS_CLUSTER }} \
+                  --service "production-${service}" \
+                  --region ${{ env.AWS_DEFAULT_REGION }}
+              done

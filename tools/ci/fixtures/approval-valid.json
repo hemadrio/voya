@@ -1,0 +1,7 @@
+{
+  "_comment": "Valid approval fixture: approver and commit author are different people.",
+  "approver": "reviewer@travel-platform.example.com",
+  "commitAuthor": "engineer@travel-platform.example.com",
+  "commitSha": "da39a3e",
+  "expectedOutcome": "PASS"
+}
