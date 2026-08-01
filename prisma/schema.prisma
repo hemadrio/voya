@@ -1146,3 +1146,40 @@ model SubjectDataKey {
   @@index([destroyedAt], map: "idx_subject_data_keys_destroyed_at")
   @@map("subject_data_keys")
 }
+
+// ---------------------------------------------------------------------------
+// FunnelEvent — pseudonymised conversion funnel event store (WO-106)
+// ---------------------------------------------------------------------------
+
+/// Append-only record of every business-significant funnel transition.
+///
+/// PII invariant: pseudonymousActorId is HMAC-SHA256 of userId or anonymous
+/// session id — never the raw user identifier. No email, name, DOB, or other
+/// PII fields exist on this model.
+///
+/// Access: app_role has INSERT + SELECT only; no UPDATE or DELETE.
+/// Retention: purge_after = occurredAt + 400 days (configurable at insert time).
+model FunnelEvent {
+  id                   String   @id @default(uuid()) @db.Uuid
+  schemaVersion        Int      @map("schema_version") @default(1)
+  eventType            String   @map("event_type") @db.Text
+  occurredAt           DateTime @map("occurred_at") @db.Timestamptz
+  correlationId        String   @map("correlation_id") @db.Text
+  /// HMAC-SHA256 digest — never the raw userId.
+  pseudonymousActorId  String   @map("pseudonymous_actor_id") @db.Text
+  sessionId            String   @map("session_id") @db.Text
+  conversationId       String?  @map("conversation_id") @db.Text
+  itineraryId          String?  @map("itinerary_id") @db.Text
+  bookingId            String?  @map("booking_id") @db.Text
+  category             String   @db.Text
+  attributes           Json     @default("{}") @db.JsonB
+  /// purgeAfter = occurredAt + retentionDays; swept by the purge job.
+  purgeAfter           DateTime @map("purge_after") @db.Timestamptz
+
+  @@index([eventType, occurredAt], map: "idx_funnel_event_type_occurred_at")
+  @@index([pseudonymousActorId, occurredAt], map: "idx_funnel_event_actor_occurred_at")
+  @@index([conversationId], map: "idx_funnel_event_conversation_id")
+  @@index([itineraryId], map: "idx_funnel_event_itinerary_id")
+  @@index([purgeAfter], map: "idx_funnel_event_purge_after")
+  @@map("funnel_event")
+}

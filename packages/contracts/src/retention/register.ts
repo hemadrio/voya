@@ -280,6 +280,31 @@ const RAW_REGISTER = {
       includedInDsrExport: true,
       isJsonSurface: false,
     },
+
+    // ── 11. Funnel telemetry events (WO-106) ──────────────────────────────
+    {
+      id: "funnel_event.telemetry",
+      category: "Funnel telemetry event",
+      table: "funnel_event",
+      columns: [
+        "pseudonymous_actor_id", "session_id", "conversation_id",
+        "itinerary_id", "booking_id", "attributes",
+      ],
+      classification: "INTERNAL" satisfies DataClassification,
+      retentionPeriodKey: null,
+      derivationExpression:
+        "occurred_at + INTERVAL '400 days' " +
+        "(purge_after computed at insert time in PrismaFunnelStore; " +
+        "configurable via FUNNEL_RETENTION_DAYS env var)",
+      erasureMethod: "physical_delete",
+      erasureExcluded: false,
+      pseudonymisationRule:
+        "pseudonymous_actor_id is already an HMAC-SHA256 of the real userId; " +
+        "physical_delete is applied once purge_after is reached; " +
+        "no additional pseudonymisation step required on erasure",
+      includedInDsrExport: false,
+      isJsonSurface: false,
+    },
   ],
 } as const;
 

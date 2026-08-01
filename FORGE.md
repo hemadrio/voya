@@ -728,3 +728,10 @@
 - **Files:** 18 (+4133/-0)
 - **Duration:** 1355ss
 - **Approach:** Two-layer fault injection: (1) in-process adapter faults with a controllable FakeClock for precise threshold assertions (circuit breaker, timeouts, dedup, webhook verification, health checks, secrets, assistant governor, rate limits, SSRF); (2) infrastructure-level FIS experiment templates + Toxiproxy wrappers targeting staging only. Every scenario asserts the OWASP A10 posture via assertLogContainsSecurityEvent() (actor/resource/operation/reference) and assertNoLeakedSecrets(). A fault-injection pipeline step is added before E2E phase gates, with results archived as SOC 2 evidence.
+
+## WO-106: User Story: WO-106 - Instrument pseudonymised conversion funnel event pipeline
+- **Status:** completed
+- **Commit:** `9335251`
+- **Files:** 25 (+3005/-0)
+- **Duration:** 1126ss
+- **Approach:** Implemented an end-to-end pseudonymised conversion funnel telemetry pipeline using a hexagonal architecture (FunnelPort interface). The contract layer defines a strict Zod schema rejecting PII via z.never() entries. The observability package provides HMAC-SHA256 pseudonymisation, a non-blocking ring-buffer emitter with drop-oldest overflow, a StdoutEmfWriter for low-cardinality EMF metrics, and a clock-injectable PrismaFunnelStore. An append-only Prisma migration with REVOKE UPDATE/DELETE guards the table. Eleven emit call sites are wired across four services. Six reporting queries use $queryRaw with explicit window parameters and an incompleteWindow flag. The funnel_event table was added to the CLASSIFICATION_REGISTER for automated physical deletion via the existing purge orchestrator. CloudWatch alarms guard heartbeat absence, dropped events, and store failures.

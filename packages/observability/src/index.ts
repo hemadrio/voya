@@ -83,6 +83,24 @@ export type {
 } from './secretValidator.js';
 
 export {
+  FunnelEmitter,
+  NOOP_FUNNEL_EMITTER,
+  StdoutEmfWriter,
+  PrismaFunnelStore,
+  pseudonymise,
+  initPseudonymKey,
+  _resetPseudonymKey,
+} from './funnel/index.js';
+export type {
+  FunnelPort,
+  FunnelStorePort,
+  FunnelEmfWriterPort,
+  FunnelEmitterConfig,
+  FunnelEventCreateInput,
+  PrismaFunnelClient,
+} from './funnel/index.js';
+
+export {
   computeBurnRate,
   computeErrorBudget,
   burnRateThreshold,
