@@ -721,3 +721,10 @@
 - **Files:** 11 (+3000/-0)
 - **Duration:** 922ss
 - **Approach:** Implemented the daily reconciliation job as three layers: (1) a pure domain ReconciliationEngine that classifies exceptions using bigint integer comparison only, (2) a cursor-based StripeBalanceReaderPort with InMemoryStripeReader test double, and (3) a jobs/reconciliation.ts entrypoint that pages Stripe, runs the engine, persists exceptions with skipDuplicates for idempotency, emits CloudWatch metrics, and writes an S3 report. The reconciliation_runs table stores the Stripe pagination cursor so crashed runs resume rather than restart. Migration 0022 extends reconciliation_exceptions with amount comparison columns, provider_reference, period_date, and a unique constraint enforcing idempotent re-runs. Terraform defines a daily EventBridge cron at 02:00 UTC, a least-privilege task role (S3 write + CloudWatch metrics + DB + Stripe read-only), and two CRITICAL alarms: non-zero exception count and missed run at 26 hours.
+
+## WO-099: User Story: WO-099 - Build failure injection and resilience test scenarios
+- **Status:** completed
+- **Commit:** `82253b2`
+- **Files:** 18 (+4133/-0)
+- **Duration:** 1355ss
+- **Approach:** Two-layer fault injection: (1) in-process adapter faults with a controllable FakeClock for precise threshold assertions (circuit breaker, timeouts, dedup, webhook verification, health checks, secrets, assistant governor, rate limits, SSRF); (2) infrastructure-level FIS experiment templates + Toxiproxy wrappers targeting staging only. Every scenario asserts the OWASP A10 posture via assertLogContainsSecurityEvent() (actor/resource/operation/reference) and assertNoLeakedSecrets(). A fault-injection pipeline step is added before E2E phase gates, with results archived as SOC 2 evidence.

@@ -1,0 +1,22 @@
+{
+  "name": "@travel/resilience-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Failure injection and resilience scenario tests (WO-099).",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:staging": "RESILIENCE_TARGET=staging vitest run --reporter=verbose"
+  },
+  "dependencies": {
+    "@travel/supplier-resilience": "workspace:*",
+    "@travel/observability": "workspace:*",
+    "@travel/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

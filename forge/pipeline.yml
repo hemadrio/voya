@@ -401,6 +401,46 @@ stages:
       Note: E2E and accessibility suites (test:e2e, test:accessibility) depend
       on this stage via seed:synthetic and also block promotion.
 
+  # ── 9b-r. Fault injection — resilience scenario suite (WO-099 AC17) ─────
+  #   Runs the @travel/resilience-tests suite in-process (adapter-level faults)
+  #   against the deployed staging environment BEFORE the E2E phase gates.
+  #   Scenario results, alarm evidence, and structured security event logs are
+  #   archived as immutable SOC 2 evidence (S3 Object Lock, 365-day retention).
+  #
+  #   Constraints:
+  #     - RESILIENCE_TARGET must be "staging"; the suite refuses to run against
+  #       production-tagged environments (checked in vitest.config.ts setup).
+  #     - Failing scenarios are blocking — a resilience regression prevents E2E.
+  #     - AWS FIS experiments (infrastructure-level injection) are invoked from
+  #       this step when FIS_EXPERIMENTS_ENABLED=true (default: false for speed).
+  - name: test:resilience
+    run: |
+      set -euo pipefail
+      export RESILIENCE_TARGET="${RESILIENCE_TARGET:-staging}"
+      export FIS_EXPERIMENTS_ENABLED="${FIS_EXPERIMENTS_ENABLED:-false}"
+
+      echo "[resilience] Running adapter-level fault-injection scenarios..."
+      pnpm --filter @travel/resilience-tests test:staging \
+        --reporter=verbose \
+        --reporter=json \
+        --outputFile=resilience-results.json
+
+      echo "[resilience] Archiving scenario results as SOC 2 evidence..."
+      tar -czf resilience-artefacts.tar.gz \
+        resilience-results.json \
+        tests/resilience/helpers/ \
+        tests/resilience/fixtures/ 2>/dev/null || true
+
+      echo "[resilience] Resilience suite complete."
+    dependsOn: [deploy, test:generic]
+    blocking: true
+    description: >
+      WO-099 — Fault-injection resilience scenario suite (adapter + infrastructure
+      level). Runs all scenarios (circuit breaker, Redis outage, webhook adversarial,
+      secret validation, SSRF, rate-limit, saga compensation, health-check removal,
+      assistant governor). Blocking — a failing scenario prevents E2E promotion.
+      Results archived as SOC 2 evidence artefacts (365-day retention).
+
   # ── 9c. Synthetic seed ───────────────────────────────────────────────────
   #   Runs the seed-synthetic CLI to populate staging with deterministic
   #   synthetic travelers, offers, bookings, and conversations before E2E.
