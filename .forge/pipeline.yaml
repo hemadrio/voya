@@ -1,0 +1,212 @@
+# Forge Shipping pipeline — WO-084
+# Triggers: pull_request (any branch), push to main, push of v* tags.
+# Pull-request runs execute source, build, and scan stage groups only.
+# No deploy step is present in PR runs (enforced by `when` conditions below).
+#
+# Secret masking: all injected credentials are listed under secrets.masked
+# so they are redacted from build logs before storage.
+
+name: forge-shipping
+version: "1.0"
+
+# ── Secret masking ────────────────────────────────────────────────────────────
+secrets:
+  masked:
+    - TURBO_TOKEN          # Turborepo remote cache auth token
+    - TURBO_TEAM           # Turborepo remote cache team slug
+    - REGISTRY_USER        # Container registry username
+    - REGISTRY_PASSWORD    # Container registry password / token
+    - FORGE_NPM_TOKEN      # Private registry token for pnpm install
+
+# ── Triggers ──────────────────────────────────────────────────────────────────
+triggers:
+  - event: pull_request
+    branches: ["*"]
+  - event: push
+    branches: ["main"]
+  - event: push
+    tags: ["v*"]
+
+# ── Environment ───────────────────────────────────────────────────────────────
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "9"
+  TURBO_TELEMETRY_DISABLED: "1"
+  # Remote cache backend — token and team injected from secrets at runtime.
+  TURBO_API: "https://cache.forge.internal"
+  # Shallow clone fetch depth — enough to resolve origin/main diff baseline.
+  GIT_FETCH_DEPTH: "50"
+  # Coverage threshold for the domain-layer gate.
+  COVERAGE_THRESHOLD: "60"
+
+# ── Stage groups ──────────────────────────────────────────────────────────────
+stage_groups:
+
+  # ── Source ────────────────────────────────────────────────────────────────
+  - name: source
+    stages:
+
+      - name: checkout
+        steps:
+          - uses: forge/checkout@v3
+            with:
+              fetch_depth: ${{ env.GIT_FETCH_DEPTH }}
+
+          - uses: forge/setup-node@v3
+            with:
+              node_version: ${{ env.NODE_VERSION }}
+              cache: pnpm
+
+          - uses: forge/setup-pnpm@v3
+            with:
+              version: ${{ env.PNPM_VERSION }}
+
+  # ── Build ─────────────────────────────────────────────────────────────────
+  - name: build
+    depends_on: [source]
+    stages:
+
+      - name: build:node
+        steps:
+          - name: Install dependencies (frozen)
+            run: pnpm install --frozen-lockfile
+            env:
+              NPM_TOKEN: ${{ secrets.FORGE_NPM_TOKEN }}
+
+          - name: Resolve affected packages
+            id: affected
+            run: |
+              node --import tsx/esm tools/ci/affected.ts \
+                --base origin/main \
+                --output filter \
+                > .forge-affected-filter.txt
+              echo "filter=$(cat .forge-affected-filter.txt)" >> $FORGE_OUTPUTS
+
+          - name: Type-check affected packages
+            # Any TypeScript error — including use of any — exits non-zero.
+            run: |
+              pnpm exec turbo run typecheck \
+                --filter="$(cat .forge-affected-filter.txt)" \
+                --token="$TURBO_TOKEN" --team="$TURBO_TEAM"
+            env:
+              TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+              TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+
+          - name: Test affected packages
+            run: |
+              pnpm exec turbo run test \
+                --filter="$(cat .forge-affected-filter.txt)" \
+                --token="$TURBO_TOKEN" --team="$TURBO_TEAM"
+            env:
+              TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+              TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+
+          - name: Build affected packages
+            run: |
+              pnpm exec turbo run build \
+                --filter="$(cat .forge-affected-filter.txt)" \
+                --token="$TURBO_TOKEN" --team="$TURBO_TEAM"
+            env:
+              TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+              TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+
+          - name: Merge coverage summaries
+            run: |
+              pnpm exec tsx tools/ci/merge-coverage.ts \
+                --glob "**/coverage/coverage-summary.json" \
+                --out coverage/merged-summary.json
+
+          - name: Domain coverage gate (≥60% statements)
+            run: |
+              node --import tsx/esm tools/ci/coverage-gate.ts \
+                --summary coverage/merged-summary.json \
+                --threshold ${{ env.COVERAGE_THRESHOLD }}
+
+      - name: build:docker
+        # Docker images are never built from pull requests.
+        when:
+          event:
+            not_in: [pull_request]
+        depends_on: [build:node]
+        steps:
+          - name: Login to container registry
+            uses: forge/docker-login@v2
+            with:
+              username: ${{ secrets.REGISTRY_USER }}
+              password: ${{ secrets.REGISTRY_PASSWORD }}
+
+          - name: Resolve git SHA
+            id: sha
+            run: echo "sha=$(git rev-parse --short HEAD)" >> $FORGE_OUTPUTS
+
+          - name: Build and tag service images
+            # Builds one image per service directory; tags as service-gitsha.
+            # Mutable tags such as "latest" are never applied.
+            run: |
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                tag=$(node --import tsx/esm tools/ci/image-tag.ts "$service" --sha "${{ steps.sha.outputs.sha }}")
+                docker build \
+                  --file docker/Dockerfile.service \
+                  --build-arg SERVICE="$service" \
+                  --build-arg BUILD_SHA="${{ steps.sha.outputs.sha }}" \
+                  --tag "registry.forge.internal/$tag" \
+                  --no-cache \
+                  .
+              done
+
+  # ── Scan ──────────────────────────────────────────────────────────────────
+  - name: scan
+    depends_on: [build]
+    stages:
+
+      - name: scan:sast
+        steps:
+          - name: Static analysis
+            run: pnpm exec turbo run lint --filter="$(cat .forge-affected-filter.txt)"
+
+  # ── Push ──────────────────────────────────────────────────────────────────
+  # Push and all subsequent stage groups run only on main or tag events.
+  - name: push
+    when:
+      event:
+        not_in: [pull_request]
+    depends_on: [scan]
+    stages:
+
+      - name: push:registry
+        steps:
+          - name: Push service images to registry
+            run: |
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                tag=$(node --import tsx/esm tools/ci/image-tag.ts "$service" --sha "$(git rev-parse --short HEAD)")
+                docker push "registry.forge.internal/$tag"
+              done
+
+  # ── Gate ──────────────────────────────────────────────────────────────────
+  - name: gate
+    when:
+      event:
+        not_in: [pull_request]
+    depends_on: [push]
+    stages:
+      - name: gate:smoke
+        steps:
+          - name: Smoke test (TBD — implemented in later WO)
+            run: echo "Smoke gate placeholder — replace in WO-085"
+
+  # ── Deploy ────────────────────────────────────────────────────────────────
+  # Deploy only on tag events (versioned releases).
+  - name: deploy
+    when:
+      event:
+        in: [push]
+      ref:
+        starts_with: "refs/tags/v"
+    depends_on: [gate]
+    stages:
+      - name: deploy:production
+        steps:
+          - name: Deploy (TBD — implemented in later WO)
+            run: echo "Deploy stage placeholder — replace in deploy WO"

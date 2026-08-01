@@ -1,0 +1,97 @@
+# Multi-stage distroless Node.js service image (WO-084).
+#
+# Stage 1 — workspace pruner: prunes the pnpm workspace to the target service
+#            and its local package dependencies only. Nothing else is carried
+#            forward, preventing dev-dependency bleed into later stages.
+#
+# Stage 2 — builder: compiles TypeScript to dist/ inside the pruned workspace.
+#            All build tooling (tsc, tsx, node-gyp) stays in this layer.
+#
+# Stage 3 — runtime: copies only dist/ and the production node_modules into
+#            gcr.io/distroless/nodejs22. The image has no shell, no package
+#            manager, and runs as the built-in "nonroot" user (UID 65532).
+#
+# Build args:
+#   SERVICE   — workspace package name that maps to services/<SERVICE>/ (required)
+#   BUILD_SHA — 7–40 hex git SHA embedded as NODE_ENV label (optional)
+#
+# Usage:
+#   docker build \
+#     --file docker/Dockerfile.service \
+#     --build-arg SERVICE=auth-service \
+#     --build-arg BUILD_SHA=$(git rev-parse --short HEAD) \
+#     --tag registry.example.com/auth-service-$(git rev-parse --short HEAD) \
+#     .
+
+ARG NODE_IMAGE=node:20-slim
+ARG DISTROLESS_IMAGE=gcr.io/distroless/nodejs22-debian12
+
+# ── Stage 1: workspace pruner ─────────────────────────────────────────────────
+FROM ${NODE_IMAGE} AS pruner
+
+ARG SERVICE
+# Fail fast if SERVICE is not supplied.
+RUN test -n "${SERVICE}" || (echo "ERROR: SERVICE build arg is required" && exit 1)
+
+WORKDIR /repo
+
+# Copy workspace manifests before source so Docker cache is invalidated only
+# when manifests change, not on every source edit.
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/ ./packages/
+COPY services/ ./services/
+COPY shared/ ./shared/
+COPY tsconfig.base.json ./
+
+RUN corepack enable pnpm \
+ && pnpm install --frozen-lockfile --ignore-scripts
+
+# Prune to only the target service and its local dependencies.
+# --prod removes devDependencies from the pruned copy.
+RUN pnpm --filter "services/${SERVICE}" deploy --prod /app/deploy
+
+# ── Stage 2: TypeScript builder ───────────────────────────────────────────────
+FROM ${NODE_IMAGE} AS builder
+
+ARG SERVICE
+WORKDIR /build
+
+# Copy the pruned workspace produced by stage 1 (includes all workspace
+# packages that SERVICE depends on with their source files).
+COPY --from=pruner /repo .
+COPY --from=pruner /app/deploy/node_modules ./node_modules
+
+# Re-install including devDependencies so tsc and tsx are available.
+RUN corepack enable pnpm \
+ && pnpm install --frozen-lockfile --ignore-scripts
+
+# Compile the service and its local package dependencies.
+RUN pnpm exec turbo run build --filter="services/${SERVICE}..."
+
+# ── Stage 3: distroless runtime ───────────────────────────────────────────────
+FROM ${DISTROLESS_IMAGE} AS runtime
+
+ARG SERVICE
+ARG BUILD_SHA=unknown
+
+# OCI standard labels — no mutable "latest" tag; tag is service-BUILD_SHA.
+LABEL org.opencontainers.image.source="https://github.com/org/repo" \
+      org.opencontainers.image.revision="${BUILD_SHA}" \
+      org.opencontainers.image.title="${SERVICE}"
+
+WORKDIR /app
+
+# Copy only the compiled output and production node_modules from builder.
+# The pruned deploy/ output already excludes devDependencies.
+COPY --from=builder /build/services/${SERVICE}/dist ./dist
+COPY --from=builder /app/deploy/node_modules ./node_modules
+
+# distroless/nodejs22 provides uid/gid 65532 as "nonroot".
+# Running as root is not permitted in production.
+USER nonroot
+
+# No HEALTHCHECK — health is delegated to the container orchestrator (Kubernetes).
+# No SHELL — the distroless base has no shell; CMD uses the exec form.
+
+# Entry point: the compiled service entry. Services must export a dist/index.js.
+CMD ["dist/index.js"]

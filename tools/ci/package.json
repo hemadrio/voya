@@ -2,7 +2,7 @@
   "name": "@travel/ci-tools",
   "version": "0.1.0",
   "private": true,
-  "description": "CI pipeline tools — migration linter and compatibility gate.",
+  "description": "CI pipeline tools — migration linter, compatibility gate, affected-graph resolver, coverage gate, and image-tag generator.",
   "type": "module",
   "engines": {
     "node": ">=20.0.0 <21.0.0"
@@ -11,7 +11,10 @@
     "lint": "echo 'no lint for ci-tools'",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "affected": "tsx affected.ts",
+    "coverage-gate": "tsx coverage-gate.ts",
+    "image-tag": "tsx image-tag.ts"
   },
   "dependencies": {
     "js-yaml": "^4.1.0"
