@@ -1,0 +1,85 @@
+{
+  "description": "Booking fixtures in non-payable states — each triggers a 409 before any Stripe call",
+  "scenarios": [
+    {
+      "name": "not_revalidated",
+      "description": "Booking has never been through price re-validation (WO-042 gate not passed)",
+      "booking": {
+        "id": "bk_not_revalidated_001",
+        "status": "PENDING",
+        "totalPrice": "412.50",
+        "currency": "USD",
+        "expiresAt": "2026-08-01T12:30:00.000Z",
+        "payableUntil": null
+      },
+      "expectedError": {
+        "code": "PRICE_CONSENT_REQUIRED",
+        "httpStatus": 409
+      }
+    },
+    {
+      "name": "payable_window_expired",
+      "description": "payableUntil has passed — 15-minute consent window elapsed without payment",
+      "booking": {
+        "id": "bk_window_expired_001",
+        "status": "PENDING",
+        "totalPrice": "412.50",
+        "currency": "USD",
+        "expiresAt": "2026-08-01T12:30:00.000Z",
+        "payableUntil": "2026-08-01T11:45:00.000Z"
+      },
+      "expectedError": {
+        "code": "PRICE_CONSENT_REQUIRED",
+        "httpStatus": 409
+      }
+    },
+    {
+      "name": "booking_expired",
+      "description": "PENDING booking expiresAt has passed — traveler must create a new booking",
+      "booking": {
+        "id": "bk_booking_expired_001",
+        "status": "PENDING",
+        "totalPrice": "412.50",
+        "currency": "USD",
+        "expiresAt": "2026-08-01T11:30:00.000Z",
+        "payableUntil": "2026-08-01T12:15:00.000Z"
+      },
+      "expectedError": {
+        "code": "BOOKING_NOT_PAYABLE",
+        "httpStatus": 409
+      }
+    },
+    {
+      "name": "already_confirmed",
+      "description": "Booking is CONFIRMED — payment already processed",
+      "booking": {
+        "id": "bk_already_confirmed_001",
+        "status": "CONFIRMED",
+        "totalPrice": "412.50",
+        "currency": "USD",
+        "expiresAt": null,
+        "payableUntil": "2026-08-01T12:15:00.000Z"
+      },
+      "expectedError": {
+        "code": "BOOKING_NOT_PAYABLE",
+        "httpStatus": 409
+      }
+    },
+    {
+      "name": "already_cancelled",
+      "description": "Booking is CANCELLED — cannot accept payment",
+      "booking": {
+        "id": "bk_already_cancelled_001",
+        "status": "CANCELLED",
+        "totalPrice": "412.50",
+        "currency": "USD",
+        "expiresAt": null,
+        "payableUntil": null
+      },
+      "expectedError": {
+        "code": "BOOKING_NOT_PAYABLE",
+        "httpStatus": 409
+      }
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "scenarios": [
+    {
+      "name": "created",
+      "description": "Stripe returns a new PaymentIntent requiring payment method",
+      "stripeResponse": {
+        "id": "pi_3OxBcKLkdIwHu7x41RGVwX2k",
+        "object": "payment_intent",
+        "amount": 41250,
+        "currency": "usd",
+        "status": "requires_payment_method",
+        "client_secret": "pi_3OxBcKLkdIwHu7x41RGVwX2k_secret_0S5LkSaKRPdZMxoRvYTiCLN8R",
+        "livemode": false,
+        "created": 1753972800,
+        "idempotency_key": "a8f3d7e1b4c2f9e6d0a3b7c1e4f8d2b5a9c3e7f1d4b8e2c6a0f4d8b2e6c9a3"
+      },
+      "expected": {
+        "status": "REQUIRES_PAYMENT_METHOD",
+        "amountMinor": 41250,
+        "currency": "USD"
+      }
+    },
+    {
+      "name": "requires_action",
+      "description": "Stripe returns an intent requiring 3DS authentication",
+      "stripeResponse": {
+        "id": "pi_3OxBcKLkdIwHu7x41RGVwX3m",
+        "object": "payment_intent",
+        "amount": 41250,
+        "currency": "usd",
+        "status": "requires_action",
+        "client_secret": "pi_3OxBcKLkdIwHu7x41RGVwX3m_secret_YKp2NfRLqCW8vA1sMj5iHdT3x",
+        "livemode": false,
+        "next_action": {
+          "type": "use_stripe_sdk"
+        },
+        "created": 1753972800
+      },
+      "expected": {
+        "status": "PROCESSING",
+        "amountMinor": 41250,
+        "currency": "USD"
+      }
+    },
+    {
+      "name": "duplicate_idempotent",
+      "description": "Second call with same idempotency key — Stripe returns same intent",
+      "stripeResponse": {
+        "id": "pi_3OxBcKLkdIwHu7x41RGVwX2k",
+        "object": "payment_intent",
+        "amount": 41250,
+        "currency": "usd",
+        "status": "requires_payment_method",
+        "client_secret": "pi_3OxBcKLkdIwHu7x41RGVwX2k_secret_0S5LkSaKRPdZMxoRvYTiCLN8R",
+        "livemode": false,
+        "created": 1753972800,
+        "idempotency_key": "a8f3d7e1b4c2f9e6d0a3b7c1e4f8d2b5a9c3e7f1d4b8e2c6a0f4d8b2e6c9a3"
+      },
+      "expected": {
+        "isDuplicate": true,
+        "status": "REQUIRES_PAYMENT_METHOD",
+        "amountMinor": 41250,
+        "currency": "USD"
+      }
+    },
+    {
+      "name": "card_declined",
+      "description": "Stripe declines the card — payment fails",
+      "stripeResponse": {
+        "error": {
+          "type": "card_error",
+          "code": "card_declined",
+          "decline_code": "insufficient_funds",
+          "message": "Your card has insufficient funds.",
+          "charge": "ch_3OxBcKLkdIwHu7x4decl001"
+        }
+      },
+      "expected": {
+        "errorCode": "PROVIDER_UNAVAILABLE",
+        "httpStatus": 502
+      }
+    }
+  ]
+}

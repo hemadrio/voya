@@ -77,6 +77,21 @@ const PII_REDACT_PATHS: ReadonlyArray<string> = [
   '*.privateKey',
   'signingKey',
   '*.signingKey',
+  // --- Stripe / payment fields (WO-045) ---
+  // payment_method is a Stripe object that may contain card data at sub-fields;
+  // redact the entire object at top level and one level deep as defence-in-depth.
+  'payment_method',
+  '*.payment_method',
+  // stripe_secret_key and stripe_api_key patterns
+  'stripeSecretKey',
+  '*.stripeSecretKey',
+  'stripeApiKey',
+  '*.stripeApiKey',
+  // client_secret is the Stripe payment intent secret — redact from logs
+  'client_secret',
+  '*.client_secret',
+  'clientSecret',
+  '*.clientSecret',
 ];
 
 // ---------------------------------------------------------------------------

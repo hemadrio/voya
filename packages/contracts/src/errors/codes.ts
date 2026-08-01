@@ -86,6 +86,15 @@ export const ErrorCode = {
   /** 409 — the traveler attempted to accept a price quote whose expiry has
    *  passed; the booking must be re-validated before consent can be given. */
   QUOTE_EXPIRED: "QUOTE_EXPIRED",
+  /** 409 — booking is not in a payable state: it is not PENDING, it has
+   *  expired, or it is already CONFIRMED / CANCELLED / FAILED. */
+  BOOKING_NOT_PAYABLE: "BOOKING_NOT_PAYABLE",
+  /** 422 — the requested currency is not supported by the configured
+   *  payment provider account. */
+  UNSUPPORTED_CURRENCY: "UNSUPPORTED_CURRENCY",
+  /** 502 — the payment provider (Stripe) returned an error or is unreachable.
+   *  The same idempotency key should be reused on retry. */
+  PROVIDER_UNAVAILABLE: "PROVIDER_UNAVAILABLE",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -136,6 +145,9 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   INSUFFICIENT_PERMISSIONS: 403,
   PRICE_CONSENT_REQUIRED: 409,
   QUOTE_EXPIRED: 409,
+  BOOKING_NOT_PAYABLE: 409,
+  UNSUPPORTED_CURRENCY: 422,
+  PROVIDER_UNAVAILABLE: 502,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

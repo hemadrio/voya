@@ -2,37 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "amount": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "number"
-        }
-      ]
-    },
     "bookingId": {
       "minLength": 1,
       "type": "string"
     },
     "currency": {
       "type": "string"
-    },
-    "idempotencyKey": {
-      "minLength": 1,
-      "type": "string"
-    },
-    "paymentMethodId": {
-      "minLength": 1,
-      "type": "string"
     }
   },
   "required": [
-    "amount",
     "bookingId",
-    "currency",
-    "idempotencyKey"
+    "currency"
   ],
   "schemaId": "payment.PaymentIntentRequest",
   "type": "object"

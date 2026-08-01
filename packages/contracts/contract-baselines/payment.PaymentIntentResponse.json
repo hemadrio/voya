@@ -2,19 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "amount": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "number"
-        }
-      ]
-    },
-    "bookingId": {
-      "minLength": 1,
-      "type": "string"
+    "amountMinor": {
+      "exclusiveMinimum": 0,
+      "type": "integer"
     },
     "clientSecret": {
       "minLength": 1,
@@ -23,8 +13,11 @@
     "currency": {
       "type": "string"
     },
-    "id": {
+    "paymentId": {
       "minLength": 1,
+      "type": "string"
+    },
+    "reference": {
       "type": "string"
     },
     "status": {
@@ -39,11 +32,10 @@
     }
   },
   "required": [
-    "amount",
-    "bookingId",
+    "amountMinor",
     "clientSecret",
     "currency",
-    "id",
+    "paymentId",
     "status"
   ],
   "schemaId": "payment.PaymentIntentResponse",

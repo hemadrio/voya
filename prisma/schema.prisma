@@ -252,6 +252,7 @@ model Booking {
   auditLogs     BookingAuditLog[]
   travelers     BookingTraveler[]
   priceConsents BookingPriceConsent[]
+  payments      Payment[]
 
   // WO-073: nullable marker set by the backfill job when all passengers have
   // been migrated to booking_travelers; null means the row has not yet been
@@ -731,4 +732,57 @@ model BookingPriceConsent {
 
   @@index([bookingId], map: "idx_booking_price_consents_booking_id")
   @@map("booking_price_consents")
+}
+
+// ---------------------------------------------------------------------------
+// Payment — payments ledger (WO-045)
+// ---------------------------------------------------------------------------
+
+/// Immutable ledger row for every payment provider transaction.
+///
+/// PCI scope: this table MUST NOT contain PANs, CVCs, or expiry dates.
+/// Only provider_reference (Stripe intent ID), card_brand and card_last4 are
+/// retained — the minimum needed for customer-service reconciliation.
+///
+/// Deduplication:
+///   - UNIQUE (provider, provider_reference) prevents duplicate rows even
+///     when concurrent requests with the same idempotency key both reach the
+///     provider call (unique constraint is the durable authority; the
+///     application-layer check is a fast path only).
+///   - The Stripe idempotency key is derived deterministically from
+///     (booking_id, amount_minor, currency) so a client retry returns
+///     the same PaymentIntent from Stripe.
+///
+/// type values: CHARGE | REFUND
+/// parent_payment_id is non-null only for REFUND rows.
+model Payment {
+  id                String    @id @default(uuid()) @db.Uuid
+  bookingId         String    @map("booking_id") @db.Uuid
+  /// Payment provider name (always "stripe" for now).
+  provider          String    @db.VarChar(32)
+  /// Provider-assigned transaction identifier (e.g. Stripe PaymentIntent ID).
+  providerReference String    @map("provider_reference") @db.VarChar(255)
+  /// CHARGE or REFUND.
+  type              String    @db.VarChar(16)
+  /// For REFUND rows only: the CHARGE payment this refund is against.
+  parentPaymentId   String?   @map("parent_payment_id") @db.Uuid
+  /// Amount in the currency's minor unit (e.g. cents). Never a float.
+  amountMinor       BigInt    @map("amount_minor")
+  currency          String    @db.Char(3)
+  /// Stripe PaymentIntent status string.
+  status            String    @db.VarChar(64)
+  /// Card network (visa, mastercard, amex, …). Null until confirmed by webhook.
+  cardBrand         String?   @map("card_brand") @db.VarChar(32)
+  /// Last four digits of the card. Null until confirmed by webhook.
+  cardLast4         String?   @map("card_last4") @db.Char(4)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  booking       Booking   @relation(fields: [bookingId], references: [id])
+  parentPayment Payment?  @relation("PaymentRefund", fields: [parentPaymentId], references: [id])
+  refunds       Payment[] @relation("PaymentRefund")
+
+  @@unique([provider, providerReference], map: "idx_payments_provider_ref_unique")
+  @@index([bookingId, createdAt(sort: Desc)], map: "idx_payments_booking_created_at")
+  @@map("payments")
 }

@@ -1,0 +1,29 @@
+{
+  "description": "Booking fixture in a fully payable state (WO-042 preconditions satisfied)",
+  "booking": {
+    "id": "bk_payable_fixture_001",
+    "status": "PENDING",
+    "totalPrice": "412.50",
+    "currency": "USD",
+    "expiresAt": "2026-08-01T12:30:00.000Z",
+    "payableUntil": "2026-08-01T12:15:00.000Z",
+    "offerSnapshot": {
+      "offerId": "off_amadeus_LHR_JFK_001",
+      "supplier": "AMADEUS",
+      "totalPrice": "412.50",
+      "currency": "USD",
+      "bookable": true,
+      "provenance": "AMADEUS"
+    },
+    "revalidatedSnapshot": {
+      "offerId": "off_amadeus_LHR_JFK_001",
+      "supplier": "AMADEUS",
+      "totalPrice": "412.50",
+      "currency": "USD",
+      "freshness": "LIVE",
+      "revalidatedAt": "2026-08-01T11:58:00.000Z"
+    }
+  },
+  "expectedAmountMinor": 41250,
+  "expectedIdempotencyKey": "sha256(bk_payable_fixture_001:41250:USD)"
+}

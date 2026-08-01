@@ -48,6 +48,9 @@ export {
   insufficientPermissions,
   priceConsentRequired,
   quoteExpired,
+  bookingNotPayable,
+  unsupportedCurrency,
+  providerUnavailable,
 } from "./domain-errors.js";
 
 export { serialiseError, RESTRICTED_FIELDS } from "./serialise.js";

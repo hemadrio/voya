@@ -251,3 +251,36 @@ export function quoteExpired(
 ): DomainError {
   return new DomainErrorImpl("QUOTE_EXPIRED", message);
 }
+
+/**
+ * 409 — the booking is not in a state that allows payment initiation.
+ * This is distinct from PRICE_CONSENT_REQUIRED: it means the booking itself
+ * (status, expiry) prevents payment — not just the re-validation gate.
+ */
+export function bookingNotPayable(
+  message = "This booking is not in a payable state. It may be expired, already confirmed, or cancelled.",
+): DomainError {
+  return new DomainErrorImpl("BOOKING_NOT_PAYABLE", message);
+}
+
+/**
+ * 422 — the requested currency is not supported by the configured payment
+ * provider account.  The caller should retry with a supported currency.
+ */
+export function unsupportedCurrency(
+  currency: string,
+  message = `Currency "${currency}" is not supported by the payment provider.`,
+): DomainError {
+  return new DomainErrorImpl("UNSUPPORTED_CURRENCY", message, "currency");
+}
+
+/**
+ * 502 — the payment provider (Stripe) is unreachable or returned a 5xx.
+ * The client should retry using the same request (the idempotency key
+ * guarantees the provider will return the same intent on retry).
+ */
+export function providerUnavailable(
+  message = "The payment provider is temporarily unavailable. Please retry the request.",
+): DomainError {
+  return new DomainErrorImpl("PROVIDER_UNAVAILABLE", message);
+}
