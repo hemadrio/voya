@@ -1,16 +1,24 @@
 "use client";
 
 /**
- * Confirmation client component — polls for final booking status
- * and renders the booking confirmed / pending-confirmation / failed screens.
+ * Confirmation client component — polls for final booking status and renders
+ * the booking confirmed / pending-confirmation / failed screens (WO-068, AC10).
  *
  * When the wizard times out during polling (AC9), the URL still redirects here.
  * This component resumes polling with fresh backoff.
+ *
+ * Reads a ConfirmationSnapshot from sessionStorage to display dates, guests,
+ * itemized total, and cancellation deadline without an extra API call.
  */
 
 import { useEffect, useState } from "react";
 import { pollBookingStatus } from "@/lib/booking/pollStatus.js";
 import type { PollResult } from "@/lib/booking/pollStatus.js";
+import {
+  loadConfirmationSnapshot,
+  clearConfirmationSnapshot,
+} from "@/lib/booking/confirmationSnapshot.js";
+import type { ConfirmationSnapshot } from "@/lib/booking/confirmationSnapshot.js";
 
 interface ConfirmationClientProps {
   bookingId: string;
@@ -23,10 +31,104 @@ type ConfirmationState =
   | { phase: "failed"; reason?: string }
   | { phase: "pending" };
 
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function formatAmount(amount: number, currency: string): string {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+  }).format(amount);
+}
+
+function guestSummary(snapshot: ConfirmationSnapshot): string {
+  const parts: string[] = [];
+  if (snapshot.adults > 0)
+    parts.push(`${snapshot.adults} adult${snapshot.adults !== 1 ? "s" : ""}`);
+  if (snapshot.children > 0)
+    parts.push(`${snapshot.children} child${snapshot.children !== 1 ? "ren" : ""}`);
+  if (snapshot.infants > 0)
+    parts.push(`${snapshot.infants} infant${snapshot.infants !== 1 ? "s" : ""}`);
+  return parts.join(", ");
+}
+
+function BookingDetails({
+  reference,
+  bookingId,
+  snapshot,
+}: {
+  reference: string;
+  bookingId: string;
+  snapshot: ConfirmationSnapshot | null;
+}) {
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm">
+      <dl className="space-y-2">
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">Booking reference</dt>
+          <dd className="font-mono font-semibold text-neutral-900">{reference}</dd>
+        </div>
+        {snapshot && (
+          <>
+            <div className="flex justify-between">
+              <dt className="text-neutral-500">Check-in</dt>
+              <dd className="font-medium text-neutral-900">{formatDate(snapshot.checkIn)}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-neutral-500">Check-out</dt>
+              <dd className="font-medium text-neutral-900">{formatDate(snapshot.checkOut)}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-neutral-500">Guests</dt>
+              <dd className="font-medium text-neutral-900">{guestSummary(snapshot)}</dd>
+            </div>
+            <div className="border-t border-neutral-200 pt-2 flex justify-between">
+              <dt className="font-semibold text-neutral-700">Total paid</dt>
+              <dd className="font-bold text-neutral-900">
+                {formatAmount(snapshot.total, snapshot.currency)}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-neutral-500">Free cancellation until</dt>
+              <dd className="font-medium text-neutral-900">
+                {formatDate(snapshot.cancellationDeadline)}
+              </dd>
+            </div>
+          </>
+        )}
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">Booking ID</dt>
+          <dd className="font-mono text-xs text-neutral-500">{bookingId}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 export function ConfirmationClient({ bookingId, reference }: ConfirmationClientProps) {
   const [state, setState] = useState<ConfirmationState>(
     reference ? { phase: "polling" } : { phase: "pending" },
   );
+  const [snapshot, setSnapshot] = useState<ConfirmationSnapshot | null>(null);
+
+  // Load snapshot once on mount, then clear it
+  useEffect(() => {
+    const s = loadConfirmationSnapshot(bookingId);
+    if (s) {
+      setSnapshot(s);
+      clearConfirmationSnapshot();
+    }
+  }, [bookingId]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -89,20 +191,17 @@ export function ConfirmationClient({ bookingId, reference }: ConfirmationClientP
           </p>
         </div>
 
-        <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm">
-          <dl className="space-y-2">
-            <div className="flex justify-between">
-              <dt className="text-neutral-500">Booking reference</dt>
-              <dd className="font-mono font-semibold text-neutral-900">{state.reference}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-neutral-500">Booking ID</dt>
-              <dd className="font-mono text-xs text-neutral-600">{bookingId}</dd>
-            </div>
-          </dl>
-        </div>
+        <BookingDetails
+          reference={state.reference}
+          bookingId={bookingId}
+          snapshot={snapshot}
+        />
 
-        <div className="mt-6 flex flex-col gap-3">
+        <p className="mt-3 text-xs text-neutral-400">
+          Questions? Contact your host via the booking detail page.
+        </p>
+
+        <div className="mt-4 flex flex-col gap-3">
           <a
             href={`/bookings/${bookingId}`}
             className="block w-full rounded-md bg-brand-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-brand-700"
@@ -110,8 +209,14 @@ export function ConfirmationClient({ bookingId, reference }: ConfirmationClientP
             View booking details
           </a>
           <a
-            href="/"
+            href={`/bookings/${bookingId}/calendar.ics`}
             className="block w-full rounded-md border border-neutral-300 px-4 py-2.5 text-center text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          >
+            Add to calendar
+          </a>
+          <a
+            href="/"
+            className="block w-full rounded-md px-4 py-2.5 text-center text-sm font-medium text-neutral-500 hover:text-neutral-700"
           >
             Return to home
           </a>
@@ -180,7 +285,7 @@ export function ConfirmationClient({ bookingId, reference }: ConfirmationClientP
         <h1 className="text-xl font-bold text-neutral-900">Booking pending</h1>
         <p className="text-sm text-neutral-600">
           Your booking is being processed. We'll send you a confirmation email
-          once it's finalised.
+          once it's finalised. Your payment has been received.
         </p>
       </div>
 
@@ -199,10 +304,20 @@ export function ConfirmationClient({ bookingId, reference }: ConfirmationClientP
         </dl>
       </div>
 
-      <div className="mt-6">
+      <p className="mt-3 text-xs text-neutral-400">
+        Keep this reference for support enquiries. You can also check status in your bookings.
+      </p>
+
+      <div className="mt-4 flex flex-col gap-3">
+        <a
+          href={`/bookings/${bookingId}`}
+          className="block w-full rounded-md border border-neutral-300 px-4 py-2.5 text-center text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+        >
+          Check booking status
+        </a>
         <a
           href="/"
-          className="block w-full rounded-md border border-neutral-300 px-4 py-2.5 text-center text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="block w-full rounded-md px-4 py-2.5 text-center text-sm font-medium text-neutral-500 hover:text-neutral-700"
         >
           Return to home
         </a>

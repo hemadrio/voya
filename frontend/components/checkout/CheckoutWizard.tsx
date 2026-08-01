@@ -14,6 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { loadDraft, saveDraft, clearDraft, updateDraftStep } from "@/lib/booking/draft.js";
 import type { BookingDraft } from "@/lib/booking/draft.js";
 import { clearIdempotencyKey } from "@/lib/booking/idempotency.js";
+import { saveConfirmationSnapshot } from "@/lib/booking/confirmationSnapshot.js";
 import { isValidCheckoutStep, nextStep, prevStep, CHECKOUT_STEPS } from "@/lib/validation/checkout.js";
 import type { CheckoutStep, TravelerDetailsValues, ExtrasValues } from "@/lib/validation/checkout.js";
 import type { RevalidatedQuote } from "@/lib/api/bookings.js";
@@ -266,6 +267,22 @@ export function CheckoutWizard({
         { bookingId: booking.bookingId, currency: draft?.currency },
         route,
       );
+
+      // Save a snapshot so the confirmation page can show dates/total/deadline
+      if (draft) {
+        saveConfirmationSnapshot({
+          bookingId: booking.bookingId,
+          reference,
+          checkIn: draft.checkIn,
+          checkOut: draft.checkOut,
+          adults: draft.adults,
+          children: draft.children,
+          infants: draft.infants,
+          currency: draft.currency,
+          total: draft.revalidatedTotal ?? booking.total,
+          cancellationDeadline: booking.cancellationDeadline,
+        });
+      }
 
       clearDraft();
       clearIdempotencyKey();
