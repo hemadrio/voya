@@ -1,0 +1,81 @@
+# Gitleaks configuration — WO-085
+# Full-history scan on main; diff scan on pull requests.
+# Custom rules cover known placeholder patterns used in this repo.
+
+title = "travel-platform gitleaks config"
+
+[extend]
+# Extend the default ruleset so all built-in secret patterns still apply.
+useDefault = true
+
+# ── Custom rules ─────────────────────────────────────────────────────────────
+
+[[rules]]
+id = "jwt-signing-secret-placeholder"
+description = "JWT signing secret placeholder pattern"
+regex = '''(?i)(jwt[_-]?secret|jwt[_-]?signing[_-]?key)\s*[=:]\s*["']?[A-Za-z0-9+/]{32,}["']?'''
+tags = ["jwt", "secret", "credentials"]
+severity = "critical"
+
+[[rules]]
+id = "stripe-webhook-secret-placeholder"
+description = "Stripe webhook secret placeholder"
+regex = '''whsec_[A-Za-z0-9]{32,}'''
+tags = ["stripe", "webhook", "secret", "credentials"]
+severity = "critical"
+
+[[rules]]
+id = "stripe-secret-key"
+description = "Stripe secret key"
+regex = '''sk_(live|test)_[A-Za-z0-9]{24,}'''
+tags = ["stripe", "api-key", "credentials"]
+severity = "critical"
+
+[[rules]]
+id = "aws-access-key-literal"
+description = "AWS access key literal"
+regex = '''(?:^|[^A-Z0-9])(AKIA[A-Z0-9]{16})(?:[^A-Z0-9]|$)'''
+tags = ["aws", "credentials"]
+severity = "critical"
+
+[[rules]]
+id = "database-url-with-credentials"
+description = "Database URL containing username/password"
+regex = '''(?i)(postgresql|mysql|mongodb|redis)://[^:@/\s]+:[^@\s]+@'''
+tags = ["database", "credentials"]
+severity = "critical"
+
+[[rules]]
+id = "generic-high-entropy-env-assignment"
+description = "High-entropy value assigned to a *_SECRET or *_PASSWORD variable"
+regex = '''(?i)(password|secret|token|key|passwd|pwd)\s*[:=]\s*["']?[A-Za-z0-9+/!@#$%^&*]{20,}["']?'''
+entropy = 4.5
+tags = ["secret", "credentials"]
+severity = "high"
+
+# ── Allow-list — synthetic test fixtures (never disable rules globally) ───────
+
+[allowlist]
+description = "Synthetic test fixtures and known-safe paths"
+# Paths that are explicitly allow-listed — must be specific fixture files, never
+# entire directories, so the rule still catches accidental copies elsewhere.
+paths = [
+  # Gitleaks fixture itself
+  '''^\.gitleaks\.toml$''',
+  # CI test fixture files for the waiver-check and artifact-guard unit tests
+  '''^tools/ci/fixtures/waiver-.*\.yaml$''',
+  '''^tools/ci/fixtures/artifact-diff-.*\.txt$''',
+  # Phase 0 red-build evidence committed intentionally
+  '''^security/phase0-evidence/''',
+]
+# Known-safe regexes for patterns that fire false positives in test helpers
+regexes = [
+  # Example secrets deliberately used in test assertions (wrapped in expect())
+  '''expect\(.*secret.*\)''',
+]
+
+[allowlist.commits]
+# Commits that are known to contain intentional red-build artefacts (Phase 0).
+# Add the full 40-char SHA only — short SHAs are not accepted.
+description = "Phase 0 gate evidence commits — deliberate red builds"
+commits = []

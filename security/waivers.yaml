@@ -1,0 +1,32 @@
+# Security scanner waiver file — WO-085
+#
+# Schema (each entry requires all fields — permanent waivers are NOT permitted):
+#
+#   - finding_id: <string>        # Unique ID of the finding (e.g. CVE-2024-XXXX, semgrep-rule-id)
+#     tool: <string>              # Scanner that raised the finding: sonarqube|snyk|gitleaks|semgrep|grype
+#     justification: <string>     # Clear rationale for the waiver; reference ticket/PR
+#     approver: <string>          # Email of the approver (must differ from finding reporter)
+#     created_at: <ISO-8601>      # Waiver creation timestamp (UTC)
+#     expires_at: <ISO-8601>      # Mandatory expiry — permanent waivers are rejected
+#
+# Rules enforced by tools/ci/waiver-check.ts:
+#   - expires_at is mandatory; missing or blank value fails the build
+#   - expired waivers fail the build (waiver-check uses build time, not commit time)
+#   - missing approver fails the build
+#   - malformed YAML fails the build
+#   - each applied waiver writes an immutable audit record to FORGE_AUDIT_SINK
+#
+# Emergency waiver procedure:
+#   1. Create a PR that adds a waiver entry with expires_at no more than 7 days out.
+#   2. The PR must be reviewed and merged by a different engineer (separation of duty).
+#   3. Within the expiry window, file a tracked remediation ticket.
+#   4. Remove the waiver entry once the underlying finding is resolved.
+#
+# On-call triage path:
+#   1. Identify the failing scanner and finding from the pipeline artefacts (SARIF).
+#   2. Assess exploitability: if not exploitable on the release path, create a
+#      time-boxed waiver (max 7 days) while a proper fix is prepared.
+#   3. If exploitable, halt the release and page the security team via the
+#      #security-incidents Slack channel.
+
+waivers: []

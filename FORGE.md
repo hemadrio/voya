@@ -581,3 +581,10 @@
 - **Files:** 19 (+2422/-0)
 - **Duration:** 879ss
 - **Approach:** Implemented the full listing detail page as a Next.js 14 App Router feature. The page.tsx is an async server component that fetches listing data and the first page of reviews in parallel server-side (SEO-friendly), with availability and pricing isolated to client-side fresh fetches to satisfy the 'never cached' constraint. All 19 files were created fresh following existing codebase patterns (SearchPageClient, Radix Dialog Modal, MSW fixtures). The ApproximateLocationMap is dynamically imported with ssr:false so exact coordinates never appear in the server-rendered payload. Pure booking helpers in lib/booking/availability.ts are independently unit-tested with 25 test cases covering all edge cases. The BookingWidget performs a live getQuote POST on each valid date selection, never reusing cached data.
+
+## WO-085: User Story: WO-085 - Blocking parallel security scan and image signing stage
+- **Status:** completed
+- **Commit:** `44bdca7`
+- **Files:** 18 (+1937/-7)
+- **Duration:** 711ss
+- **Approach:** Extended the existing .forge/pipeline.yaml scan stage group by replacing the single scan:sast lint step with six independent parallel stages (scan:sonarqube, scan:snyk, scan:gitleaks, scan:semgrep, scan:grype, scan:artifact-guard). No inter-dependencies between the stages causes Forge to execute all six concurrently. The push stage was replaced with two sequential sub-stages: push:ecr (ECR with IMMUTABLE tag mutability and scan-on-push) and push:sign (cosign KMS signing). All deploy stages already contained cosign verify preconditions from WO-084. Added five supporting files: .gitleaks.toml custom ruleset, .semgrep.yml OWASP rules, sonar-project.properties, security/waivers.yaml, and tools/ci/verify-signature.sh. Implemented two CLI tools (artifact-guard.ts, waiver-check.ts) with full unit test coverage and YAML test fixtures. Added the ECR Terraform module and Phase 0 evidence documentation.

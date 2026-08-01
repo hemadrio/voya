@@ -1,0 +1,19 @@
+# Fixture: valid waivers — all fields present, not expired (WO-085 tests)
+waivers:
+  - finding_id: CVE-2024-00001
+    tool: snyk
+    justification: "Transitive dependency of audit-logger@1.0.0. No exploit path exists
+      in our usage (we never call the vulnerable code path). Ticket INFRA-4321 tracks
+      the upstream fix. Waiver valid for 7 days pending library update."
+    approver: security-lead@example.com
+    created_at: "2099-01-01T00:00:00Z"
+    expires_at: "2099-01-08T00:00:00Z"
+
+  - finding_id: semgrep-cors-allow-all-origins
+    tool: semgrep
+    justification: "Public health-check endpoint intentionally allows all origins.
+      CORS wildcard is scoped only to /health/* via middleware ordering. Ticket
+      INFRA-4322 tracks adding an explicit allow-list. 7-day emergency waiver."
+    approver: platform-lead@example.com
+    created_at: "2099-01-01T00:00:00Z"
+    expires_at: "2099-01-08T00:00:00Z"

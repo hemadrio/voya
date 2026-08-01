@@ -160,33 +160,275 @@ stage_groups:
               done
 
   # ── Scan ──────────────────────────────────────────────────────────────────
+  # Five independent stages within this group — Forge executes them in
+  # parallel because none declare a depends_on.  The stage group fails if any
+  # single stage exits non-zero (blocking, not advisory).
+  #
+  # A waiver-check pre-step runs first inside each scanner stage so that an
+  # expired or approver-less waiver is caught before the scanner output is
+  # examined.  This ensures waiver discipline is enforced regardless of which
+  # scanner fires.
   - name: scan
     depends_on: [build]
+    secrets:
+      masked:
+        - SONAR_TOKEN           # SonarQube authentication token
+        - SNYK_TOKEN            # Snyk authentication token
+        - SEMGREP_APP_TOKEN     # Semgrep Cloud (optional — gates on local rules if absent)
     stages:
 
-      - name: scan:sast
+      # ── SonarQube quality gate ─────────────────────────────────────────────
+      - name: scan:sonarqube
         steps:
-          - name: Static analysis
-            run: pnpm exec turbo run lint --filter="$(cat .forge-affected-filter.txt)"
+          - name: Validate security waivers
+            run: node --import tsx/esm tools/ci/waiver-check.ts --file security/waivers.yaml
+            env:
+              FORGE_AUDIT_SINK: ${{ vars.FORGE_AUDIT_SINK }}
+              FORGE_SHA: ${{ github.sha }}
+
+          - name: Run SonarQube analysis
+            run: |
+              sonar-scanner \
+                -Dsonar.token="${SONAR_TOKEN}" \
+                -Dsonar.host.url="${SONAR_HOST_URL}" \
+                -Dsonar.qualitygate.wait=true \
+                -Dsonar.qualitygate.timeout=300
+            env:
+              SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+              SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+
+          - name: Upload SARIF report
+            uses: forge/upload-artifact@v2
+            if: always()
+            with:
+              name: sonar-sarif-${{ github.sha }}
+              path: sonar-report.sarif
+              retention_days: 90
+
+      # ── Snyk dependency + licence scan ────────────────────────────────────
+      - name: scan:snyk
+        steps:
+          - name: Validate security waivers
+            run: node --import tsx/esm tools/ci/waiver-check.ts --file security/waivers.yaml
+            env:
+              FORGE_AUDIT_SINK: ${{ vars.FORGE_AUDIT_SINK }}
+              FORGE_SHA: ${{ github.sha }}
+
+          - name: Snyk dependency scan (fail on critical + high)
+            # --sarif-file-output emits findings in SARIF for reviewer visibility.
+            # Secret values are never printed because --json output is parsed by
+            # Snyk itself; the only output is the advisory summary.
+            run: |
+              snyk test \
+                --all-projects \
+                --severity-threshold=high \
+                --json-file-output=snyk-results.json \
+                --sarif-file-output=snyk-report.sarif || (
+                  # Print advisory summary without leaking secret values
+                  node -e "
+                    const r = require('./snyk-results.json');
+                    const vulns = r.vulnerabilities || [];
+                    vulns.forEach(v => console.error('✗', v.severity, v.id, '-', v.title));
+                  " 2>&1
+                  exit 1
+                )
+            env:
+              SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+          - name: Upload Snyk SARIF report
+            uses: forge/upload-artifact@v2
+            if: always()
+            with:
+              name: snyk-sarif-${{ github.sha }}
+              path: snyk-report.sarif
+              retention_days: 90
+
+      # ── Gitleaks secret scan ───────────────────────────────────────────────
+      - name: scan:gitleaks
+        steps:
+          - name: Validate security waivers
+            run: node --import tsx/esm tools/ci/waiver-check.ts --file security/waivers.yaml
+            env:
+              FORGE_AUDIT_SINK: ${{ vars.FORGE_AUDIT_SINK }}
+              FORGE_SHA: ${{ github.sha }}
+
+          - name: Gitleaks full-history scan (main) / diff scan (PR)
+            # --redact ensures secret VALUES are never printed in logs (constraint).
+            # --config points to our custom ruleset with allow-listed fixture paths.
+            # PR runs scan only the diff; main runs scan full history.
+            run: |
+              if [ "${{ github.event_name }}" = "pull_request" ]; then
+                gitleaks detect \
+                  --config .gitleaks.toml \
+                  --redact \
+                  --log-opts "origin/main..HEAD" \
+                  --report-format sarif \
+                  --report-path gitleaks-report.sarif
+              else
+                gitleaks detect \
+                  --config .gitleaks.toml \
+                  --redact \
+                  --report-format sarif \
+                  --report-path gitleaks-report.sarif
+              fi
+
+          - name: Upload Gitleaks SARIF report
+            uses: forge/upload-artifact@v2
+            if: always()
+            with:
+              name: gitleaks-sarif-${{ github.sha }}
+              path: gitleaks-report.sarif
+              retention_days: 90
+
+      # ── Semgrep SAST ───────────────────────────────────────────────────────
+      - name: scan:semgrep
+        steps:
+          - name: Validate security waivers
+            run: node --import tsx/esm tools/ci/waiver-check.ts --file security/waivers.yaml
+            env:
+              FORGE_AUDIT_SINK: ${{ vars.FORGE_AUDIT_SINK }}
+              FORGE_SHA: ${{ github.sha }}
+
+          - name: Semgrep SAST (OWASP A01/A05/A10 + custom rules)
+            run: |
+              semgrep \
+                --config .semgrep.yml \
+                --config p/typescript \
+                --error \
+                --sarif \
+                --output semgrep-report.sarif \
+                --no-rewrite-rule-ids \
+                services/ packages/ shared/ tools/
+            env:
+              SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+          - name: Upload Semgrep SARIF report
+            uses: forge/upload-artifact@v2
+            if: always()
+            with:
+              name: semgrep-sarif-${{ github.sha }}
+              path: semgrep-report.sarif
+              retention_days: 90
+
+      # ── Grype container image scan ─────────────────────────────────────────
+      # Grype targets the final runtime image (not the builder stage) so it
+      # reflects the actual attack surface delivered to production.
+      - name: scan:grype
+        when:
+          event:
+            not_in: [pull_request]
+        steps:
+          - name: Validate security waivers
+            run: node --import tsx/esm tools/ci/waiver-check.ts --file security/waivers.yaml
+            env:
+              FORGE_AUDIT_SINK: ${{ vars.FORGE_AUDIT_SINK }}
+              FORGE_SHA: ${{ github.sha }}
+
+          - name: Grype container vulnerability scan (fail on critical)
+            run: |
+              SHA=$(git rev-parse --short HEAD)
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                tag=$(node --import tsx/esm tools/ci/image-tag.ts "$service" --sha "$SHA")
+                echo "Scanning: registry.forge.internal/$tag"
+                grype "registry.forge.internal/$tag" \
+                  --fail-on critical \
+                  --output sarif \
+                  --file "grype-${service}-report.sarif"
+              done
+
+          - name: Upload Grype SARIF reports
+            uses: forge/upload-artifact@v2
+            if: always()
+            with:
+              name: grype-sarif-${{ github.sha }}
+              path: grype-*.sarif
+              retention_days: 90
+
+      # ── NPM Build policy / artefact guard ─────────────────────────────────
+      - name: scan:artifact-guard
+        steps:
+          - name: Check for committed packaged artefacts and sensitive files
+            # Fails with an actionable message if *.tgz, node_modules, .env*,
+            # *.pem, *.p12, id_rsa, or *.key files appear in the commit diff.
+            run: |
+              node --import tsx/esm tools/ci/artifact-guard.ts
+            env:
+              FORGE_BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD^' }}
 
   # ── Push ──────────────────────────────────────────────────────────────────
   # Push and all subsequent stage groups run only on main or tag events.
+  # Images go to ECR with immutable tags; every image is signed with cosign
+  # using a KMS-backed key immediately after push.
   - name: push
     when:
       event:
         not_in: [pull_request]
     depends_on: [scan]
+    secrets:
+      masked:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - COSIGN_KEY_REF        # KMS key reference for cosign signing
+        - COSIGN_PUBLIC_KEY     # Cosign public key for verification
     stages:
 
-      - name: push:registry
+      - name: push:ecr
         steps:
-          - name: Push service images to registry
+          - name: Authenticate to ECR
             run: |
+              aws ecr get-login-password \
+                --region ${{ vars.AWS_DEFAULT_REGION }} \
+              | docker login \
+                --username AWS \
+                --password-stdin \
+                "${{ vars.ECR_REGISTRY }}"
+            env:
+              AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+              AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+          - name: Push service images to ECR (immutable tags: service-gitsha)
+            # Pushing the same tag twice will fail because repositories are
+            # configured with image_tag_mutability = IMMUTABLE.  Pipeline retries
+            # are idempotent because the tag is content-addressed (digest == same).
+            run: |
+              SHA=$(git rev-parse --short HEAD)
               for service_dir in services/*/; do
                 service=$(basename "$service_dir")
-                tag=$(node --import tsx/esm tools/ci/image-tag.ts "$service" --sha "$(git rev-parse --short HEAD)")
-                docker push "registry.forge.internal/$tag"
+                tag=$(node --import tsx/esm tools/ci/image-tag.ts "$service" --sha "$SHA")
+                local_image="registry.forge.internal/$tag"
+                ecr_image="${{ vars.ECR_REGISTRY }}/$tag"
+                docker tag "$local_image" "$ecr_image"
+                docker push "$ecr_image"
+                echo "Pushed: $ecr_image"
               done
+            env:
+              AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+              AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: push:sign
+        depends_on: [push:ecr]
+        steps:
+          - name: Sign images with cosign (KMS-backed key)
+            # KMS key unavailability fails the stage closed — signing is never
+            # skipped even on pipeline retries.  COSIGN_KEY_REF must be a KMS
+            # alias ARN (e.g. awskms:///arn:aws:kms:...).
+            run: |
+              SHA=$(git rev-parse --short HEAD)
+              for service_dir in services/*/; do
+                service=$(basename "$service_dir")
+                tag=$(node --import tsx/esm tools/ci/image-tag.ts "$service" --sha "$SHA")
+                ecr_image="${{ vars.ECR_REGISTRY }}/$tag"
+                cosign sign \
+                  --key "${COSIGN_KEY_REF}" \
+                  --yes \
+                  "$ecr_image"
+                echo "Signed: $ecr_image"
+              done
+            env:
+              COSIGN_KEY_REF: ${{ secrets.COSIGN_KEY_REF }}
+              AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+              AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   # ── Gate — staging smoke tests ────────────────────────────────────────────
   # Smoke tests run against staging after every image push to main.

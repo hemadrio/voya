@@ -1,0 +1,152 @@
+# Semgrep rules — WO-085
+# TypeScript / OWASP A01 (Broken Access Control), A05 (Security Misconfiguration),
+# A10 (Server-Side Request Forgery) + custom Prisma queryRaw injection rule.
+
+rules:
+
+  # ── Prisma queryRaw injection (custom) ───────────────────────────────────
+
+  - id: prisma-queryraw-string-interpolation
+    message: >
+      Raw string interpolation into Prisma.$queryRaw or $executeRaw is a SQL
+      injection vector. Use tagged-template literals (Prisma.sql`...`) or
+      parameterised $queryRaw`SELECT ... WHERE id = ${param}` syntax instead.
+    severity: ERROR
+    languages: [typescript, javascript]
+    patterns:
+      - pattern: $DB.$queryRaw($QUERY + ...)
+      - pattern: $DB.$queryRaw(`...${...}...`)
+      - pattern: $DB.$executeRaw($QUERY + ...)
+      - pattern: $DB.$executeRaw(`...${...}...`)
+    metadata:
+      category: security
+      cwe: "CWE-89"
+      owasp: "A03:2021"
+      confidence: HIGH
+
+  # ── OWASP A01 — Broken Access Control ────────────────────────────────────
+
+  - id: ownership-from-request-body
+    message: >
+      Ownership/identity predicate derived from request body or query params is
+      an A01 broken access control risk. The authenticated principal must always
+      originate from the verified JWT/session, never from client-supplied input.
+    severity: ERROR
+    languages: [typescript, javascript]
+    patterns:
+      - pattern: |
+          const $OWNER = $REQ.body.$FIELD;
+          ...
+          where: $OWNER == $PREDICATE
+      - pattern: |
+          const { $OWNER } = $REQ.body;
+          ...
+          prisma.$MODEL.findMany({ where: { userId: $OWNER, ... } })
+      - pattern: |
+          prisma.$MODEL.findMany({ where: { userId: $REQ.body.$FIELD, ... } })
+      - pattern: |
+          prisma.$MODEL.findMany({ where: { userId: $REQ.query.$FIELD, ... } })
+    metadata:
+      category: security
+      cwe: "CWE-639"
+      owasp: "A01:2021"
+      confidence: MEDIUM
+
+  - id: jwt-secret-hardcoded
+    message: >
+      JWT secret is hardcoded. Secrets must be loaded from environment variables
+      or a secrets manager, never embedded in source code.
+    severity: ERROR
+    languages: [typescript, javascript]
+    patterns:
+      - pattern: jwt.sign($PAYLOAD, "...", ...)
+      - pattern: jwt.verify($TOKEN, "...", ...)
+    metadata:
+      category: security
+      cwe: "CWE-798"
+      owasp: "A01:2021"
+      confidence: HIGH
+
+  # ── OWASP A05 — Security Misconfiguration ────────────────────────────────
+
+  - id: cors-allow-all-origins
+    message: >
+      CORS configured with origin '*' allows any domain to make credentialed
+      requests. Restrict the origin to known-safe domains.
+    severity: WARNING
+    languages: [typescript, javascript]
+    patterns:
+      - pattern: cors({ origin: "*", ... })
+      - pattern: cors({ origin: true, ... })
+      - pattern: |
+          $RES.setHeader("Access-Control-Allow-Origin", "*")
+    metadata:
+      category: security
+      cwe: "CWE-942"
+      owasp: "A05:2021"
+      confidence: HIGH
+
+  - id: helmet-disabled
+    message: >
+      Helmet security headers are disabled. Remove the false argument to enable
+      the default protective headers.
+    severity: WARNING
+    languages: [typescript, javascript]
+    pattern: helmet({ $KEY: false, ... })
+    metadata:
+      category: security
+      cwe: "CWE-16"
+      owasp: "A05:2021"
+      confidence: MEDIUM
+
+  - id: session-no-secure-flag
+    message: >
+      Session cookie missing the 'secure' flag. Set secure:true to prevent the
+      cookie being transmitted over unencrypted HTTP.
+    severity: WARNING
+    languages: [typescript, javascript]
+    patterns:
+      - pattern: session({ cookie: { secure: false, ... }, ... })
+      - pattern: session({ cookie: { httpOnly: false, ... }, ... })
+    metadata:
+      category: security
+      cwe: "CWE-614"
+      owasp: "A05:2021"
+      confidence: HIGH
+
+  # ── OWASP A10 — Server-Side Request Forgery (SSRF) ───────────────────────
+
+  - id: ssrf-user-controlled-url-fetch
+    message: >
+      Fetching a URL derived from user-controlled input is an SSRF risk.
+      Validate the URL against an explicit allow-list of approved origins before
+      making the request.
+    severity: ERROR
+    languages: [typescript, javascript]
+    patterns:
+      - pattern: fetch($REQ.body.$URL, ...)
+      - pattern: fetch($REQ.query.$URL, ...)
+      - pattern: fetch($REQ.params.$URL, ...)
+      - pattern: axios.get($REQ.body.$URL, ...)
+      - pattern: axios.get($REQ.query.$URL, ...)
+    metadata:
+      category: security
+      cwe: "CWE-918"
+      owasp: "A10:2021"
+      confidence: HIGH
+
+  - id: ssrf-user-controlled-url-http
+    message: >
+      http.get/request called with a user-controlled URL is an SSRF risk.
+      Validate the hostname against an allow-list before making the request.
+    severity: ERROR
+    languages: [typescript, javascript]
+    patterns:
+      - pattern: http.get($REQ.body.$URL, ...)
+      - pattern: https.get($REQ.body.$URL, ...)
+      - pattern: http.request({ hostname: $REQ.body.$FIELD, ... }, ...)
+    metadata:
+      category: security
+      cwe: "CWE-918"
+      owasp: "A10:2021"
+      confidence: HIGH
