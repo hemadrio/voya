@@ -237,9 +237,21 @@ model Booking {
   /// to CONFIRMED or CANCELLED.
   expiresAt DateTime? @map("expires_at") @db.Timestamptz
 
-  user       User              @relation(fields: [userId], references: [id])
-  auditLogs  BookingAuditLog[]
-  travelers  BookingTraveler[]
+  // WO-042 additions — price re-validation and consent (additive, both nullable)
+  /// Re-validated offer snapshot appended after a live supplier re-price call.
+  /// The original offer_snapshot is never mutated; this column holds the
+  /// authoritative quote that the traveler must consent to when the price moved.
+  revalidatedSnapshot Json?     @map("revalidated_snapshot") @db.JsonB
+  /// Deadline after which this booking is no longer payable at the current price.
+  /// Set (a) immediately when re-validation shows no price change, or (b) after
+  /// the traveler explicitly accepts a changed price via accept-price.
+  /// NULL means the booking has not yet been validated or the window has closed.
+  payableUntil        DateTime? @map("payable_until") @db.Timestamptz
+
+  user          User                  @relation(fields: [userId], references: [id])
+  auditLogs     BookingAuditLog[]
+  travelers     BookingTraveler[]
+  priceConsents BookingPriceConsent[]
 
   // WO-073: nullable marker set by the backfill job when all passengers have
   // been migrated to booking_travelers; null means the row has not yet been
@@ -688,4 +700,35 @@ model UserRoleEntry {
   @@id([userId, roleId])
   @@index([userId], map: "idx_user_roles_user_id")
   @@map("user_roles")
+}
+
+// ---------------------------------------------------------------------------
+// BookingPriceConsent — immutable consent record (WO-042)
+// ---------------------------------------------------------------------------
+
+/// Append-only record written whenever a traveler explicitly accepts a changed
+/// price quote.  One row per accepted transition; the booking may accumulate
+/// multiple consent rows if it is re-validated and re-accepted several times.
+///
+/// previous_total and accepted_total are stored as Decimal so the audit record
+/// is self-contained without a JOIN to the booking snapshot.
+///
+/// Append-only: application role has INSERT only — UPDATE and DELETE are
+/// REVOKED in the companion migration.
+model BookingPriceConsent {
+  id            String   @id @default(uuid()) @db.Uuid
+  bookingId     String   @map("booking_id") @db.Uuid
+  /// Price recorded in the original offer snapshot at re-validation time.
+  previousTotal Decimal  @map("previous_total") @db.Decimal(12, 2)
+  /// Price the traveler explicitly accepted.
+  acceptedTotal Decimal  @map("accepted_total") @db.Decimal(12, 2)
+  currency      String   @db.Char(3)
+  actorId       String   @map("actor_id") @db.VarChar(128)
+  acceptedAt    DateTime @default(now()) @map("accepted_at") @db.Timestamptz
+  correlationId String?  @map("correlation_id") @db.VarChar(128)
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([bookingId], map: "idx_booking_price_consents_booking_id")
+  @@map("booking_price_consents")
 }

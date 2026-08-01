@@ -80,6 +80,12 @@ export const ErrorCode = {
   SESSION_REVOKED: "SESSION_REVOKED",
   /** 403 — the authenticated caller lacks the required role(s) or permission(s). */
   INSUFFICIENT_PERMISSIONS: "INSUFFICIENT_PERMISSIONS",
+  /** 409 — a PaymentIntent was requested but the booking has not passed price
+   *  re-validation, or a changed price has not been explicitly accepted. */
+  PRICE_CONSENT_REQUIRED: "PRICE_CONSENT_REQUIRED",
+  /** 409 — the traveler attempted to accept a price quote whose expiry has
+   *  passed; the booking must be re-validated before consent can be given. */
+  QUOTE_EXPIRED: "QUOTE_EXPIRED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -128,6 +134,8 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   INVALID_TOKEN: 401,
   SESSION_REVOKED: 401,
   INSUFFICIENT_PERMISSIONS: 403,
+  PRICE_CONSENT_REQUIRED: 409,
+  QUOTE_EXPIRED: 409,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

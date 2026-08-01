@@ -28,3 +28,18 @@ export type { SanitisedPayload } from "./audit.js";
 
 export { OfferSnapshotSchema, OfferLegSchema } from "./offer.js";
 export type { OfferSnapshot, OfferLeg } from "./offer.js";
+
+export {
+  LegFreshnessSchema,
+  RevalidatedLegSchema,
+  RevalidateResponseSchema,
+  AcceptPriceRequestSchema,
+  AcceptPriceResponseSchema,
+} from "./revalidation.js";
+export type {
+  LegFreshness,
+  RevalidatedLeg,
+  RevalidateResponse,
+  AcceptPriceRequest,
+  AcceptPriceResponse,
+} from "./revalidation.js";

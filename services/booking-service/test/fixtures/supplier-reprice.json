@@ -1,0 +1,154 @@
+{
+  "scenarios": [
+    {
+      "name": "unchanged",
+      "description": "Supplier returns the exact same price — no consent required",
+      "input": {
+        "offerId": "off_amadeus_LHR_JFK",
+        "supplier": "AMADEUS",
+        "originalTotal": "412.50",
+        "currency": "USD"
+      },
+      "supplierResponse": {
+        "offerId": "off_amadeus_LHR_JFK",
+        "supplier": "AMADEUS",
+        "price": 412.50,
+        "currency": "USD",
+        "freshness": "LIVE"
+      },
+      "expected": {
+        "priceChanged": false,
+        "previousTotal": 412.50,
+        "newTotal": 412.50,
+        "delta": 0,
+        "bookingPayable": true
+      }
+    },
+    {
+      "name": "increased",
+      "description": "Supplier returns a higher price — traveler must accept before payment",
+      "input": {
+        "offerId": "off_amadeus_LHR_JFK",
+        "supplier": "AMADEUS",
+        "originalTotal": "412.50",
+        "currency": "USD"
+      },
+      "supplierResponse": {
+        "offerId": "off_amadeus_LHR_JFK",
+        "supplier": "AMADEUS",
+        "price": 450.00,
+        "currency": "USD",
+        "freshness": "LIVE"
+      },
+      "expected": {
+        "priceChanged": true,
+        "previousTotal": 412.50,
+        "newTotal": 450.00,
+        "delta": 37.50,
+        "bookingPayable": false
+      }
+    },
+    {
+      "name": "decreased",
+      "description": "Supplier returns a lower price — traveler must still accept before payment",
+      "input": {
+        "offerId": "off_amadeus_LHR_JFK",
+        "supplier": "AMADEUS",
+        "originalTotal": "412.50",
+        "currency": "USD"
+      },
+      "supplierResponse": {
+        "offerId": "off_amadeus_LHR_JFK",
+        "supplier": "AMADEUS",
+        "price": 380.00,
+        "currency": "USD",
+        "freshness": "LIVE"
+      },
+      "expected": {
+        "priceChanged": true,
+        "previousTotal": 412.50,
+        "newTotal": 380.00,
+        "delta": -32.50,
+        "bookingPayable": false
+      }
+    },
+    {
+      "name": "sold_out",
+      "description": "Supplier responds with SOLD_OUT — revalidation fails with SUPPLIER_REJECTED 422",
+      "input": {
+        "offerId": "off_amadeus_LHR_JFK",
+        "supplier": "AMADEUS",
+        "originalTotal": "412.50",
+        "currency": "USD"
+      },
+      "supplierResponse": {
+        "error": "SOLD_OUT",
+        "message": "SOLD_OUT: inventory no longer available for this fare class"
+      },
+      "expected": {
+        "errorCode": "SUPPLIER_REJECTED",
+        "httpStatus": 422
+      }
+    },
+    {
+      "name": "timeout",
+      "description": "Supplier does not respond within 1500 ms — revalidation fails with SUPPLIER_TIMEOUT 504",
+      "input": {
+        "offerId": "off_amadeus_LHR_JFK",
+        "supplier": "AMADEUS",
+        "originalTotal": "412.50",
+        "currency": "USD"
+      },
+      "supplierResponse": {
+        "error": "AbortError",
+        "message": "The operation was aborted"
+      },
+      "expected": {
+        "errorCode": "SUPPLIER_TIMEOUT",
+        "httpStatus": 504
+      }
+    },
+    {
+      "name": "circuit_open",
+      "description": "Supplier circuit breaker is open — revalidation fails with SUPPLIER_UNAVAILABLE 502",
+      "input": {
+        "offerId": "off_amadeus_LHR_JFK",
+        "supplier": "AMADEUS",
+        "originalTotal": "412.50",
+        "currency": "USD"
+      },
+      "supplierResponse": {
+        "error": "CIRCUIT_OPEN",
+        "message": "CIRCUIT_OPEN: supplier circuit breaker is open, too many failures"
+      },
+      "expected": {
+        "errorCode": "SUPPLIER_UNAVAILABLE",
+        "httpStatus": 502
+      }
+    },
+    {
+      "name": "cached_price",
+      "description": "Supplier returns a cached (non-live) price with the same total — booking still marked payable",
+      "input": {
+        "offerId": "off_amadeus_LHR_JFK",
+        "supplier": "AMADEUS",
+        "originalTotal": "412.50",
+        "currency": "USD"
+      },
+      "supplierResponse": {
+        "offerId": "off_amadeus_LHR_JFK",
+        "supplier": "AMADEUS",
+        "price": 412.50,
+        "currency": "USD",
+        "freshness": "CACHED"
+      },
+      "expected": {
+        "priceChanged": false,
+        "previousTotal": 412.50,
+        "newTotal": 412.50,
+        "delta": 0,
+        "bookingPayable": true
+      }
+    }
+  ]
+}

@@ -46,6 +46,8 @@ export {
   invalidToken,
   sessionRevoked,
   insufficientPermissions,
+  priceConsentRequired,
+  quoteExpired,
 } from "./domain-errors.js";
 
 export { serialiseError, RESTRICTED_FIELDS } from "./serialise.js";

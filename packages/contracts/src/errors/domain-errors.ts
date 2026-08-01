@@ -231,3 +231,23 @@ export function insufficientPermissions(
   err.required = required;
   return err;
 }
+
+/**
+ * 409 — the booking has not passed price re-validation, or a changed price
+ * has not been explicitly accepted by the traveler.  No Stripe call is made.
+ */
+export function priceConsentRequired(
+  message = "Price re-validation or explicit consent is required before payment can be initiated.",
+): DomainError {
+  return new DomainErrorImpl("PRICE_CONSENT_REQUIRED", message);
+}
+
+/**
+ * 409 — the price quote the traveler is trying to accept has expired.
+ * The booking must be re-validated to obtain a fresh quote.
+ */
+export function quoteExpired(
+  message = "The price quote has expired. Please re-validate the booking price before accepting.",
+): DomainError {
+  return new DomainErrorImpl("QUOTE_EXPIRED", message);
+}

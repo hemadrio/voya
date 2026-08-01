@@ -15,6 +15,11 @@ import { deriveBookingPurgeAfter } from "@travel/retention";
 import type { RetentionConfig } from "@travel/contracts/retention";
 import type { AuditTxClient } from "../domain/AuditWriter.js";
 import type { LifecycleRepositoryPort, BookingStatusRow } from "../domain/BookingLifecycleService.js";
+import type {
+  RevalidationRepositoryPort,
+  RevalidationBookingRow,
+  ConsentRecord,
+} from "../domain/PriceRevalidationService.js";
 
 // ---------------------------------------------------------------------------
 // Injectable Prisma interface — duck-typed for unit testability
@@ -43,6 +48,10 @@ export interface BookingRow {
   purgeAfter?: Date | null;
   /** WO-102: Legal hold flag — when true, purge worker skips this row. */
   legalHold?: boolean;
+  /** WO-042: Re-validated offer snapshot from supplier re-price call. Null until revalidated. */
+  revalidatedSnapshot?: Record<string, unknown> | null;
+  /** WO-042: Deadline after which the booking is no longer payable. Null until validated. */
+  payableUntil?: Date | null;
 }
 
 export interface BookingPrismaClient {
@@ -92,6 +101,35 @@ export interface BookingPrismaClient {
       where: { id: string; status: string };
       data: { status: string; updatedAt: Date };
     }): Promise<{ count: number }>;
+
+    /**
+     * WO-042: Update revalidation fields on a booking row.
+     */
+    update(args: {
+      where: { id: string };
+      data: {
+        revalidatedSnapshot?: Record<string, unknown> | null;
+        payableUntil?: Date | null;
+        updatedAt?: Date;
+      };
+    }): Promise<BookingRow>;
+  };
+
+  /**
+   * WO-042: booking_price_consents table operations.
+   */
+  bookingPriceConsent: {
+    create(args: {
+      data: {
+        bookingId: string;
+        previousTotal: number | string;
+        acceptedTotal: number | string;
+        currency: string;
+        actorId: string;
+        acceptedAt: Date;
+        correlationId?: string | null;
+      };
+    }): Promise<unknown>;
   };
 
   /**
@@ -121,7 +159,7 @@ export class OwnershipError extends Error {
 // BookingRepository implements both CRUD and LifecycleRepositoryPort
 // ---------------------------------------------------------------------------
 
-export class BookingRepository implements LifecycleRepositoryPort {
+export class BookingRepository implements LifecycleRepositoryPort, RevalidationRepositoryPort {
   constructor(
     private readonly db: BookingPrismaClient,
     /**
@@ -295,6 +333,85 @@ export class BookingRepository implements LifecycleRepositoryPort {
    */
   async runInTransaction<T>(work: (tx: AuditTxClient) => Promise<T>): Promise<T> {
     return this.db.$transaction((tx) => work(tx as unknown as AuditTxClient));
+  }
+
+  // WO-042 revalidation port methods ─────────────────────────────────────────
+
+  /**
+   * Find a booking by ID for price re-validation (no ownership predicate).
+   * Used exclusively by PriceRevalidationService.
+   */
+  async findBookingForRevalidation(bookingId: string): Promise<RevalidationBookingRow | null> {
+    const row = await this.db.booking.findFirst({ where: { id: bookingId } });
+    if (!row) return null;
+    return {
+      id: row.id,
+      status: row.status,
+      totalPrice: row.totalPrice.toString(),
+      currency: row.currency,
+      offerSnapshot: row.offerSnapshot as Record<string, unknown>,
+      revalidatedSnapshot: (row.revalidatedSnapshot as Record<string, unknown> | null) ?? null,
+      payableUntil: row.payableUntil ?? null,
+    };
+  }
+
+  /**
+   * Persist the re-validated offer snapshot and the payment deadline on the
+   * booking row.  Called both when price is unchanged (payableUntil = now + 15m)
+   * and as an intermediate step when price changed (payableUntil = epoch 0,
+   * meaning NOT payable until consent is given).
+   */
+  async saveRevalidationResult(
+    bookingId: string,
+    revalidatedSnapshot: Record<string, unknown>,
+    payableUntil: Date,
+  ): Promise<void> {
+    const isPayable = payableUntil.getTime() > 0;
+    await this.db.booking.update({
+      where: { id: bookingId },
+      data: {
+        revalidatedSnapshot,
+        payableUntil: isPayable ? payableUntil : null,
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Persist the consent record and mark the booking payable inside the same
+   * Prisma transaction that also writes the PRICE_ACCEPTED audit row.
+   *
+   * The `tx` parameter is the transaction-scoped Prisma client cast to
+   * AuditTxClient (for the audit write in the service layer).  The concrete
+   * implementation casts it back to the full client type for booking/consent
+   * writes.
+   */
+  async saveConsentAndMarkPayable(
+    consent: ConsentRecord,
+    revalidatedSnapshot: Record<string, unknown>,
+    payableUntil: Date,
+    tx: AuditTxClient,
+  ): Promise<void> {
+    const dbTx = tx as unknown as BookingPrismaClient;
+    await dbTx.bookingPriceConsent.create({
+      data: {
+        bookingId: consent.bookingId,
+        previousTotal: consent.previousTotal,
+        acceptedTotal: consent.acceptedTotal,
+        currency: consent.currency,
+        actorId: consent.actorId,
+        acceptedAt: consent.acceptedAt,
+        correlationId: consent.correlationId ?? null,
+      },
+    });
+    await dbTx.booking.update({
+      where: { id: consent.bookingId },
+      data: {
+        revalidatedSnapshot,
+        payableUntil,
+        updatedAt: new Date(),
+      },
+    });
   }
 
   /**

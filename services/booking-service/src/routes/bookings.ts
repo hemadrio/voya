@@ -27,13 +27,14 @@
  */
 import { Router } from "express";
 import { z } from "zod";
-import { CreateBookingRequestSchema, identifier } from "@travel/contracts";
+import { CreateBookingRequestSchema, identifier, AcceptPriceRequestSchema } from "@travel/contracts";
 import { requireRole, registerRouteGuard } from "@travel/auth";
 import { validateRequest } from "../../../../shared/middleware/validateRequest.js";
 import type { Request, Response } from "express";
 import type { SecurityEventWriter } from "../domain/SecurityEventWriter.js";
 import type { BookingRepository } from "../repositories/BookingRepository.js";
 import { OwnershipError } from "../repositories/BookingRepository.js";
+import type { PriceRevalidationService } from "../domain/PriceRevalidationService.js";
 
 // Compiled once at module scope.
 const BookingIdParamsSchema = z.object({ bookingId: identifier });
@@ -77,17 +78,23 @@ export interface BookingDomain {
   cancel(bookingId: string, actorId: string, actorRole: string): Promise<unknown>;
 }
 
+// Compiled once at module scope for accept-price body.
+const validateAcceptPrice = validateRequest({ body: AcceptPriceRequestSchema });
+
 // Register route guards in the global registry (for startup assertion + tests)
 registerRouteGuard('POST', '/', 'requireRole', ['traveler']);
 registerRouteGuard('GET', '/:bookingId', 'requireRole', ['traveler', 'support_agent']);
 registerRouteGuard('POST', '/:bookingId/cancel', 'requireRole', ['traveler', 'support_agent']);
 registerRouteGuard('GET', '/:bookingId/history', 'requireRole', ['traveler', 'support_agent']);
+registerRouteGuard('POST', '/:bookingId/revalidate', 'requireRole', ['traveler']);
+registerRouteGuard('POST', '/:bookingId/accept-price', 'requireRole', ['traveler']);
 
 export function createBookingRouter(
   domain: BookingDomain,
   securityEventWriter?: SecurityEventWriter,
   bookingRepo?: BookingRepository,
   auditLogRepo?: AuditLogRepository,
+  priceRevalidationService?: PriceRevalidationService,
 ): Router {
   const router = Router();
 
@@ -234,6 +241,113 @@ export function createBookingRouter(
 
       const items = await auditLogRepo.getHistory(bookingId);
       res.json({ items });
+    },
+  );
+
+  // ── POST /:bookingId/revalidate ─────────────────────────────────────────
+  // WO-042: Re-price every leg through the supplier adapter port within
+  // 1,500 ms.  On price change the booking is NOT payable until accept-price.
+  router.post(
+    "/:bookingId/revalidate",
+    requireRole('traveler'),
+    validateBookingId,
+    async (req: Request, res: Response): Promise<void> => {
+      const { bookingId } = req.validated?.params as { bookingId: string };
+      const actor = (req as Request & { actor?: { sub: string; roles: string[] } }).actor;
+      const correlationId = (req as Request & { correlationId?: string }).correlationId;
+      const reference = correlationId;
+
+      if (!priceRevalidationService) {
+        res.status(501).json({
+          error: { code: 'NOT_IMPLEMENTED', message: 'Price revalidation not configured' },
+          reference,
+        });
+        return;
+      }
+
+      // Ownership check — traveler must own the booking.
+      if (bookingRepo) {
+        try {
+          await bookingRepo.findOwnedBookingOrThrow(bookingId, actor?.sub ?? '');
+        } catch (err) {
+          if (err instanceof OwnershipError) {
+            await denyWithAudit(res, req, 'booking', bookingId, 'REVALIDATE', 'OWNERSHIP_PREDICATE_FAILED');
+            return;
+          }
+          throw err;
+        }
+      }
+
+      const result = await priceRevalidationService.revalidate(
+        bookingId,
+        { id: actor?.sub ?? '', role: actor?.roles[0] ?? 'traveler' },
+        correlationId,
+      );
+
+      res.json({
+        data: {
+          bookingId: result.bookingId,
+          priceChanged: result.priceChanged,
+          previousTotal: result.previousTotal,
+          newTotal: result.newTotal,
+          currency: result.currency,
+          delta: result.delta,
+          quoteExpiresAt: result.quoteExpiresAt.toISOString(),
+          legs: result.legs,
+        },
+        reference,
+      });
+    },
+  );
+
+  // ── POST /:bookingId/accept-price ───────────────────────────────────────
+  // WO-042: Record traveler consent to a changed price.  Blocks payment until
+  // the exact newTotal from the revalidate response is submitted here.
+  router.post(
+    "/:bookingId/accept-price",
+    requireRole('traveler'),
+    validateBookingId,
+    validateAcceptPrice,
+    async (req: Request, res: Response): Promise<void> => {
+      const { bookingId } = req.validated?.params as { bookingId: string };
+      const body = req.validated?.body as { acceptedTotal: number; currency: string };
+      const actor = (req as Request & { actor?: { sub: string; roles: string[] } }).actor;
+      const correlationId = (req as Request & { correlationId?: string }).correlationId;
+      const reference = correlationId;
+
+      if (!priceRevalidationService) {
+        res.status(501).json({
+          error: { code: 'NOT_IMPLEMENTED', message: 'Price revalidation not configured' },
+          reference,
+        });
+        return;
+      }
+
+      // Ownership check.
+      if (bookingRepo) {
+        try {
+          await bookingRepo.findOwnedBookingOrThrow(bookingId, actor?.sub ?? '');
+        } catch (err) {
+          if (err instanceof OwnershipError) {
+            await denyWithAudit(res, req, 'booking', bookingId, 'ACCEPT_PRICE', 'OWNERSHIP_PREDICATE_FAILED');
+            return;
+          }
+          throw err;
+        }
+      }
+
+      const result = await priceRevalidationService.acceptPrice(
+        bookingId,
+        body.acceptedTotal,
+        body.currency,
+        { id: actor?.sub ?? '', role: actor?.roles[0] ?? 'traveler' },
+        correlationId,
+      );
+
+      res.json({
+        data: { payableUntil: result.payableUntil.toISOString() },
+        reference,
+      });
     },
   );
 
