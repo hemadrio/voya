@@ -16,6 +16,7 @@ import type { BookingDomain } from "./routes/bookings.js";
 import type { HealthHandlers } from "@travel/observability";
 import type { ItineraryService } from "./domain/ItineraryService.js";
 import type { TripDocumentService } from "./domain/TripDocumentService.js";
+import type { TripDocumentDeliveryService } from "./domain/TripDocumentDeliveryService.js";
 
 export interface BookingAppOptions {
   /**
@@ -28,6 +29,8 @@ export interface BookingAppOptions {
   itineraryService?: ItineraryService;
   /** WO-054: wired TripDocumentService for /itineraries/:id/documents routes. */
   documentService?: TripDocumentService;
+  /** WO-055: wired TripDocumentDeliveryService for /itineraries/:id/documents/send. */
+  deliveryService?: TripDocumentDeliveryService;
 }
 
 export function createApp(
@@ -38,7 +41,7 @@ export function createApp(
     healthHandlersOrOptions !== undefined && "liveHandler" in healthHandlersOrOptions
       ? { healthHandlers: healthHandlersOrOptions as HealthHandlers }
       : (healthHandlersOrOptions as BookingAppOptions) ?? {};
-  const { floorLimitRedis, healthHandlers, itineraryService, documentService } = options;
+  const { floorLimitRedis, healthHandlers, itineraryService, documentService, deliveryService } = options;
 
   const app = express();
   app.use(express.json({ limit: "64kb" }));
@@ -70,7 +73,7 @@ export function createApp(
   // WO-053: /v1/itineraries/** proxied by the gateway to booking-service.
   // JWT enforcement is applied at the gateway level; all itinerary routes
   // require the 'traveler' role (not on the guest allow-list).
-  app.use("/itineraries", createItineraryRouter(itineraryService, documentService));
+  app.use("/itineraries", createItineraryRouter(itineraryService, documentService, deliveryService));
 
   if (healthHandlers !== undefined) {
     app.get("/health/live", healthHandlers.liveHandler.bind(healthHandlers));

@@ -6,6 +6,8 @@ export {
   TripDocumentViewModelSchema,
   PostDocumentRequestSchema,
   DocumentResponseSchema,
+  SendDocumentRequestSchema,
+  SendDocumentResponseSchema,
 } from "./schemas.js";
 
 export type {
@@ -16,4 +18,6 @@ export type {
   TripDocumentViewModel,
   PostDocumentRequest,
   DocumentResponse,
+  SendDocumentRequest,
+  SendDocumentResponse,
 } from "./schemas.js";

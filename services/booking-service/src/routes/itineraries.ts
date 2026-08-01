@@ -21,6 +21,7 @@ import { validateRequest } from "../../../../shared/middleware/validateRequest.j
 import type { ItineraryService } from "../domain/ItineraryService.js";
 import { createItineraryDocumentRouter } from "./itineraryDocuments.js";
 import type { TripDocumentService } from "../domain/TripDocumentService.js";
+import type { TripDocumentDeliveryService } from "../domain/TripDocumentDeliveryService.js";
 
 // Compiled once at module scope (not per-request).
 const ItineraryIdParamsSchema = z.object({
@@ -41,6 +42,7 @@ registerRouteGuard("DELETE", "/:itineraryId", "requireRole", ["traveler"]);
 export function createItineraryRouter(
   itineraryService?: ItineraryService,
   documentService?: TripDocumentService,
+  deliveryService?: TripDocumentDeliveryService,
 ): Router {
   const router = Router();
 
@@ -177,7 +179,7 @@ export function createItineraryRouter(
 
   // ── /itineraries/:itineraryId/documents — document generation sub-router ─
   // WO-054: POST /:itineraryId/documents and GET /:itineraryId/documents/:documentId
-  router.use("/", createItineraryDocumentRouter(documentService));
+  router.use("/", createItineraryDocumentRouter(documentService, deliveryService));
 
   return router;
 }

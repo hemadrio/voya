@@ -137,3 +137,42 @@ export const DocumentResponseSchema = z
   .strict();
 
 export type DocumentResponse = z.infer<typeof DocumentResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Send document request / response schemas — WO-055
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /v1/itineraries/{id}/documents/send request body.
+ *
+ * No `recipient` field — the recipient is resolved server-side from the
+ * authenticated user's verified email.  Any client-supplied recipient would
+ * be silently ignored; the schema enforces this at validation time.
+ */
+export const SendDocumentRequestSchema = z
+  .object({
+    locale: z.string().optional().default("en"),
+  })
+  .strict();
+
+export type SendDocumentRequest = z.infer<typeof SendDocumentRequestSchema>;
+
+/**
+ * POST /v1/itineraries/{id}/documents/send 202 response body.
+ *
+ * `requestId`  — UUID generated per request for support tracing.
+ * `eventId`    — deterministic UUID derived from itineraryId + time bucket;
+ *                reused within the dedup window to suppress duplicate emails.
+ * `status`     — always "QUEUED" on 202.
+ * `reference`  — correlation/trace ID from the inbound request.
+ */
+export const SendDocumentResponseSchema = z
+  .object({
+    requestId: identifier,
+    eventId: z.string().uuid(),
+    status: z.literal("QUEUED"),
+    reference: z.string().optional(),
+  })
+  .strict();
+
+export type SendDocumentResponse = z.infer<typeof SendDocumentResponseSchema>;

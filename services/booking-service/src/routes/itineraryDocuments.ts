@@ -16,13 +16,14 @@
  */
 
 import { Router } from "express";
-import type { Request, Response } from "express";
+import type { Request, Response, RequestHandler } from "express";
 import { z } from "zod";
 import { requireRole, registerRouteGuard } from "@travel/auth";
 import { validateRequest } from "../../../../shared/middleware/validateRequest.js";
-import { PostDocumentRequestSchema } from "@travel/contracts/documents";
+import { PostDocumentRequestSchema, SendDocumentRequestSchema } from "@travel/contracts/documents";
 import type { TripDocumentService } from "../domain/TripDocumentService.js";
 import { DocumentGenerationError } from "../domain/TripDocumentService.js";
+import type { TripDocumentDeliveryService } from "../domain/TripDocumentDeliveryService.js";
 
 // Compiled once at module scope (not per-request).
 const ItineraryIdParamsSchema = z.object({
@@ -36,15 +37,19 @@ const DocumentIdParamsSchema = z.object({
 const validateItineraryId = validateRequest({ params: ItineraryIdParamsSchema });
 const validateDocumentId = validateRequest({ params: DocumentIdParamsSchema });
 const validatePostBody = validateRequest({ body: PostDocumentRequestSchema });
+const validateSendBody = validateRequest({ body: SendDocumentRequestSchema });
 
 // Route guards for startup assertion registry.
 registerRouteGuard("POST", "/:itineraryId/documents", "requireRole", ["traveler"]);
+registerRouteGuard("POST", "/:itineraryId/documents/send", "requireRole", ["traveler"]);
 registerRouteGuard("GET", "/:itineraryId/documents/:documentId", "requireRole", ["traveler"]);
 
 type ActorReq = Request & { actor?: { sub: string; roles: string[] }; correlationId?: string };
 
 export function createItineraryDocumentRouter(
   documentService?: TripDocumentService,
+  deliveryService?: TripDocumentDeliveryService,
+  sendRateLimiter?: RequestHandler,
 ): Router {
   const router = Router({ mergeParams: true });
 
@@ -97,6 +102,35 @@ export function createItineraryDocumentRouter(
         }
         throw err;
       }
+    },
+  );
+
+  // ── POST /:itineraryId/documents/send — queue async document email ──────
+  // Registered BEFORE /:documentId to prevent "send" being captured as a param.
+  router.post(
+    "/:itineraryId/documents/send",
+    requireRole("traveler"),
+    validateItineraryId,
+    validateSendBody,
+    ...(sendRateLimiter ? [sendRateLimiter] : []),
+    async (req: Request, res: Response): Promise<void> => {
+      if (!deliveryService) { notWired(res, req); return; }
+
+      const typedReq = req as ActorReq;
+      const { itineraryId } = req.validated?.params as { itineraryId: string };
+      const body = req.validated?.body as import("@travel/contracts/documents").SendDocumentRequest;
+      const reference = typedReq.correlationId;
+      const actor = typedReq.actor;
+
+      const result = await deliveryService.requestDocumentSend(
+        itineraryId,
+        actor?.sub ?? "",
+        { id: actor?.sub ?? "", role: actor?.roles[0] ?? "traveler" },
+        reference ?? "no-correlation-id",
+        body.locale,
+      );
+
+      res.status(202).json({ data: result, reference });
     },
   );
 
