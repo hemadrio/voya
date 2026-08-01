@@ -257,7 +257,8 @@ model Booking {
   auditLogs     BookingAuditLog[]
   travelers     BookingTraveler[]
   priceConsents BookingPriceConsent[]
-  payments      Payment[]
+  payments                Payment[]
+  reconciliationExceptions ReconciliationException[]
 
   // WO-073: nullable marker set by the backfill job when all passengers have
   // been migrated to booking_travelers; null means the row has not yet been
@@ -868,4 +869,33 @@ model ConversationMessage {
   // Pagination index — sort by (conversation_id, created_at, id) for stable cursor pagination.
   @@index([conversationId, createdAt, id], map: "idx_conversation_messages_pagination")
   @@map("conversation_messages")
+}
+
+// ---------------------------------------------------------------------------
+// ReconciliationException — payment anomaly log (WO-043 / WO-050)
+// ---------------------------------------------------------------------------
+
+/// Anomalies detected during payment reconciliation or the expiry sweep.
+/// Shared by WO-043 (expiry sweep late-confirmation handler) and WO-050
+/// (reconciliation report). Never purged by the personal-data purge job.
+model ReconciliationException {
+  id               String    @id @default(uuid()) @db.Uuid
+  /// Classification of the anomaly (e.g. LATE_CONFIRMATION, DUPLICATE_CHARGE).
+  kind             String    @db.VarChar(64)
+  /// FK to the affected booking. SET NULL on booking deletion.
+  bookingId        String?   @map("booking_id") @db.Uuid
+  /// Stripe PaymentIntent ID for correlation with the payments table.
+  paymentIntentId  String?   @map("payment_intent_id") @db.VarChar(255)
+  /// Sanitised JSONB context. Must never contain PII.
+  detail           Json      @default("{}") @db.JsonB
+  /// Wall-clock when the exception was detected.
+  detectedAt       DateTime  @default(now()) @map("detected_at") @db.Timestamptz
+  /// Set by ops when the exception is triaged and resolved.
+  resolvedAt       DateTime? @map("resolved_at") @db.Timestamptz
+
+  booking Booking? @relation(fields: [bookingId], references: [id])
+
+  @@index([bookingId], map: "idx_reconciliation_booking")
+  @@index([detectedAt(sort: Desc)], map: "idx_reconciliation_unresolved")
+  @@map("reconciliation_exceptions")
 }

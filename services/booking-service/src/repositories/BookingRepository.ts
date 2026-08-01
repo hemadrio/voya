@@ -20,6 +20,8 @@ import type {
   RevalidationBookingRow,
   ConsentRecord,
 } from "../domain/PriceRevalidationService.js";
+import type { PaymentStatusPort, PaymentIntentStatus } from "../domain/PaymentStatusPort.js";
+import type { SweepCandidate } from "../domain/ExpirySweepService.js";
 
 // ---------------------------------------------------------------------------
 // Injectable Prisma interface — duck-typed for unit testability
@@ -141,6 +143,38 @@ export interface BookingPrismaClient {
   $transaction<T>(
     fn: (tx: BookingPrismaClient & AuditTxClient) => Promise<T>,
   ): Promise<T>;
+
+  /**
+   * WO-043: Raw SQL query for SKIP LOCKED expiry candidates.
+   * Returns typed rows without Prisma model overhead.
+   */
+  $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: unknown[]): Promise<T[]>;
+
+  /**
+   * WO-043: payments table — find the most-recent payment row for a booking.
+   */
+  payment: {
+    findFirst(args: {
+      where: { bookingId: string };
+      orderBy?: { createdAt: 'desc' | 'asc' };
+      select?: { providerReference: boolean; status: boolean };
+    }): Promise<{ providerReference: string; status: string } | null>;
+  };
+
+  /**
+   * WO-043: reconciliation_exceptions table — record late-confirmation conflicts.
+   */
+  reconciliationException: {
+    create(args: {
+      data: {
+        kind: string;
+        bookingId: string;
+        paymentIntentId?: string | null;
+        detail?: Record<string, unknown>;
+        detectedAt: Date;
+      };
+    }): Promise<{ id: string }>;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +193,7 @@ export class OwnershipError extends Error {
 // BookingRepository implements both CRUD and LifecycleRepositoryPort
 // ---------------------------------------------------------------------------
 
-export class BookingRepository implements LifecycleRepositoryPort, RevalidationRepositoryPort {
+export class BookingRepository implements LifecycleRepositoryPort, RevalidationRepositoryPort, PaymentStatusPort {
   constructor(
     private readonly db: BookingPrismaClient,
     /**
@@ -412,6 +446,50 @@ export class BookingRepository implements LifecycleRepositoryPort, RevalidationR
         updatedAt: new Date(),
       },
     });
+  }
+
+  // WO-043 methods ────────────────────────────────────────────────────────────
+
+  /**
+   * Find PENDING bookings strictly past their expires_at using the partial
+   * index idx_bookings_pending_expiry with FOR UPDATE SKIP LOCKED.
+   *
+   * FOR UPDATE SKIP LOCKED means two concurrent sweep processes over the
+   * same dataset lock disjoint rows and never contend — exactly one sweep
+   * wins per booking per run.
+   *
+   * batchSize caps the query to avoid unbounded DB load during a large backlog.
+   */
+  async findExpiredPendingCandidates(
+    batchSize: number,
+    now: Date,
+  ): Promise<SweepCandidate[]> {
+    type RawRow = { id: string; user_id: string; expires_at: Date };
+    const rows = await this.db.$queryRaw<RawRow>`
+      SELECT id, user_id, expires_at
+        FROM bookings
+       WHERE status     = 'PENDING'
+         AND expires_at < ${now}
+       ORDER BY expires_at ASC
+       LIMIT ${batchSize}
+         FOR UPDATE SKIP LOCKED
+    `;
+    return rows.map((r) => ({ id: r.id, userId: r.user_id, expiresAt: r.expires_at }));
+  }
+
+  /**
+   * PaymentStatusPort implementation — reads from the local payments ledger.
+   * Returns the most-recent payment row's status for a given booking.
+   * Returns null when no payment row exists (checkout was never initiated).
+   */
+  async getIntentStatus(bookingId: string): Promise<PaymentIntentStatus | null> {
+    const row = await this.db.payment.findFirst({
+      where: { bookingId },
+      orderBy: { createdAt: "desc" },
+      select: { providerReference: true, status: true },
+    });
+    if (!row) return null;
+    return { intentId: row.providerReference, status: row.status };
   }
 
   /**

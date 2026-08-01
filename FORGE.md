@@ -595,3 +595,10 @@
 - **Files:** 10 (+842/-2)
 - **Duration:** 686ss
 - **Approach:** Extended the existing packages/audit infrastructure (AuditWriter port + PrismaAuditWriter with hash chain, installed by WO-072/WO-101) with the WO-041-specific gaps: (1) additive migration 0016 adding the reason column, booking_occurred index, and a SECURITY DEFINER PostgreSQL function for GDPR pseudonymisation; (2) reason field wired into Zod schema and PrismaAuditWriter.append(); (3) TypeScript pseudonymise.ts module exposing deriveActorSurrogate (SHA-256(salt+actorId)) and pseudonymiseAuditActor that calls the DB stored procedure; (4) committed audit fixtures covering all six BookingActions; (5) full unit and integration test suites.
+
+## WO-043: User Story: WO-043 - Scheduled expiry sweep for abandoned PENDING bookings
+- **Status:** completed
+- **Commit:** `e4474f2`
+- **Files:** 10 (+1327/-2)
+- **Duration:** 564ss
+- **Approach:** Implemented the PENDING booking expiry sweep as a standalone ECS one-shot task (not in-process cron). The domain logic lives in ExpirySweepService which: (1) checks PaymentIntent status via PaymentStatusPort, skipping non-terminal Stripe states; (2) calls the existing BookingLifecycleService.transition() for the EXPIRED transition with a system actor, inheriting its audit row + conditional UPDATE atomicity; (3) publishes booking.expired queue events. BookingRepository gained findExpiredPendingCandidates() (FOR UPDATE SKIP LOCKED raw SQL against the existing idx_bookings_pending_expiry partial index) and implements PaymentStatusPort via the local payments ledger. EventBridge rate(5 min) Terraform triggers the ECS task. reconciliation_exceptions table added for late-confirmation anomaly recording (shared with WO-050).

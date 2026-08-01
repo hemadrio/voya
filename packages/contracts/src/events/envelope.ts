@@ -11,6 +11,7 @@ export const EventTypeSchema = z.enum([
   "booking.confirmed",
   "booking.cancelled",
   "booking.modified",
+  "booking.expired",
   "itinerary.document.requested",
 ]);
 
