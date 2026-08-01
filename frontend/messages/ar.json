@@ -1,0 +1,80 @@
+{
+  "nav": {
+    "searchFlights": "البحث عن رحلات",
+    "searchHotels": "البحث عن فنادق",
+    "searchCars": "استئجار سيارة",
+    "myTrips": "رحلاتي",
+    "signIn": "تسجيل الدخول",
+    "signUp": "إنشاء حساب",
+    "signOut": "تسجيل الخروج",
+    "account": "حسابي"
+  },
+  "home": {
+    "title": "رحلتك تبدأ من هنا",
+    "subtitle": "ابحث عن الرحلات الجوية والفنادق والسيارات من مئات الموردين. مدعوم بالذكاء الاصطناعي للعثور على أفضل الخيارات لرحلتك.",
+    "cta": {
+      "flights": "البحث عن رحلات",
+      "hotels": "البحث عن فنادق"
+    }
+  },
+  "search": {
+    "title": "نتائج البحث",
+    "noResults": "لم يتم العثور على نتائج. حاول تعديل بحثك.",
+    "loading": "جارٍ البحث…",
+    "filterLabel": "تصفية",
+    "sortLabel": "ترتيب حسب",
+    "nightsLabel": "{count, plural, zero {# ليلة} one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليالٍ}}",
+    "guestsLabel": "{count, plural, zero {# ضيف} one {ضيف واحد} two {ضيفان} few {# ضيوف} many {# ضيفاً} other {# ضيوف}}",
+    "priceLabel": "السعر",
+    "perNight": "في الليلة",
+    "totalPrice": "السعر الإجمالي",
+    "bookNow": "احجز الآن",
+    "viewDetails": "عرض التفاصيل"
+  },
+  "checkout": {
+    "title": "الدفع",
+    "summary": "ملخص الحجز",
+    "payNow": "الدفع الآن",
+    "cancel": "إلغاء",
+    "priceChangedTitle": "تغيّر السعر",
+    "priceChangedBody": "تغيّر سعر هذا الحجز. يرجى مراجعة المبلغ المحدّث وتأكيده."
+  },
+  "listing": {
+    "nights": "{count, plural, zero {# ليلة} one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليالٍ}}",
+    "guests": "{count, plural, zero {# ضيف} one {ضيف واحد} two {ضيفان} few {# ضيوف} many {# ضيفاً} other {# ضيوف}}",
+    "reserve": "احجز",
+    "reviews": "{count, plural, zero {# تقييم} one {تقييم واحد} two {تقييمان} few {# تقييمات} many {# تقييماً} other {# تقييم}}"
+  },
+  "common": {
+    "loading": "جارٍ التحميل…",
+    "error": "حدث خطأ ما",
+    "retry": "حاول مرة أخرى",
+    "back": "رجوع",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "confirm": "تأكيد",
+    "close": "إغلاق",
+    "currency": "العملة",
+    "language": "اللغة"
+  },
+  "auth": {
+    "signIn": "تسجيل الدخول",
+    "signUp": "إنشاء حساب",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "forgotPassword": "هل نسيت كلمة المرور؟",
+    "continueWithGoogle": "المتابعة مع Google"
+  },
+  "account": {
+    "title": "حسابي",
+    "profile": "الملف الشخصي",
+    "security": "الأمان",
+    "trips": "رحلاتي",
+    "wishlist": "قائمة الرغبات"
+  },
+  "errors": {
+    "notFound": "الصفحة غير موجودة",
+    "serverError": "حدث خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.",
+    "unauthorized": "يجب عليك تسجيل الدخول لعرض هذه الصفحة."
+  }
+}

@@ -2,13 +2,36 @@
   "extends": ["next/core-web-vitals"],
   "rules": {
     "no-console": "error",
-    "@next/next/no-html-link-for-pages": "error"
+    "@next/next/no-html-link-for-pages": "error",
+    "react/jsx-no-literals": [
+      "warn",
+      {
+        "noStrings": true,
+        "allowedStrings": ["·", "—", "–", "|", "/", "\\", " ", "&", "©"],
+        "ignoreProps": true,
+        "noAttributeStrings": false
+      }
+    ]
   },
   "overrides": [
     {
       "files": ["test/**/*.ts", "test/**/*.tsx", "lib/__tests__/**/*.ts"],
       "rules": {
-        "no-console": "off"
+        "no-console": "off",
+        "react/jsx-no-literals": "off"
+      }
+    },
+    {
+      "files": ["app/[locale]/**/*.tsx", "app/[locale]/**/*.ts"],
+      "rules": {
+        "react/jsx-no-literals": [
+          "warn",
+          {
+            "noStrings": true,
+            "allowedStrings": ["·", "—", "–", "|", "/", "\\", " ", "&", "©"],
+            "ignoreProps": true
+          }
+        ]
       }
     }
   ]

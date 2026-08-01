@@ -33,12 +33,29 @@ type TokenProvider = () => string | null | undefined;
  */
 type On401Handler = () => Promise<boolean>;
 
+/**
+ * Locale + currency provider — reads the active preferences so every priced
+ * request carries them and the backend returns amounts in the correct currency.
+ * Call setLocaleProvider() after mounting I18nProvider / CurrencyProvider.
+ */
+type LocaleProvider = () => { locale: string; currency: string };
+
 let _tokenProvider: TokenProvider = () => null;
 let _on401: On401Handler | null = null;
+let _localeProvider: LocaleProvider = () => ({ locale: "en", currency: "USD" });
 
 /** Register a function that returns the current access token. */
 export function setTokenProvider(provider: TokenProvider): void {
   _tokenProvider = provider;
+}
+
+/**
+ * Register a function that returns the active locale and currency.
+ * Called on every request so a currency/locale switch immediately affects
+ * subsequent fetches without a full page reload.
+ */
+export function setLocaleProvider(provider: LocaleProvider): void {
+  _localeProvider = provider;
 }
 
 /**
@@ -117,11 +134,15 @@ async function request<T>(
   _retried = false,
 ): Promise<T> {
   const token = _tokenProvider();
+  const { locale, currency } = _localeProvider();
+
   const authHeader: Record<string, string> =
     token !== null && token !== undefined ? { Authorization: `Bearer ${token}` } : {};
 
   const headers: Record<string, string> = {
     Accept: "application/json",
+    "Accept-Language": locale,
+    "X-Currency": currency,
     ...authHeader,
     ...options?.headers,
   };

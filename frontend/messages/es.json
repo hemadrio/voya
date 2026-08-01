@@ -1,0 +1,80 @@
+{
+  "nav": {
+    "searchFlights": "Buscar vuelos",
+    "searchHotels": "Buscar hoteles",
+    "searchCars": "Alquilar un coche",
+    "myTrips": "Mis viajes",
+    "signIn": "Iniciar sesión",
+    "signUp": "Registrarse",
+    "signOut": "Cerrar sesión",
+    "account": "Cuenta"
+  },
+  "home": {
+    "title": "Tu viaje comienza aquí",
+    "subtitle": "Busca vuelos, hoteles y coches de cientos de proveedores. Impulsado por IA para encontrar las mejores opciones para tu viaje.",
+    "cta": {
+      "flights": "Buscar vuelos",
+      "hotels": "Buscar hoteles"
+    }
+  },
+  "search": {
+    "title": "Resultados de búsqueda",
+    "noResults": "No se encontraron resultados. Intenta ajustar tu búsqueda.",
+    "loading": "Buscando…",
+    "filterLabel": "Filtros",
+    "sortLabel": "Ordenar por",
+    "nightsLabel": "{count, plural, one {# noche} other {# noches}}",
+    "guestsLabel": "{count, plural, one {# huésped} other {# huéspedes}}",
+    "priceLabel": "Precio",
+    "perNight": "por noche",
+    "totalPrice": "Precio total",
+    "bookNow": "Reservar ahora",
+    "viewDetails": "Ver detalles"
+  },
+  "checkout": {
+    "title": "Pago",
+    "summary": "Resumen de reserva",
+    "payNow": "Pagar ahora",
+    "cancel": "Cancelar",
+    "priceChangedTitle": "El precio ha cambiado",
+    "priceChangedBody": "El precio de esta reserva ha cambiado. Por favor, revisa y confirma el importe actualizado."
+  },
+  "listing": {
+    "nights": "{count, plural, one {# noche} other {# noches}}",
+    "guests": "{count, plural, one {# huésped} other {# huéspedes}}",
+    "reserve": "Reservar",
+    "reviews": "{count, plural, one {# opinión} other {# opiniones}}"
+  },
+  "common": {
+    "loading": "Cargando…",
+    "error": "Algo salió mal",
+    "retry": "Intentar de nuevo",
+    "back": "Volver",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "close": "Cerrar",
+    "currency": "Moneda",
+    "language": "Idioma"
+  },
+  "auth": {
+    "signIn": "Iniciar sesión",
+    "signUp": "Crear cuenta",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "continueWithGoogle": "Continuar con Google"
+  },
+  "account": {
+    "title": "Mi cuenta",
+    "profile": "Perfil",
+    "security": "Seguridad",
+    "trips": "Mis viajes",
+    "wishlist": "Lista de deseos"
+  },
+  "errors": {
+    "notFound": "Página no encontrada",
+    "serverError": "Se produjo un error en el servidor. Por favor, inténtalo más tarde.",
+    "unauthorized": "Debes iniciar sesión para ver esta página."
+  }
+}

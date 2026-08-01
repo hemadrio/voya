@@ -1,0 +1,80 @@
+{
+  "nav": {
+    "searchFlights": "Search Flights",
+    "searchHotels": "Find Hotels",
+    "searchCars": "Rent a Car",
+    "myTrips": "My Trips",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "signOut": "Sign out",
+    "account": "Account"
+  },
+  "home": {
+    "title": "Your journey starts here",
+    "subtitle": "Search flights, hotels, and cars from hundreds of suppliers. Powered by AI to find the best options for your trip.",
+    "cta": {
+      "flights": "Search Flights",
+      "hotels": "Find Hotels"
+    }
+  },
+  "search": {
+    "title": "Search results",
+    "noResults": "No results found. Try adjusting your search.",
+    "loading": "Searching…",
+    "filterLabel": "Filters",
+    "sortLabel": "Sort by",
+    "nightsLabel": "{count, plural, one {# night} other {# nights}}",
+    "guestsLabel": "{count, plural, one {# guest} other {# guests}}",
+    "priceLabel": "Price",
+    "perNight": "per night",
+    "totalPrice": "Total price",
+    "bookNow": "Book now",
+    "viewDetails": "View details"
+  },
+  "checkout": {
+    "title": "Checkout",
+    "summary": "Booking summary",
+    "payNow": "Pay now",
+    "cancel": "Cancel",
+    "priceChangedTitle": "Price has changed",
+    "priceChangedBody": "The price for this booking has changed. Please review and confirm the updated amount."
+  },
+  "listing": {
+    "nights": "{count, plural, one {# night} other {# nights}}",
+    "guests": "{count, plural, one {# guest} other {# guests}}",
+    "reserve": "Reserve",
+    "reviews": "{count, plural, one {# review} other {# reviews}}"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "back": "Back",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "currency": "Currency",
+    "language": "Language"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signUp": "Create account",
+    "email": "Email address",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "continueWithGoogle": "Continue with Google"
+  },
+  "account": {
+    "title": "My account",
+    "profile": "Profile",
+    "security": "Security",
+    "trips": "My trips",
+    "wishlist": "Wishlist"
+  },
+  "errors": {
+    "notFound": "Page not found",
+    "serverError": "A server error occurred. Please try again later.",
+    "unauthorized": "You must be signed in to view this page."
+  }
+}

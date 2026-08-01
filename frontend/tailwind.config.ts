@@ -114,6 +114,12 @@ const config: Config = {
     },
   },
   plugins: [],
+  // Enable RTL variant so components can use `rtl:` prefix for directional overrides.
+  // e.g. `rtl:flex-row-reverse`, `rtl:text-right`, `rtl:mr-0 rtl:ml-4`
+  // The html[dir="rtl"] attribute set by the root layout activates these variants.
+  future: {
+    respectDefaultRingColorOpacity: true,
+  },
 };
 
 export default config;
