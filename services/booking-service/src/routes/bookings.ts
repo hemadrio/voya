@@ -27,7 +27,7 @@
  */
 import { Router } from "express";
 import { z } from "zod";
-import { CreateBookingRequestSchema, identifier, AcceptPriceRequestSchema } from "@travel/contracts";
+import { CreateBookingRequestSchema, identifier, AcceptPriceRequestSchema, PatchBookingRequestSchema } from "@travel/contracts";
 import { requireRole, registerRouteGuard } from "@travel/auth";
 import { validateRequest } from "../../../../shared/middleware/validateRequest.js";
 import type { Request, Response } from "express";
@@ -35,6 +35,8 @@ import type { SecurityEventWriter } from "../domain/SecurityEventWriter.js";
 import type { BookingRepository } from "../repositories/BookingRepository.js";
 import { OwnershipError } from "../repositories/BookingRepository.js";
 import type { PriceRevalidationService } from "../domain/PriceRevalidationService.js";
+import { BookingEntitlementService } from "../domain/BookingEntitlementService.js";
+import { requireOwnership } from "../middleware/requireOwnership.js";
 
 // Compiled once at module scope.
 const BookingIdParamsSchema = z.object({ bookingId: identifier });
@@ -76,14 +78,23 @@ export interface BookingDomain {
   create(idempotencyKey: string, body: unknown, userId: string): Promise<unknown>;
   getById(bookingId: string, actorId: string, actorRole: string): Promise<unknown>;
   cancel(bookingId: string, actorId: string, actorRole: string): Promise<unknown>;
+  /** WO-044: modify contact fields; routes status change through lifecycle guard. */
+  modify?(bookingId: string, patch: import("@travel/contracts").PatchBookingRequest, actorId: string, actorRole: string): Promise<unknown>;
 }
 
 // Compiled once at module scope for accept-price body.
 const validateAcceptPrice = validateRequest({ body: AcceptPriceRequestSchema });
 
+// WO-044: PATCH body validator
+const validatePatch = validateRequest({ body: PatchBookingRequestSchema });
+
+// Shared entitlement service instance (pure — no deps)
+const entitlementService = new BookingEntitlementService();
+
 // Register route guards in the global registry (for startup assertion + tests)
 registerRouteGuard('POST', '/', 'requireRole', ['traveler']);
 registerRouteGuard('GET', '/:bookingId', 'requireRole', ['traveler', 'support_agent']);
+registerRouteGuard('PATCH', '/:bookingId', 'requireRole', ['traveler']);
 registerRouteGuard('POST', '/:bookingId/cancel', 'requireRole', ['traveler', 'support_agent']);
 registerRouteGuard('GET', '/:bookingId/history', 'requireRole', ['traveler', 'support_agent']);
 registerRouteGuard('POST', '/:bookingId/revalidate', 'requireRole', ['traveler']);
@@ -97,6 +108,12 @@ export function createBookingRouter(
   priceRevalidationService?: PriceRevalidationService,
 ): Router {
   const router = Router();
+
+  // Build the requireOwnership middleware once, sharing the entitlement service.
+  // bookingRepo satisfies OwnershipBookingPort via findBookingOwner().
+  const ownershipPort = bookingRepo
+    ? { findBookingById: (id: string) => bookingRepo.findBookingOwner(id) }
+    : null;
 
   // Helper: emit security event and return 403
   async function denyWithAudit(
@@ -163,6 +180,55 @@ export function createBookingRouter(
         }
         throw err;
       }
+    },
+  );
+
+  // ── PATCH /:bookingId ──────────────────────────────────────────────────
+  // WO-044: Modify mutable contact fields (contactPhone, contactEmail).
+  //
+  // Ownership is enforced at two independent layers:
+  //   1. requireOwnership middleware (second line of defence after requireRole).
+  //   2. domain.modify() re-derives entitlement from the DB principal;
+  //      removing the middleware alone cannot expose data.
+  //
+  // support_agent is intentionally EXCLUDED (requireRole: traveler only);
+  // a support_agent hitting this endpoint receives 403 from requireRole before
+  // ownership or domain logic is ever consulted.
+
+  // Register optional ownership middleware only when bookingRepo is wired.
+  const patchMiddleware = ownershipPort
+    ? requireOwnership('MODIFY', ownershipPort, entitlementService, securityEventWriter)
+    : null;
+
+  router.patch(
+    "/:bookingId",
+    requireRole('traveler'),
+    validateBookingId,
+    validatePatch,
+    async (req: Request, res: Response, next: import("express").NextFunction): Promise<void> => {
+      if (patchMiddleware) {
+        return patchMiddleware(req, res, next);
+      }
+      next();
+    },
+    async (req: Request, res: Response): Promise<void> => {
+      const { bookingId } = req.validated?.params as { bookingId: string };
+      const patch = req.validated?.body as import("@travel/contracts").PatchBookingRequest;
+      const actor = (req as Request & { actor?: { sub: string; roles: string[] } }).actor;
+      const actorId = actor?.sub ?? '';
+      const actorRole = actor?.roles[0] ?? 'traveler';
+      const reference = (req as Request & { correlationId?: string }).correlationId;
+
+      if (!domain.modify) {
+        res.status(501).json({
+          error: { code: 'NOT_IMPLEMENTED', message: 'Booking modification not configured' },
+          reference,
+        });
+        return;
+      }
+
+      const result = await domain.modify(bookingId, patch, actorId, actorRole);
+      res.json({ data: result });
     },
   );
 

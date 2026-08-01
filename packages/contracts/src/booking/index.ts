@@ -29,6 +29,9 @@ export type { SanitisedPayload } from "./audit.js";
 export { OfferSnapshotSchema, OfferLegSchema } from "./offer.js";
 export type { OfferSnapshot, OfferLeg } from "./offer.js";
 
+export { PatchBookingRequestSchema } from "./modify.js";
+export type { PatchBookingRequest } from "./modify.js";
+
 export {
   LegFreshnessSchema,
   RevalidatedLegSchema,

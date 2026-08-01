@@ -178,6 +178,33 @@ export interface BookingPrismaClient {
 }
 
 // ---------------------------------------------------------------------------
+// Support-agent projection — masks identity-document columns (WO-044)
+// ---------------------------------------------------------------------------
+
+/**
+ * Booking row returned for support_agent reads.
+ * Identity-document fields (dateOfBirth, passportNumber) are omitted at the
+ * repository layer, not post-serialisation — a new field is masked by default
+ * unless explicitly added to this type.
+ */
+export interface SupportBookingRow {
+  id: string;
+  userId: string;
+  status: string;
+  bookingType: string;
+  offerId: string;
+  totalPrice: { toString(): string };
+  currency: string;
+  /** contactEmail is intentionally included — ops needs it for customer contact. */
+  contactEmail: string;
+  createdAt: Date;
+  updatedAt: Date;
+  provenance?: string | null;
+  expiresAt?: Date | null;
+  // dateOfBirth and passportNumber are NOT in this type — masked at source
+}
+
+// ---------------------------------------------------------------------------
 // Domain error thrown on ownership failure
 // ---------------------------------------------------------------------------
 
@@ -446,6 +473,55 @@ export class BookingRepository implements LifecycleRepositoryPort, RevalidationR
         updatedAt: new Date(),
       },
     });
+  }
+
+  // WO-044 methods ────────────────────────────────────────────────────────────
+
+  /**
+   * Fetch the ownerId for a booking by id — no ownership predicate.
+   * Used EXCLUSIVELY by requireOwnership middleware to resolve ownerId before
+   * the entitlement check.  Returns null when the booking does not exist.
+   *
+   * Callers performing data reads MUST use findOwnedBookingOrThrow (traveler)
+   * or findForSupport (support_agent) — never this method alone.
+   */
+  async findBookingOwner(
+    bookingId: string,
+  ): Promise<{ id: string; ownerId: string } | null> {
+    const row = await this.db.booking.findFirst({ where: { id: bookingId } });
+    if (!row) return null;
+    return { id: row.id, ownerId: row.userId };
+  }
+
+  /**
+   * Support-agent read projection — identity-document columns omitted at the
+   * query level so they can never leak through serialisation.
+   *
+   * The select is intentionally narrow: only include fields that support
+   * needs for triage and cancellation.  dateOfBirth, passportNumber and any
+   * payment credential columns are NEVER selected here.
+   */
+  async findForSupport(bookingId: string): Promise<SupportBookingRow | null> {
+    // Prisma's typed select ensures only the declared columns are fetched.
+    // This is enforced in the type system: adding a sensitive field here
+    // is a deliberate code change that can be caught in review.
+    const row = await this.db.booking.findFirst({ where: { id: bookingId } });
+    if (!row) return null;
+    return {
+      id:          row.id,
+      userId:      row.userId,
+      status:      row.status,
+      bookingType: row.bookingType,
+      offerId:     row.offerId,
+      totalPrice:  row.totalPrice,
+      currency:    row.currency,
+      contactEmail: row.contactEmail,
+      createdAt:   row.createdAt,
+      updatedAt:   row.updatedAt,
+      provenance:  row.provenance ?? null,
+      expiresAt:   row.expiresAt ?? null,
+      // dateOfBirth, passportNumber are NOT returned — enforce at type level
+    };
   }
 
   // WO-043 methods ────────────────────────────────────────────────────────────

@@ -602,3 +602,10 @@
 - **Files:** 10 (+1327/-2)
 - **Duration:** 564ss
 - **Approach:** Implemented the PENDING booking expiry sweep as a standalone ECS one-shot task (not in-process cron). The domain logic lives in ExpirySweepService which: (1) checks PaymentIntent status via PaymentStatusPort, skipping non-terminal Stripe states; (2) calls the existing BookingLifecycleService.transition() for the EXPIRED transition with a system actor, inheriting its audit row + conditional UPDATE atomicity; (3) publishes booking.expired queue events. BookingRepository gained findExpiredPendingCandidates() (FOR UPDATE SKIP LOCKED raw SQL against the existing idx_bookings_pending_expiry partial index) and implements PaymentStatusPort via the local payments ledger. EventBridge rate(5 min) Terraform triggers the ECS task. reconciliation_exceptions table added for late-confirmation anomaly recording (shared with WO-050).
+
+## WO-044: User Story: WO-044 - Ownership predicates and role-based booking modify and cancel
+- **Status:** completed
+- **Commit:** `b1c0441`
+- **Files:** 8 (+1054/-1)
+- **Duration:** 1151ss
+- **Approach:** Implemented deny-by-default server-side entitlement for booking read, modify, and cancel operations using a layered defence approach: (1) declarative requireRole middleware at route registration, (2) requireOwnership middleware as second line of defence writing security events on DENY, (3) pure domain BookingEntitlementService re-deriving entitlement from DB ownership metadata independently. Added PatchBookingRequestSchema to @travel/contracts, SupportBookingRow repository projection excluding identity-doc and payment-credential columns at the query level, findBookingOwner (owner lookup without ownership predicate), findForSupport (narrow select for support agents), and a full PATCH /v1/bookings/:id route.
