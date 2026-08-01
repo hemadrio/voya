@@ -74,7 +74,8 @@ export const OfferCardEventSchema = z.object({
 export const MessageEndEventSchema = z.object({
   type: z.literal("message_end"),
   turnId: z.string(),
-  status: z.enum(["complete", "incomplete"]),
+  /** "refused" is emitted when the safety layer refuses the request (WO-061). */
+  status: z.enum(["complete", "incomplete", "refused"]),
   tokenUsage: z
     .object({
       inputTokens: z.number().int().nonnegative(),

@@ -42,6 +42,13 @@ import { ClaimExtractor } from "../grounding/ClaimExtractor.js";
 import { GroundingVerifier } from "../grounding/GroundingVerifier.js";
 import { ResponseAssembler } from "../grounding/ResponseAssembler.js";
 import type { GroundingRef } from "../grounding/ResponseAssembler.js";
+import type { PromptTemplate } from "../safety/PromptTemplate.js";
+import { UntrustedContentWrapper } from "../safety/UntrustedContentWrapper.js";
+import { InjectionScreener } from "../safety/InjectionScreener.js";
+import { RefusalPolicy } from "../safety/RefusalPolicy.js";
+import { OutputSanitiser } from "../safety/OutputSanitiser.js";
+import { NOOP_SAFETY_METRICS } from "../safety/SafetyMetrics.js";
+import type { SafetyMetrics } from "../safety/SafetyMetrics.js";
 
 // ---------------------------------------------------------------------------
 // ModelClientPort — duck-typed to avoid @anthropic-ai/sdk in domain layer
@@ -93,6 +100,21 @@ export interface ModelClientPort {
 // Orchestrator configuration
 // ---------------------------------------------------------------------------
 
+export interface OrchestratorSafetyConfig {
+  /** Versioned prompt template (defaults to default template when omitted). */
+  promptTemplate?: PromptTemplate;
+  /** Overrides default UntrustedContentWrapper. */
+  contentWrapper?: UntrustedContentWrapper;
+  /** Overrides default InjectionScreener. */
+  injectionScreener?: InjectionScreener;
+  /** Overrides default RefusalPolicy. */
+  refusalPolicy?: RefusalPolicy;
+  /** Overrides default OutputSanitiser. */
+  outputSanitiser?: OutputSanitiser;
+  /** OTel safety metrics. Defaults to no-op. */
+  metrics?: SafetyMetrics;
+}
+
 export interface OrchestratorConfig {
   /** Budget caps — enforced server-side, cannot be changed by clients. */
   budgetCaps?: Partial<BudgetCaps>;
@@ -100,6 +122,8 @@ export interface OrchestratorConfig {
   clock?: () => number;
   /** Grounding freshness window in ms (default: 15 minutes). */
   freshnessWindowMs?: number;
+  /** Safety/injection-defence configuration. */
+  safety?: OrchestratorSafetyConfig;
 }
 
 // Default caps — conservative, production-safe
@@ -120,6 +144,12 @@ export class ConversationOrchestrator {
   private readonly caps: BudgetCaps;
   private readonly clock: () => number;
   private readonly freshnessWindowMs: number;
+  private readonly promptTemplate: PromptTemplate | undefined;
+  private readonly contentWrapper: UntrustedContentWrapper;
+  private readonly injectionScreener: InjectionScreener;
+  private readonly refusalPolicy: RefusalPolicy;
+  private readonly outputSanitiser: OutputSanitiser;
+  private readonly safetyMetrics: SafetyMetrics;
 
   constructor(
     private readonly modelClient: ModelClientPort,
@@ -131,6 +161,13 @@ export class ConversationOrchestrator {
     this.caps = { ...DEFAULT_CAPS, ...config.budgetCaps };
     this.clock = config.clock ?? (() => Date.now());
     this.freshnessWindowMs = config.freshnessWindowMs ?? 15 * 60 * 1000;
+    const safety = config.safety ?? {};
+    this.promptTemplate = safety.promptTemplate;
+    this.contentWrapper = safety.contentWrapper ?? new UntrustedContentWrapper();
+    this.injectionScreener = safety.injectionScreener ?? new InjectionScreener();
+    this.refusalPolicy = safety.refusalPolicy ?? new RefusalPolicy();
+    this.outputSanitiser = safety.outputSanitiser ?? new OutputSanitiser();
+    this.safetyMetrics = safety.metrics ?? NOOP_SAFETY_METRICS;
   }
 
   /**
@@ -163,6 +200,40 @@ export class ConversationOrchestrator {
     const verifier = new GroundingVerifier(this.freshnessWindowMs, this.clock);
     const assembler = new ResponseAssembler(this.freshnessWindowMs);
 
+    // -----------------------------------------------------------------------
+    // Safety: inbound user message screening (AC1, AC2, AC3, AC4)
+    // -----------------------------------------------------------------------
+
+    // Wrap user message in a labelled data block before prompt insertion.
+    const wrappedUserMessage = this.contentWrapper.wrap("user", userMessage);
+
+    // Screen raw user text for injection patterns.
+    const recentContextTexts = history.map((m) => m.content);
+    const detections = this.injectionScreener.screen(
+      userMessage,
+      recentContextTexts,
+      turnId,
+    );
+
+    // Record detections in telemetry (AC9) — no user free text in labels.
+    for (const d of detections) {
+      this.safetyMetrics.recordDetection(d.patternClass);
+    }
+
+    // Evaluate whether to refuse.
+    const refusalDecision = this.refusalPolicy.evaluate(detections);
+    if (refusalDecision.refuse) {
+      this.safetyMetrics.recordRefusal(refusalDecision.reason);
+      yield { type: "text_delta", text: refusalDecision.message } as TextDeltaEvent;
+      yield {
+        type: "message_end",
+        turnId,
+        status: "refused",
+        tokenUsage: guard.turnUsage,
+      } as MessageEndEvent;
+      return;
+    }
+
     let status: "complete" | "incomplete" = "complete";
     let capNotice: string | undefined;
     /** All groundingRefs collected across rounds — emitted in message_end for persistence. */
@@ -174,9 +245,10 @@ export class ConversationOrchestrator {
       input_schema: t.input_schema,
     }));
 
+    // Insert the wrapped (escaped, data-block-labelled) user message into history.
     let messages: ModelMessage[] = [
       ...history,
-      { role: "user", content: userMessage },
+      { role: "user", content: wrappedUserMessage.wrappedText },
     ];
 
     try {
@@ -302,9 +374,13 @@ export class ConversationOrchestrator {
               summary: result.ok ? summarizeToolResult(result.data) : result.error.code,
             } as ToolEndEvent;
 
+            // Wrap tool result free-text in a labelled data block (AC1, AC3).
+            const toolContent = result.ok
+              ? this.contentWrapper.wrapToolResult(tc.toolName, result.data)
+              : `Error: ${result.error.message}`;
             toolResults.push({
               role: "tool",
-              content: result.ok ? JSON.stringify(result.data) : `Error: ${result.error.message}`,
+              content: toolContent,
             });
           }
         }
@@ -325,9 +401,16 @@ export class ConversationOrchestrator {
               this.clock(),
             );
 
-            // Emit rewritten safe text
-            if (assembled.safeText.length > 0) {
-              yield { type: "text_delta", text: assembled.safeText } as TextDeltaEvent;
+            // Outbound sanitisation — strip executable markup, dangerous URIs,
+            // invisible chars from assembled grounded text (AC5, AC6, AC7).
+            const sanitised = this.outputSanitiser.sanitise(assembled.safeText);
+            for (const action of sanitised.actions) {
+              this.safetyMetrics.recordSanitiserAction(action.kind, action.count);
+            }
+
+            // Emit sanitised grounded text
+            if (sanitised.safeText.length > 0) {
+              yield { type: "text_delta", text: sanitised.safeText } as TextDeltaEvent;
             }
 
             // Emit grounded offer cards (sourced from ledger, never model text)
@@ -350,9 +433,13 @@ export class ConversationOrchestrator {
             // Accumulate grounding refs for persistence
             allGroundingRefs.push(...assembled.groundingRefs);
           } catch {
-            // Assembly bug → fail safe: emit text verbatim (no unsupported claims stripped)
+            // Assembly bug → fail safe: still sanitise before emitting
             if (assistantContent.length > 0) {
-              yield { type: "text_delta", text: assistantContent } as TextDeltaEvent;
+              const fallbackSanitised = this.outputSanitiser.sanitise(assistantContent);
+              for (const action of fallbackSanitised.actions) {
+                this.safetyMetrics.recordSanitiserAction(action.kind, action.count);
+              }
+              yield { type: "text_delta", text: fallbackSanitised.safeText } as TextDeltaEvent;
             }
           }
         }
