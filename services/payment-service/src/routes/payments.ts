@@ -24,6 +24,8 @@ import { validateRequest } from "../../../../shared/middleware/validateRequest.j
 import type { Request, Response } from "express";
 import type { PaymentIntentService } from "../domain/PaymentIntentService.js";
 import type { RefundService } from "../domain/RefundService.js";
+import type { WebhookProcessor } from "../domain/WebhookProcessor.js";
+import type { WebhookVerifier } from "../domain/WebhookVerifier.js";
 
 // ---------------------------------------------------------------------------
 // WebhookLogger — minimal structured logger interface for signature events
@@ -77,6 +79,8 @@ export function createPaymentRouter(
   paymentIntentService?: PaymentIntentService,
   webhookSecurityEventWriter?: WebhookSecurityEventWriter,
   refundService?: RefundService,
+  webhookVerifier?: WebhookVerifier,
+  webhookProcessor?: WebhookProcessor,
 ): Router {
   const router = Router();
 
@@ -257,9 +261,24 @@ export function createPaymentRouter(
       }
 
       try {
-        // req.body is a Buffer here (not parsed JSON) — passed directly
-        await domain.handleWebhook(req.body as Buffer, signature);
-        res.status(200).json({ received: true });
+        // WO-047: Use WebhookProcessor (verify → dedup → process) when wired.
+        // Falls back to legacy domain.handleWebhook for backward compat.
+        if (webhookVerifier && webhookProcessor) {
+          const rawBody = req.body as Buffer;
+          const context = {
+            requestId: reference,
+            ipAddress: req.ip ?? "unknown",
+          };
+          // Verify first — throws SIGNATURE_VERIFICATION_FAILED on failure
+          const event = webhookVerifier.verify(rawBody, signature, context);
+          // Process with doubly-guarded idempotency
+          const outcome = await webhookProcessor.process(event, rawBody, reference);
+          res.status(200).json({ received: true, outcome });
+        } else {
+          // Legacy path
+          await domain.handleWebhook(req.body as Buffer, signature);
+          res.status(200).json({ received: true });
+        }
       } catch (err: unknown) {
         const isDomainError =
           err !== null &&

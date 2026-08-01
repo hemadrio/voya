@@ -707,3 +707,10 @@
 - **Files:** 10 (+1519/-7)
 - **Duration:** 1032ss
 - **Approach:** Implemented envelope encryption for Restricted traveler identity fields (dateOfBirth, passportReference) using a per-subject AES-256-GCM DEK wrapped by a KMS CMK. Added a subject_data_keys table for the DEK registry with key versioning and cryptographic erasure via destroyed_at. Enforced server-side authorization-gated decryption (traveler + system allowed; support_agent hard-denied with 403 + immutable security audit event). Centralised PII redaction in the shared observability package with wildcard Pino paths covering top-level, nested, and array contexts. Guarded the pipeline with a blocking scan:pii-fixtures stage that rejects real passport patterns, production-restore markers, and suspicious DOBs in committed fixture files.
+
+## WO-047: User Story: WO-047 - Exactly-once webhook processing with durable event dedup
+- **Status:** completed
+- **Commit:** `875f9cc`
+- **Files:** 9 (+1803/-10)
+- **Duration:** 796ss
+- **Approach:** Implemented doubly-guarded webhook idempotency: Redis SET NX (72-hour TTL) as the hot-path dedup layer, and a unique constraint on processed_events (provider, event_id) as the durable authority. Added WebhookProcessor domain class with constructor-injected DedupCachePort, BookingCommandPort, QueuePort, and DB client, routing payment_intent.succeeded to CONFIRMED + audit PAYMENT_RECEIVED + SQS FIFO publish, payment_intent.payment_failed to payment FAILED + booking stays PENDING, unknown types to IGNORED, and terminal-booking confirmations to reconciliation_exceptions(CONFIRMATION_AFTER_TERMINAL). Added outcome column to processed_events via migration 0021. Redis outage falls through to DB — never skips processing.

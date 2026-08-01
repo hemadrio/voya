@@ -192,3 +192,49 @@ export const SIG_PAYMENT_SUCCEEDED_WRONG_SECRET = makeWebhookHeader(
   WEBHOOK_WRONG_SECRET,
   WEBHOOK_FIXED_TIMESTAMP,
 );
+
+// ---------------------------------------------------------------------------
+// WO-047: Unknown event type (outcome=IGNORED)
+// ---------------------------------------------------------------------------
+
+/** An event type the handler does not recognise — should return IGNORED. */
+export const FIXTURE_UNKNOWN_EVENT_TYPE = JSON.stringify({
+  id: "SYNTH-EVT-9001",
+  object: "event",
+  api_version: "2023-10-16",
+  created: WEBHOOK_FIXED_TIMESTAMP,
+  type: "customer.created",
+  livemode: false,
+  data: {
+    object: {
+      id: "cus_SYNTH0000000000001",
+      object: "customer",
+      email: null,
+    },
+  },
+});
+
+/** Valid Stripe-Signature header for FIXTURE_UNKNOWN_EVENT_TYPE */
+export const SIG_UNKNOWN_EVENT_TYPE = makeWebhookHeader(
+  FIXTURE_UNKNOWN_EVENT_TYPE,
+  WEBHOOK_TEST_SECRET,
+  WEBHOOK_FIXED_TIMESTAMP,
+);
+
+// ---------------------------------------------------------------------------
+// WO-047: Duplicate delivery — same event ID as FIXTURE_PAYMENT_SUCCEEDED
+// ---------------------------------------------------------------------------
+
+/**
+ * Simulates Stripe re-delivering the same payment_intent.succeeded event.
+ * The event ID ("SYNTH-EVT-0001") is identical to FIXTURE_PAYMENT_SUCCEEDED
+ * so the idempotency layer must detect and suppress this delivery.
+ */
+export const FIXTURE_PAYMENT_SUCCEEDED_DUPLICATE = FIXTURE_PAYMENT_SUCCEEDED;
+
+/** Valid Stripe-Signature header for the duplicate delivery (same payload, new request) */
+export const SIG_PAYMENT_SUCCEEDED_DUPLICATE = makeWebhookHeader(
+  FIXTURE_PAYMENT_SUCCEEDED_DUPLICATE,
+  WEBHOOK_TEST_SECRET,
+  WEBHOOK_FIXED_TIMESTAMP,
+);
