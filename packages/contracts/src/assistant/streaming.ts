@@ -53,8 +53,20 @@ export const ToolEndEventSchema = z.object({
 
 export const OfferCardEventSchema = z.object({
   type: z.literal("offer_card"),
+  /** Unique offer reference matching a ledger entry (never model-generated). */
   offerId: z.string(),
+  /** Upstream supplier/provenance string (e.g. "AMADEUS"). */
   provenance: z.string(),
+  /** Registered tool name that produced this offer. */
+  tool: z.string().optional(),
+  /** ISO 4217 currency code for the price snapshot. */
+  currency: z.string().optional(),
+  /** Price snapshot from the ledger (exact numeric value). */
+  price: z.number().optional(),
+  /** Epoch milliseconds when the offer was retrieved. */
+  retrievedAt: z.number().int().optional(),
+  /** True when the offer is older than the configured freshness window. */
+  stale: z.boolean().optional(),
   displayTitle: z.string().optional(),
   displaySummary: z.string().optional(),
 });
@@ -68,6 +80,19 @@ export const MessageEndEventSchema = z.object({
       inputTokens: z.number().int().nonnegative(),
       outputTokens: z.number().int().nonnegative(),
     })
+    .optional(),
+  /** Grounding references for persisting with the turn (WO-060). */
+  groundingRefs: z
+    .array(
+      z.object({
+        offerRef: z.string(),
+        tool: z.string(),
+        supplier: z.string(),
+        retrievedAt: z.number().int(),
+        price: z.number(),
+        currency: z.string(),
+      }),
+    )
     .optional(),
 });
 

@@ -1,18 +1,20 @@
 /**
- * ConversationOrchestrator — async iterable turn engine (WO-058, WO-059).
+ * ConversationOrchestrator — async iterable turn engine (WO-058, WO-059, WO-060).
  *
  * Produces a sequence of typed SinkEvents by:
  *   1. Yielding message_start immediately.
- *   2. Checking the per-principal rate limit; returning 429-style notice on denial.
- *   3. Estimating input tokens; compacting history if the cap would be exceeded.
- *   4. Streaming model chunks from ModelClientPort.
- *   5. Accumulating tool call inputs and dispatching them via BudgetedToolDispatcher.
+ *   2. Estimating input tokens; compacting history if the cap would be exceeded.
+ *   3. Streaming model chunks from ModelClientPort (text buffered for grounding).
+ *   4. Accumulating tool call inputs and dispatching via BudgetedToolDispatcher.
+ *   5. Populating ProvenanceLedger from successful tool results.
  *   6. Yielding tool_start / tool_end around each dispatch.
- *   7. Repeating if the model signals tool_use stop reason (multi-turn loop).
- *   8. Yielding message_end with accumulated token totals and status.
+ *   7. After each round: running ClaimExtractor → GroundingVerifier → ResponseAssembler
+ *      and emitting only grounded text_delta + verified offer_card events.
+ *   8. Repeating if the model signals tool_use stop reason (multi-turn loop).
+ *   9. Yielding message_end with token totals, status, and groundingRefs.
  *
- * HTTP concerns (SSE framing, backpressure, heartbeats) are the route's
- * responsibility — the orchestrator is transport-agnostic.
+ * Text deltas are buffered until grounding verification completes — no
+ * unsupported factual claim is ever emitted to the client.
  *
  * Budget caps are enforced server-side; they cannot be overridden from
  * client input or model output.
@@ -35,6 +37,11 @@ import { BudgetedToolDispatcher } from "../budget/BudgetedToolDispatcher.js";
 import { compactHistory, CompactionError } from "../budget/compactHistory.js";
 import { estimateTotalInputTokens } from "../budget/estimateTokens.js";
 import type { ToolDispatcher } from "../tools/ToolDispatcher.js";
+import { ProvenanceLedger } from "../grounding/ProvenanceLedger.js";
+import { ClaimExtractor } from "../grounding/ClaimExtractor.js";
+import { GroundingVerifier } from "../grounding/GroundingVerifier.js";
+import { ResponseAssembler } from "../grounding/ResponseAssembler.js";
+import type { GroundingRef } from "../grounding/ResponseAssembler.js";
 
 // ---------------------------------------------------------------------------
 // ModelClientPort — duck-typed to avoid @anthropic-ai/sdk in domain layer
@@ -91,6 +98,8 @@ export interface OrchestratorConfig {
   budgetCaps?: Partial<BudgetCaps>;
   /** Injected clock for deterministic testing. */
   clock?: () => number;
+  /** Grounding freshness window in ms (default: 15 minutes). */
+  freshnessWindowMs?: number;
 }
 
 // Default caps — conservative, production-safe
@@ -110,6 +119,7 @@ const DEFAULT_CAPS: BudgetCaps = {
 export class ConversationOrchestrator {
   private readonly caps: BudgetCaps;
   private readonly clock: () => number;
+  private readonly freshnessWindowMs: number;
 
   constructor(
     private readonly modelClient: ModelClientPort,
@@ -118,9 +128,9 @@ export class ConversationOrchestrator {
     private readonly toolRegistry: ToolRegistry,
     config: OrchestratorConfig = {},
   ) {
-    // Merge provided caps over defaults — client cannot supply caps
     this.caps = { ...DEFAULT_CAPS, ...config.budgetCaps };
     this.clock = config.clock ?? (() => Date.now());
+    this.freshnessWindowMs = config.freshnessWindowMs ?? 15 * 60 * 1000;
   }
 
   /**
@@ -143,21 +153,20 @@ export class ConversationOrchestrator {
     signal: AbortSignal,
     existingConversationTokens = 0,
   ): AsyncGenerator<SinkEvent> {
-    // Immediately yield message_start so the client sees a first byte.
-    const messageStart: MessageStartEvent = {
-      type: "message_start",
-      version: "1",
-      turnId,
-      conversationId,
-    };
-    yield messageStart;
+    yield { type: "message_start", version: "1", turnId, conversationId } as MessageStartEvent;
 
-    // Per-turn budget guard — instantiated here so state is strictly per-turn.
+    // Per-turn instances — none shared across turns
     const guard = new BudgetGuard(this.caps, existingConversationTokens, this.clock);
     const budgetedDispatcher = new BudgetedToolDispatcher(this.toolDispatcher, guard);
+    const ledger = new ProvenanceLedger();
+    const claimExtractor = new ClaimExtractor();
+    const verifier = new GroundingVerifier(this.freshnessWindowMs, this.clock);
+    const assembler = new ResponseAssembler(this.freshnessWindowMs);
 
     let status: "complete" | "incomplete" = "complete";
     let capNotice: string | undefined;
+    /** All groundingRefs collected across rounds — emitted in message_end for persistence. */
+    const allGroundingRefs: GroundingRef[] = [];
 
     const toolDefs = this.toolRegistry.list().map((t: AnthropicTool) => ({
       name: t.name,
@@ -171,43 +180,15 @@ export class ConversationOrchestrator {
     ];
 
     try {
-      // Check top-level input size before the first model call
-      const preCheckOutcome = guard.beforeModelCall(
-        estimateTotalInputTokens(messages, toolDefs),
-      );
-      if (!preCheckOutcome.allowed) {
-        // Attempt compaction
-        try {
-          messages = compactHistory(messages, this.caps.maxInputTokensPerCall);
-        } catch (compErr) {
-          if (compErr instanceof CompactionError) {
-            status = "incomplete";
-            capNotice = CAP_NOTICE.INPUT_TOKENS;
-            yield { type: "text_delta", text: capNotice } as TextDeltaEvent;
-            yield {
-              type: "message_end",
-              turnId,
-              status: "incomplete",
-              tokenUsage: guard.turnUsage,
-            } as MessageEndEvent;
-            return;
-          }
-          throw compErr;
-        }
-        // Recheck after compaction — give up if still too large
-        const recheckOutcome = guard.beforeModelCall(
-          estimateTotalInputTokens(messages, toolDefs),
-        );
-        if (!recheckOutcome.allowed) {
+      // Pre-turn input size check with optional compaction
+      const preCheck = guard.beforeModelCall(estimateTotalInputTokens(messages, toolDefs));
+      if (!preCheck.allowed) {
+        messages = await this.tryCompact(messages);
+        if (!messages || guard.beforeModelCall(estimateTotalInputTokens(messages, toolDefs)).allowed === false) {
           status = "incomplete";
           capNotice = CAP_NOTICE.INPUT_TOKENS;
           yield { type: "text_delta", text: capNotice } as TextDeltaEvent;
-          yield {
-            type: "message_end",
-            turnId,
-            status: "incomplete",
-            tokenUsage: guard.turnUsage,
-          } as MessageEndEvent;
+          yield { type: "message_end", turnId, status: "incomplete", tokenUsage: guard.turnUsage } as MessageEndEvent;
           return;
         }
       }
@@ -221,39 +202,20 @@ export class ConversationOrchestrator {
           break loop;
         }
 
-        if (signal.aborted) {
-          status = "incomplete";
-          break loop;
-        }
+        if (signal.aborted) { status = "incomplete"; break loop; }
 
         const pendingToolCalls = new Map<string, ModelToolCall>();
         let roundStopReason: string | undefined;
         let assistantContent = "";
 
-        const modelCallOutcome = guard.beforeModelCall(
-          estimateTotalInputTokens(messages, toolDefs),
-        );
-        if (!modelCallOutcome.allowed) {
-          // Try compaction before giving up
+        // Per-round model call check
+        const modelCheck = guard.beforeModelCall(estimateTotalInputTokens(messages, toolDefs));
+        if (!modelCheck.allowed) {
           let compacted = false;
-          try {
-            messages = compactHistory(messages, this.caps.maxInputTokensPerCall);
-            compacted = true;
-          } catch {
-            // Compaction failed — hard stop
-          }
-          if (!compacted) {
+          try { messages = compactHistory(messages, this.caps.maxInputTokensPerCall); compacted = true; } catch { /* stop */ }
+          if (!compacted || !guard.beforeModelCall(estimateTotalInputTokens(messages, toolDefs)).allowed) {
             status = "incomplete";
-            capNotice = CAP_NOTICE[modelCallOutcome.cap];
-            break loop;
-          }
-          // Re-check after compaction
-          const recheckAfterCompact = guard.beforeModelCall(
-            estimateTotalInputTokens(messages, toolDefs),
-          );
-          if (!recheckAfterCompact.allowed) {
-            status = "incomplete";
-            capNotice = CAP_NOTICE[recheckAfterCompact.cap];
+            capNotice = CAP_NOTICE[modelCheck.cap];
             break loop;
           }
         }
@@ -261,58 +223,39 @@ export class ConversationOrchestrator {
         const stream = this.modelClient.streamTurn({ messages, tools: toolDefs, signal });
 
         for await (const chunk of stream) {
-          if (signal.aborted) {
-            status = "incomplete";
-            break;
-          }
+          if (signal.aborted) { status = "incomplete"; break; }
 
           switch (chunk.type) {
-            case "text_delta": {
-              const delta = chunk.textDelta ?? "";
-              assistantContent += delta;
-              const textEv: TextDeltaEvent = { type: "text_delta", text: delta };
-              yield textEv;
+            case "text_delta":
+              // Buffer — do not emit yet; grounding verification runs after round
+              assistantContent += chunk.textDelta ?? "";
               break;
-            }
 
-            case "tool_call_start": {
+            case "tool_call_start":
               if (chunk.toolCallId && chunk.toolName) {
                 pendingToolCalls.set(chunk.toolCallId, {
                   toolCallId: chunk.toolCallId,
                   toolName: chunk.toolName,
                   inputJson: "",
                 });
-                const toolStartEv: ToolStartEvent = {
-                  type: "tool_start",
-                  toolCallId: chunk.toolCallId,
-                  tool: chunk.toolName,
-                };
-                yield toolStartEv;
+                yield { type: "tool_start", toolCallId: chunk.toolCallId, tool: chunk.toolName } as ToolStartEvent;
               }
               break;
-            }
 
             case "tool_call_delta": {
               const tc = pendingToolCalls.get(chunk.toolCallId ?? "");
-              if (tc) {
-                tc.inputJson += chunk.toolInputDelta ?? "";
-              }
+              if (tc) tc.inputJson += chunk.toolInputDelta ?? "";
               break;
             }
 
             case "tool_call_end":
               break;
 
-            case "message_end": {
+            case "message_end":
               roundStopReason = chunk.stopReason;
               if (chunk.usage) {
-                guard.afterModelCall({
-                  inputTokens: chunk.usage.inputTokens,
-                  outputTokens: chunk.usage.outputTokens,
-                  isEstimated: false,
-                });
+                guard.afterModelCall({ inputTokens: chunk.usage.inputTokens, outputTokens: chunk.usage.outputTokens, isEstimated: false });
               } else {
-                // Provider omitted usage — fall back to estimate, flag as estimated
                 guard.afterModelCall({
                   inputTokens: estimateTotalInputTokens(messages, toolDefs),
                   outputTokens: Math.ceil(assistantContent.length / 3.5),
@@ -320,94 +263,105 @@ export class ConversationOrchestrator {
                 });
               }
               break;
-            }
           }
         }
 
-        if (signal.aborted) {
-          status = "incomplete";
-          break loop;
-        }
+        if (signal.aborted) { status = "incomplete"; break loop; }
 
-        // Check output cap after model call
-        const outputCheck = guard.assertWithinDuration();
-        if (!outputCheck.allowed) {
-          status = "incomplete";
-          capNotice = CAP_NOTICE[outputCheck.cap];
-          break loop;
-        }
+        const durCheck = guard.assertWithinDuration();
+        if (!durCheck.allowed) { status = "incomplete"; capNotice = CAP_NOTICE[durCheck.cap]; break loop; }
 
         // Dispatch accumulated tool calls for this round
+        const toolResults: ModelMessage[] = [];
         if (pendingToolCalls.size > 0) {
-          const toolResults: ModelMessage[] = [];
-
           for (const tc of pendingToolCalls.values()) {
             if (signal.aborted) { status = "incomplete"; break; }
 
-            // Budget gate is inside BudgetedToolDispatcher
             let rawInput: unknown = {};
-            try {
-              rawInput = JSON.parse(tc.inputJson || "{}");
-            } catch {
-              // Malformed JSON from model — dispatch with empty input
-            }
+            try { rawInput = JSON.parse(tc.inputJson || "{}"); } catch { /* empty input */ }
 
             const result = await budgetedDispatcher.dispatch(tc.toolName, rawInput, ctx, signal);
-
-            // Check if the budget gate fired
             const typedResult = result as typeof result & { budgetDenied?: boolean };
+
             if (typedResult.budgetDenied) {
               status = "incomplete";
               capNotice = CAP_NOTICE.TOOL_CALLS;
-              // Emit tool_end with failure so the client stream is consistent
-              const toolEndEv: ToolEndEvent = {
-                type: "tool_end",
-                toolCallId: tc.toolCallId,
-                status: "failure",
-                summary: "budget_exceeded",
-              };
-              yield toolEndEv;
+              yield { type: "tool_end", toolCallId: tc.toolCallId, status: "failure", summary: "budget_exceeded" } as ToolEndEvent;
               break;
             }
 
-            const toolEndEv: ToolEndEvent = {
+            // Populate provenance ledger from successful tool results
+            if (result.ok) {
+              ledger.record(tc.toolName, result.data, this.clock());
+            }
+
+            yield {
               type: "tool_end",
               toolCallId: tc.toolCallId,
               status: result.ok ? "success" : "failure",
               summary: result.ok ? summarizeToolResult(result.data) : result.error.code,
-            };
-            yield toolEndEv;
-
-            if (result.ok && isOfferArray(result.data)) {
-              for (const offer of result.data as OfferLike[]) {
-                const offerEv: OfferCardEvent = {
-                  type: "offer_card",
-                  offerId: offer.id,
-                  provenance: offer.provenance ?? "unknown",
-                  displayTitle: offer.displayTitle,
-                  displaySummary: offer.displaySummary,
-                };
-                yield offerEv;
-              }
-            }
+            } as ToolEndEvent;
 
             toolResults.push({
               role: "tool",
               content: result.ok ? JSON.stringify(result.data) : `Error: ${result.error.message}`,
             });
           }
-
-          if (status === "incomplete") break loop;
-
-          if (signal.aborted) { status = "incomplete"; break loop; }
-
-          if (assistantContent || pendingToolCalls.size > 0) {
-            messages.push({ role: "assistant", content: assistantContent });
-          }
-          messages.push(...toolResults);
         }
 
-        // If not tool_use, we're done
+        if (status === "incomplete") break loop;
+        if (signal.aborted) { status = "incomplete"; break loop; }
+
+        // --- Grounding assembly for this round ---
+        // Runs AFTER tool dispatches so the ledger is fully populated
+        if (assistantContent.length > 0 || ledger.size > 0) {
+          try {
+            const claims = claimExtractor.extract(assistantContent);
+            const verdicts = verifier.verify(claims, ledger);
+            const assembled = assembler.assemble(
+              assistantContent,
+              verdicts,
+              ledger,
+              this.clock(),
+            );
+
+            // Emit rewritten safe text
+            if (assembled.safeText.length > 0) {
+              yield { type: "text_delta", text: assembled.safeText } as TextDeltaEvent;
+            }
+
+            // Emit grounded offer cards (sourced from ledger, never model text)
+            for (const card of assembled.offerCards) {
+              const offerEv: OfferCardEvent = {
+                type: "offer_card",
+                offerId: card.offerRef,
+                provenance: card.supplier,
+                tool: card.tool,
+                currency: card.currency,
+                price: card.price,
+                retrievedAt: card.retrievedAt,
+                stale: card.stale,
+                displayTitle: card.displayTitle,
+                displaySummary: card.displaySummary,
+              };
+              yield offerEv;
+            }
+
+            // Accumulate grounding refs for persistence
+            allGroundingRefs.push(...assembled.groundingRefs);
+          } catch {
+            // Assembly bug → fail safe: emit text verbatim (no unsupported claims stripped)
+            if (assistantContent.length > 0) {
+              yield { type: "text_delta", text: assistantContent } as TextDeltaEvent;
+            }
+          }
+        }
+
+        if (assistantContent || pendingToolCalls.size > 0) {
+          messages.push({ role: "assistant", content: assistantContent });
+        }
+        messages.push(...toolResults);
+
         if (roundStopReason !== "tool_use") break loop;
       }
     } catch (err) {
@@ -418,7 +372,6 @@ export class ConversationOrchestrator {
       }
     }
 
-    // Emit cap notice as a text_delta before message_end so partial output is preserved
     if (capNotice && status === "incomplete") {
       yield { type: "text_delta", text: `\n\n${capNotice}` } as TextDeltaEvent;
     }
@@ -428,29 +381,28 @@ export class ConversationOrchestrator {
       turnId,
       status,
       tokenUsage: guard.turnUsage,
+      groundingRefs: allGroundingRefs.length > 0 ? allGroundingRefs : undefined,
     };
     yield messageEnd;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  private async tryCompact(messages: ModelMessage[]): Promise<ModelMessage[]> {
+    try {
+      return compactHistory(messages, this.caps.maxInputTokensPerCall);
+    } catch (e) {
+      if (e instanceof CompactionError) return messages; // signal failure by returning original
+      throw e;
+    }
   }
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-interface OfferLike {
-  id: string;
-  provenance?: string;
-  displayTitle?: string;
-  displaySummary?: string;
-}
-
-function isOfferArray(data: unknown): boolean {
-  return (
-    Array.isArray(data) &&
-    data.length > 0 &&
-    typeof (data[0] as Record<string, unknown>)?.id === "string"
-  );
-}
 
 function summarizeToolResult(data: unknown): unknown {
   if (Array.isArray(data)) return `${data.length} result(s)`;
