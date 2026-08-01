@@ -1,8 +1,9 @@
 /**
- * AI tools registry test.
+ * AI tools registry test (updated for WO-056 ToolRegistry).
  *
- * AC8: Every tool schema corresponds to a contracts schema (not hand-written),
- *      and model-emitted inputs that violate the schema are rejected before
+ * AC1: ToolRegistry exposes exactly the declared 5 first-party tools and
+ *      returns Anthropic-compatible definitions generated from contracts Zod schemas.
+ * AC8 (legacy): backward-compat validateToolInput rejects schema violations before
  *      any first-party search endpoint is invoked.
  */
 import { describe, it, expect } from "vitest";
@@ -10,6 +11,7 @@ import {
   SEARCH_TOOLS,
   TOOL_BY_NAME,
   validateToolInput,
+  createDefaultRegistry,
 } from "../src/tools.js";
 import {
   FlightSearchRequestSchema,
@@ -20,7 +22,33 @@ import {
 } from "@travel/contracts";
 import { IATA_CODE_MESSAGE } from "@travel/contracts/common";
 
-describe("SEARCH_TOOLS registry", () => {
+const GATEWAY = "http://localhost:8080";
+
+describe("ToolRegistry — full 5-tool set (AC1)", () => {
+  it("contains exactly five first-party tools", () => {
+    const reg = createDefaultRegistry(GATEWAY);
+    expect(reg.list()).toHaveLength(5);
+  });
+
+  it("contains all required tool names", () => {
+    const reg = createDefaultRegistry(GATEWAY);
+    const names = reg.list().map((t) => t.name);
+    expect(names).toContain("search_flights");
+    expect(names).toContain("search_hotels");
+    expect(names).toContain("search_cars");
+    expect(names).toContain("get_offer");
+    expect(names).toContain("get_user_preferences");
+  });
+
+  it("every tool has a non-empty description", () => {
+    const reg = createDefaultRegistry(GATEWAY);
+    for (const tool of reg.list()) {
+      expect(tool.description.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("SEARCH_TOOLS legacy registry", () => {
   it("contains exactly three first-party search tools", () => {
     expect(SEARCH_TOOLS).toHaveLength(3);
     const names = SEARCH_TOOLS.map((t) => t.name);
@@ -32,7 +60,6 @@ describe("SEARCH_TOOLS registry", () => {
   it("AC8 — every tool has a _contractsSchema reference (not hand-written)", () => {
     for (const tool of SEARCH_TOOLS) {
       expect(tool._contractsSchema).toBeDefined();
-      // Verify the schema is one of the known contracts schemas
       const known = [FlightSearchRequestSchema, HotelSearchRequestSchema, CarRentalSearchRequestSchema];
       expect(known).toContain(tool._contractsSchema);
     }
