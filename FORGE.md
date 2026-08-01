@@ -735,3 +735,10 @@
 - **Files:** 25 (+3005/-0)
 - **Duration:** 1126ss
 - **Approach:** Implemented an end-to-end pseudonymised conversion funnel telemetry pipeline using a hexagonal architecture (FunnelPort interface). The contract layer defines a strict Zod schema rejecting PII via z.never() entries. The observability package provides HMAC-SHA256 pseudonymisation, a non-blocking ring-buffer emitter with drop-oldest overflow, a StdoutEmfWriter for low-cardinality EMF metrics, and a clock-injectable PrismaFunnelStore. An append-only Prisma migration with REVOKE UPDATE/DELETE guards the table. Eleven emit call sites are wired across four services. Six reporting queries use $queryRaw with explicit window parameters and an incompleteWindow flag. The funnel_event table was added to the CLASSIFICATION_REGISTER for automated physical deletion via the existing purge orchestrator. CloudWatch alarms guard heartbeat absence, dropped events, and store failures.
+
+## WO-109: User Story: WO-109 - Author operational runbooks for critical failure modes
+- **Status:** completed
+- **Commit:** `12d3a42`
+- **Files:** 11 (+2542/-0)
+- **Duration:** 1228ss
+- **Approach:** Created documentation infrastructure (TEMPLATE.md, INDEX.md) then authored 5 new runbooks for the six required failure modes (the sixth, payment-reconciliation-exception.md, was pre-existing from prior WOs). Every runbook carries CI-parsable **Alarms:** front matter, starts triage from the traveler reference identifier via X-Ray, quotes only architecture-fixed thresholds, and includes SOC 2 evidence capture. The two-way coverage checker (check-runbook-coverage.ts) maps all 64 static Terraform alarm names to INDEX.md entries and validates that runbook alarm references exist in Terraform. Nine unit tests cover all extraction helpers and the three failure cases. A game-day rehearsal script (localhost-only) proves Scenario A (circuit breaker), B (Redis outage), and C (unsigned/replayed webhook) with committed stub fixtures. Two new pipeline stages (runbook-coverage blocking check and docs:publish with gitleaks scan + S3 upload) wire everything into the Forge Shipping pipeline.

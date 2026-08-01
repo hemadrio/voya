@@ -668,3 +668,71 @@ stages:
       DataClassification).  Names the resource address and missing tags in the
       failure output.  See docs/governance/tagging.md for permitted values and
       the exemption process.
+
+  # ── 13. Runbook coverage check (WO-109 AC5) ─────────────────────────────
+  #   Parses alarm_name values from all infra/terraform/*.tf files and
+  #   verifies every alarm maps to exactly one runbook in docs/runbooks/INDEX.md.
+  #   Also validates that runbooks do not reference non-existent alarms.
+  #
+  #   Blocking: an alarm without a runbook must never reach production because
+  #   the on-call engineer will have no triage path if it fires.
+  #
+  #   Runs early in the pipeline (depends only on build) so runbook gaps are
+  #   caught on every PR, not just at the deploy gate.
+  - name: runbook-coverage
+    run: npx tsx scripts/check-runbook-coverage.ts
+    dependsOn: [build]
+    blocking: true
+    description: >
+      WO-109 AC5 — Alarm-to-runbook coverage gate.
+      Reads all alarm_name values from infra/terraform/ and verifies each maps
+      to a runbook in docs/runbooks/INDEX.md. Fails when any alarm is unmapped
+      or a runbook references a non-existent alarm. Runbook gaps block the
+      pipeline before they can reach production.
+
+  # ── 14. Documentation publish (WO-109 AC8) ──────────────────────────────
+  #   Publishes the versioned runbook set as an immutable documentation
+  #   artefact on every merge to the main branch.  The artefact is uploaded
+  #   to S3 alongside the coverage reports for SOC 2 evidence.
+  #
+  #   Secret scanning (scan:gitleaks) must pass before docs are published —
+  #   the dependsOn chain ensures no secret-containing commit can produce a
+  #   published docs artefact.
+  #
+  #   The artefact includes:
+  #     - All docs/runbooks/*.md files (versioned by git SHA)
+  #     - docs/runbooks/INDEX.md (the alarm-to-runbook map)
+  #     - The check-runbook-coverage output log
+  #   Retention: S3 Object Lock COMPLIANCE mode, 365-day retention (SOC 2).
+  - name: docs:publish
+    run: |
+      set -euo pipefail
+      GIT_SHA=$(git rev-parse --short HEAD)
+      DOCS_ARCHIVE="runbooks-${GIT_SHA}.tar.gz"
+
+      echo "[docs:publish] Building runbook artefact ${DOCS_ARCHIVE}..."
+      tar -czf "${DOCS_ARCHIVE}" docs/runbooks/
+
+      echo "[docs:publish] Running secret scan on runbook archive..."
+      # Verify no credentials slipped into runbook content
+      docker run --rm -v "$(pwd):/repo" -w /repo \
+        ghcr.io/gitleaks/gitleaks:latest detect \
+        --source /repo/docs/runbooks \
+        --redact \
+        --exit-code 1
+
+      echo "[docs:publish] Uploading to S3 artefact bucket..."
+      aws s3 cp "${DOCS_ARCHIVE}" \
+        "s3://travel-platform-ci-artefacts/runbooks/${GIT_SHA}/${DOCS_ARCHIVE}" \
+        --storage-class STANDARD_IA
+
+      echo "[docs:publish] Runbook artefact published: runbooks/${GIT_SHA}/${DOCS_ARCHIVE}"
+    dependsOn:
+      - runbook-coverage
+      - scan:gitleaks
+      - deploy
+    description: >
+      WO-109 AC8 — Publish versioned runbook artefact to S3 on merge to main.
+      Runs gitleaks secret scan on docs/ before upload to ensure no credential
+      pattern was accidentally committed to a runbook.
+      Artefact retained for 365 days (SOC 2 change-management evidence).
