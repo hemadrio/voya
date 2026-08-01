@@ -889,6 +889,15 @@ model ReconciliationException {
   bookingId        String?   @map("booking_id") @db.Uuid
   /// Stripe PaymentIntent ID for correlation with the payments table.
   paymentIntentId  String?   @map("payment_intent_id") @db.VarChar(255)
+  // WO-050 additions: amount comparison and reconciliation period context
+  /// Expected settlement amount in integer minor units. NULL for non-amount exceptions.
+  expectedAmountMinor BigInt?   @map("expected_amount_minor")
+  /// Actual settlement amount in integer minor units from provider. NULL for non-amount exceptions.
+  actualAmountMinor   BigInt?   @map("actual_amount_minor")
+  /// Stripe charge, PaymentIntent, or refund ID. Used in the unique dedup constraint.
+  providerReference   String?   @map("provider_reference")
+  /// UTC date of the reconciliation run that produced this exception.
+  periodDate          DateTime? @map("period_date") @db.Date
   /// Sanitised JSONB context. Must never contain PII.
   detail           Json      @default("{}") @db.JsonB
   /// Wall-clock when the exception was detected.
@@ -900,7 +909,42 @@ model ReconciliationException {
 
   @@index([bookingId], map: "idx_reconciliation_booking")
   @@index([detectedAt(sort: Desc)], map: "idx_reconciliation_unresolved")
+  @@index([periodDate(sort: Desc)], map: "idx_reconciliation_period_date")
   @@map("reconciliation_exceptions")
+}
+
+// ---------------------------------------------------------------------------
+// ReconciliationRun — daily reconciliation job state (WO-050)
+// ---------------------------------------------------------------------------
+
+/// One row per daily reconciliation job execution.
+/// period_date is UNIQUE — re-running for the same date updates the existing row.
+/// cursor persists the Stripe balance_transactions pagination position so a
+/// crashed run can resume from where it stopped rather than starting over.
+model ReconciliationRun {
+  id                   String    @id @default(uuid()) @db.Uuid
+  /// UTC date for which this run was executed (UNIQUE — one active run per day).
+  periodDate           DateTime  @unique @map("period_date") @db.Date
+  /// Run lifecycle: RUNNING | COMPLETED | FAILED | PARTIAL
+  status               String    @db.VarChar(32)
+  /// Stripe balance_transactions list cursor (last seen `starting_after` value).
+  cursor               String?
+  /// Running count of provider transactions compared.
+  transactionsCompared Int       @default(0) @map("transactions_compared")
+  /// Count of exceptions persisted this run.
+  exceptionCount       Int       @default(0) @map("exception_count")
+  /// True when the run completed with zero exceptions (used for 14-day clean gate).
+  cleanRun             Boolean   @default(false) @map("clean_run")
+  /// Correct-terminal-state percentage × 100 as integer (e.g. 9985 = 99.85 %).
+  /// NULL until status = COMPLETED.
+  correctTerminalPct   Int?      @map("correct_terminal_pct")
+  startedAt            DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  finishedAt           DateTime? @map("finished_at") @db.Timestamptz
+  /// S3 key for the JSON + human-readable report artifact.
+  reportS3Key          String?   @map("report_s3_key")
+
+  @@index([periodDate(sort: Desc)], map: "idx_reconciliation_runs_period_desc")
+  @@map("reconciliation_runs")
 }
 
 // ---------------------------------------------------------------------------

@@ -714,3 +714,10 @@
 - **Files:** 9 (+1803/-10)
 - **Duration:** 796ss
 - **Approach:** Implemented doubly-guarded webhook idempotency: Redis SET NX (72-hour TTL) as the hot-path dedup layer, and a unique constraint on processed_events (provider, event_id) as the durable authority. Added WebhookProcessor domain class with constructor-injected DedupCachePort, BookingCommandPort, QueuePort, and DB client, routing payment_intent.succeeded to CONFIRMED + audit PAYMENT_RECEIVED + SQS FIFO publish, payment_intent.payment_failed to payment FAILED + booking stays PENDING, unknown types to IGNORED, and terminal-booking confirmations to reconciliation_exceptions(CONFIRMATION_AFTER_TERMINAL). Added outcome column to processed_events via migration 0021. Redis outage falls through to DB — never skips processing.
+
+## WO-050: User Story: WO-050 - Daily payment-to-booking reconciliation job with zero-exception gate
+- **Status:** completed
+- **Commit:** `dcdd66b`
+- **Files:** 11 (+3000/-0)
+- **Duration:** 922ss
+- **Approach:** Implemented the daily reconciliation job as three layers: (1) a pure domain ReconciliationEngine that classifies exceptions using bigint integer comparison only, (2) a cursor-based StripeBalanceReaderPort with InMemoryStripeReader test double, and (3) a jobs/reconciliation.ts entrypoint that pages Stripe, runs the engine, persists exceptions with skipDuplicates for idempotency, emits CloudWatch metrics, and writes an S3 report. The reconciliation_runs table stores the Stripe pagination cursor so crashed runs resume rather than restart. Migration 0022 extends reconciliation_exceptions with amount comparison columns, provider_reference, period_date, and a unique constraint enforcing idempotent re-runs. Terraform defines a daily EventBridge cron at 02:00 UTC, a least-privilege task role (S3 write + CloudWatch metrics + DB + Stripe read-only), and two CRITICAL alarms: non-zero exception count and missed run at 26 hours.

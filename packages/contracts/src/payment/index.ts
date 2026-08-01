@@ -178,3 +178,53 @@ export const RefundResponseSchema = z
   .strict();
 
 export type RefundResponse = z.infer<typeof RefundResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Reconciliation report schemas — WO-050
+// ---------------------------------------------------------------------------
+
+/**
+ * Shape of the JSON report written to S3 per reconciliation run (AC5).
+ *
+ * Contains no card data, no email addresses, and no personal identifiers
+ * beyond internal booking IDs (which appear only in exception detail — not
+ * in the top-level report shape below).
+ */
+export const ReconciliationReportSchema = z
+  .object({
+    periodDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    transactionsCompared: z.number().int().nonnegative(),
+    exceptionsByKind: z.record(z.string(), z.number().int().nonnegative()),
+    exceptionCount: z.number().int().nonnegative(),
+    cleanRun: z.boolean(),
+    correctTerminalStatePercent: z.number().min(0).max(100),
+    generatedAt: z.string().datetime(),
+  })
+  .strict();
+
+export type ReconciliationReport = z.infer<typeof ReconciliationReportSchema>;
+
+/**
+ * GET /v1/payments/reconciliation/runs response (operator endpoint, support_agent role only).
+ */
+export const ReconciliationRunSummarySchema = z
+  .object({
+    id: identifier,
+    periodDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    status: z.enum(["RUNNING", "COMPLETED", "FAILED", "PARTIAL"]),
+    transactionsCompared: z.number().int().nonnegative(),
+    exceptionCount: z.number().int().nonnegative(),
+    cleanRun: z.boolean(),
+    reportS3Key: z.string().nullable(),
+  })
+  .strict();
+
+export const ReconciliationRunsResponseSchema = z
+  .object({
+    runs: z.array(ReconciliationRunSummarySchema),
+    reference: z.string().optional(),
+  })
+  .strict();
+
+export type ReconciliationRunSummary = z.infer<typeof ReconciliationRunSummarySchema>;
+export type ReconciliationRunsResponse = z.infer<typeof ReconciliationRunsResponseSchema>;
