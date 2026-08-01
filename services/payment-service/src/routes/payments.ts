@@ -19,10 +19,11 @@
  */
 import { Router, raw as expressRaw } from "express";
 import { z } from "zod";
-import { PaymentIntentRequestSchema } from "@travel/contracts";
+import { PaymentIntentRequestSchema, RefundRequestSchema } from "@travel/contracts";
 import { validateRequest } from "../../../../shared/middleware/validateRequest.js";
 import type { Request, Response } from "express";
 import type { PaymentIntentService } from "../domain/PaymentIntentService.js";
+import type { RefundService } from "../domain/RefundService.js";
 
 // ---------------------------------------------------------------------------
 // WebhookLogger — minimal structured logger interface for signature events
@@ -46,6 +47,7 @@ export interface WebhookSecurityEventWriter {
 // ---------------------------------------------------------------------------
 
 const validateIntent = validateRequest({ body: PaymentIntentRequestSchema });
+const validateRefund = validateRequest({ body: RefundRequestSchema });
 
 const BookingIdParamsSchema = z.object({}).passthrough(); // params not used for POST /intents
 
@@ -74,6 +76,7 @@ export function createPaymentRouter(
   domain: PaymentDomain,
   paymentIntentService?: PaymentIntentService,
   webhookSecurityEventWriter?: WebhookSecurityEventWriter,
+  refundService?: RefundService,
 ): Router {
   const router = Router();
 
@@ -117,6 +120,62 @@ export function createPaymentRouter(
           currency: result.currency,
           status: result.status,
           paymentId: result.paymentId,
+        },
+        reference,
+      });
+    },
+  );
+
+  // ── POST /refunds — WO-049: idempotent refund through original payment route ──
+  //
+  // Route path: /refunds (mounted under /payments → full path /payments/refunds)
+  // The api-gateway prefixes /v1, giving the contract path POST /v1/payments/refunds.
+  //
+  // Request body: { bookingId, amountMinor?, currency, reason, legId? }
+  //   amountMinor omitted → full refund of remaining charge amount.
+  //
+  // Response 201: { data: { refundId, providerReference, amountMinor, currency, status, settlementWindow } }
+  router.post(
+    "/refunds",
+    validateRefund,
+    async (req: Request, res: Response): Promise<void> => {
+      const reference = (req as Request & { correlationId?: string }).correlationId;
+
+      if (!refundService) {
+        res.status(501).json({
+          error: { code: "NOT_IMPLEMENTED", message: "RefundService is not configured" },
+          reference,
+        });
+        return;
+      }
+
+      const body = req.validated?.body as {
+        bookingId: string;
+        amountMinor?: number;
+        currency: string;
+        reason: string;
+        legId?: string;
+      };
+      const actor = (req as Request & { actor?: { sub: string; roles: string[] } }).actor;
+
+      const result = await refundService.issueRefund({
+        bookingId: body.bookingId,
+        amountMinor: body.amountMinor !== undefined ? BigInt(body.amountMinor) : undefined,
+        currency: body.currency,
+        reason: body.reason,
+        legId: body.legId,
+        actor: { id: actor?.sub ?? "", role: actor?.roles?.[0] ?? "traveler" },
+        correlationId: reference,
+      });
+
+      res.status(201).json({
+        data: {
+          refundId: result.refundId,
+          providerReference: result.providerReference,
+          amountMinor: Number(result.amountMinor), // BigInt → Number for JSON
+          currency: result.currency,
+          status: result.status,
+          settlementWindow: result.settlementWindow,
         },
         reference,
       });

@@ -46,6 +46,30 @@ export interface StripeIntentResult {
   currency: string;
 }
 
+/** Result of issuing a refund via Stripe. */
+export interface StripeRefundResult {
+  /** Stripe Refund ID (e.g. "re_3..."). */
+  id: string;
+  /** Refund status as returned by Stripe. */
+  status: "succeeded" | "pending" | "failed" | "canceled";
+  /** Refunded amount in the currency's minor unit. */
+  amountMinor: bigint;
+  /** ISO 4217 currency code, lower-case as Stripe returns it. */
+  currency: string;
+}
+
+/** Parameters for creating a refund on an existing charge. */
+export interface StripeCreateRefundParams {
+  /** Stripe PaymentIntent ID of the original charge (e.g. "pi_3..."). */
+  chargeProviderReference: string;
+  /** Amount to refund in the currency's minor unit. */
+  amountMinor: bigint;
+  /** Deterministic idempotency key for this specific refund scope. */
+  idempotencyKey: string;
+  /** Human-readable reason (passed as Stripe refund metadata, not surfaced to travelers). */
+  reason?: string;
+}
+
 /** Parameters for creating a new PaymentIntent. */
 export interface StripeCreateIntentParams {
   /** Amount in the currency's minor unit (must be a safe integer). */
@@ -82,6 +106,16 @@ export interface StripePort {
    *   not supported by the configured Stripe account.
    */
   createIntent(params: StripeCreateIntentParams): Promise<StripeIntentResult>;
+
+  /**
+   * Issue a refund against an existing charge.
+   *
+   * If Stripe already has a refund for this idempotency key it returns the
+   * existing one (no double-refund).
+   *
+   * @throws {DomainError} PROVIDER_UNAVAILABLE (502) on Stripe SDK errors.
+   */
+  createRefund(params: StripeCreateRefundParams): Promise<StripeRefundResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,4 +142,40 @@ export function deriveIdempotencyKey(
   return createHash("sha256")
     .update(`${bookingId}:${amountMinor.toString()}:${currency.toUpperCase()}`)
     .digest("hex");
+}
+
+/**
+ * Derive a deterministic refund idempotency key.
+ *
+ * Format: SHA-256(chargeProviderReference + ':' + scopeKey)
+ * Where scopeKey is:
+ *   - 'full'                         for a full refund (no legId, no specific amount)
+ *   - '{legId}:{amountMinor}'        for a partial/split refund scoped to a leg
+ *
+ * Stable across retries: given the same charge and scope, the same key is
+ * always produced, so Stripe returns the same refund and no second row is created.
+ */
+export function deriveRefundIdempotencyKey(
+  chargeProviderReference: string,
+  scopeKey: string,
+): string {
+  return createHash("sha256")
+    .update(`${chargeProviderReference}:${scopeKey}`)
+    .digest("hex");
+}
+
+/**
+ * Build the scope key for a refund idempotency key.
+ *
+ * - Full refund (no legId):  'full'
+ * - Partial/split refund:    '{legId}:{amountMinor}'
+ */
+export function buildRefundScopeKey(
+  amountMinor: bigint | undefined,
+  legId: string | undefined,
+): string {
+  if (legId !== undefined && amountMinor !== undefined) {
+    return `${legId}:${amountMinor.toString()}`;
+  }
+  return "full";
 }

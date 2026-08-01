@@ -87,3 +87,94 @@ export const PaymentIntentResponseSchema = z
   .strict();
 
 export type PaymentIntentResponse = z.infer<typeof PaymentIntentResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Minor-unit guard helper (WO-049)
+// ---------------------------------------------------------------------------
+
+/**
+ * Assert that a value is a safe-integer bigint (no fractional component).
+ * Throws a TypeError if the value is null, undefined, fractional, or negative
+ * when `allowZero` is false.
+ *
+ * AC9: all money arithmetic uses integer minor units; this helper is the
+ * single enforcement point for the no-float constraint.
+ */
+export function assertIntegerMinorUnits(
+  value: unknown,
+  fieldName = "amountMinor",
+): bigint {
+  if (typeof value === "number") {
+    if (!Number.isInteger(value)) {
+      throw new TypeError(
+        `${fieldName} must be an integer minor-unit amount; received ${value}`,
+      );
+    }
+    return BigInt(value);
+  }
+  if (typeof value === "bigint") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const n = Number(value);
+    if (!Number.isInteger(n)) {
+      throw new TypeError(
+        `${fieldName} must be an integer minor-unit amount; received "${value}"`,
+      );
+    }
+    return BigInt(n);
+  }
+  throw new TypeError(
+    `${fieldName} must be a bigint or integer; received ${String(value)}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Refund schemas — WO-049
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /v1/payments/refunds request body.
+ *
+ * `bookingId`    — the CONFIRMED booking to refund.
+ * `amountMinor`  — amount to refund in the currency's minor unit; omit for a full refund.
+ * `currency`     — ISO 4217 currency code; must match the original charge.
+ * `reason`       — human-readable reason for the refund (logged in audit row).
+ * `legId`        — optional leg identifier for split/partial refunds.
+ */
+export const RefundRequestSchema = z
+  .object({
+    bookingId: identifier,
+    amountMinor: z.number().int().positive().optional(),
+    currency: currencyCode,
+    reason: z.string().trim().min(1).max(512),
+    legId: z.string().trim().min(1).max(128).optional(),
+  })
+  .strict();
+
+export type RefundRequest = z.infer<typeof RefundRequestSchema>;
+
+/**
+ * POST /v1/payments/refunds 201 response body.
+ *
+ * `refundId`        — platform refund payment row UUID.
+ * `providerReference` — Stripe refund ID (e.g. "re_3...").
+ * `amountMinor`     — refunded amount in the currency's minor unit.
+ * `currency`        — ISO 4217 currency code.
+ * `status`          — refund status: SUCCEEDED | PENDING | FAILED.
+ * `settlementWindow` — human-readable settlement window sourced from config template.
+ * `reference`       — correlation/trace ID echoed back for client diagnostics.
+ */
+export const RefundResponseSchema = z
+  .object({
+    refundId: identifier,
+    providerReference: z.string().trim().min(1),
+    amountMinor: z.number().int().positive(),
+    currency: currencyCode,
+    status: z.enum(["SUCCEEDED", "PENDING", "FAILED"]),
+    settlementWindow: z.string().trim().min(1),
+    reference: z.string().optional(),
+  })
+  .strict();
+
+export type RefundResponse = z.infer<typeof RefundResponseSchema>;

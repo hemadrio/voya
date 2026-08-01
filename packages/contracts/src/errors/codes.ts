@@ -100,6 +100,14 @@ export const ErrorCode = {
    *  Distinct from VALIDATION_FAILED — no state change has occurred and no
    *  event detail is echoed. */
   SIGNATURE_VERIFICATION_FAILED: "SIGNATURE_VERIFICATION_FAILED",
+  /** 409 — the requested refund amount would cause cumulative refunds to
+   *  exceed the original charge amount. Computed from summed minor units;
+   *  no floating-point arithmetic is performed. */
+  REFUND_EXCEEDS_CHARGE: "REFUND_EXCEEDS_CHARGE",
+  /** 422 — the booking leg is non-refundable according to the supplier terms
+   *  carried in the offer snapshot. The response names the leg and the
+   *  specific supplier term that prevents the refund. */
+  NOT_REFUNDABLE: "NOT_REFUNDABLE",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -154,6 +162,8 @@ export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   UNSUPPORTED_CURRENCY: 422,
   PROVIDER_UNAVAILABLE: 502,
   SIGNATURE_VERIFICATION_FAILED: 400,
+  REFUND_EXCEEDS_CHARGE: 409,
+  NOT_REFUNDABLE: 422,
 };
 
 /** Allowed HTTP statuses per the API contracts. */

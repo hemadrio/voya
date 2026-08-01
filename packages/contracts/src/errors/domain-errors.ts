@@ -298,3 +298,56 @@ export function signatureVerificationFailed(
 ): DomainError {
   return new DomainErrorImpl("SIGNATURE_VERIFICATION_FAILED", message);
 }
+
+/**
+ * 409 — the requested refund would cause cumulative refunds to exceed the
+ * original charge amount.  All arithmetic is in integer minor units.
+ *
+ * @param alreadyRefundedMinor — total already refunded (minor units).
+ * @param chargeMinor          — original charge amount (minor units).
+ * @param requestedMinor       — amount the caller requested to refund.
+ */
+export function refundExceedsCharge(
+  alreadyRefundedMinor: bigint,
+  chargeMinor: bigint,
+  requestedMinor: bigint,
+  message?: string,
+): DomainError & { alreadyRefundedMinor: bigint; remainingMinor: bigint; requestedMinor: bigint } {
+  const remainingMinor = chargeMinor - alreadyRefundedMinor;
+  const defaultMessage =
+    `Refund of ${requestedMinor} would exceed the original charge of ${chargeMinor}. ` +
+    `Already refunded: ${alreadyRefundedMinor}, remaining: ${remainingMinor}.`;
+  const err = new DomainErrorImpl(
+    "REFUND_EXCEEDS_CHARGE",
+    message ?? defaultMessage,
+  ) as DomainError & { alreadyRefundedMinor: bigint; remainingMinor: bigint; requestedMinor: bigint };
+  err.alreadyRefundedMinor = alreadyRefundedMinor;
+  err.remainingMinor = remainingMinor;
+  err.requestedMinor = requestedMinor;
+  return err;
+}
+
+/**
+ * 422 — the booking leg is non-refundable per the supplier terms in the
+ * offer snapshot.  The response names the leg and the supplier term that
+ * applies so the caller can surface it to the traveler.
+ *
+ * @param legId       — the leg that is non-refundable (undefined for a full booking).
+ * @param supplierTerm — the supplier term key that prevents the refund.
+ */
+export function notRefundable(
+  legId: string | undefined,
+  supplierTerm: string,
+  message?: string,
+): DomainError & { legId: string | undefined; supplierTerm: string } {
+  const defaultMessage = legId
+    ? `Leg "${legId}" is non-refundable per supplier term "${supplierTerm}".`
+    : `This booking is non-refundable per supplier term "${supplierTerm}".`;
+  const err = new DomainErrorImpl(
+    "NOT_REFUNDABLE",
+    message ?? defaultMessage,
+  ) as DomainError & { legId: string | undefined; supplierTerm: string };
+  err.legId = legId;
+  err.supplierTerm = supplierTerm;
+  return err;
+}

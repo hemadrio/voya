@@ -12,8 +12,8 @@ if (process.env['NODE_ENV'] !== 'test') {
  * payment-service entry point.
  *
  * Exports the ProcessedEventRepository for use by the Stripe webhook handler.
- * The full Express service and Stripe integration are delivered by later
- * payment epics and are out of scope for WO-072.
+ * Exports RefundPort for the WO-048 saga compensation path so the
+ * CheckoutSagaOrchestrator depends on an abstraction, not payment-service internals.
  */
 export {
   recordProcessedEvent,
@@ -23,3 +23,10 @@ export type {
   ProcessedEventDbClient,
   InsertOutcome,
 } from "./repositories/ProcessedEventRepository.js";
+
+// RefundPort — exported for WO-048 saga compensation (AC9 of WO-049)
+export type {
+  RefundPort,
+  RefundResult,
+  RefundServiceRequest,
+} from "./domain/RefundService.js";
