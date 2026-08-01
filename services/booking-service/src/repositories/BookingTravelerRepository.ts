@@ -33,6 +33,10 @@ export interface TravelerRow {
   dekKeyId: string;
   encryptionContext: Record<string, string>;
   createdAt: Date;
+  /** WO-102: null until trip_completed_at is set; then derived as +identityDocumentDays. */
+  purgeAfter: Date | null;
+  tripCompletedAt: Date | null;
+  legalHold: boolean;
 }
 
 export interface TravelerPrismaClient {
@@ -51,6 +55,10 @@ export interface TravelerPrismaClient {
         wrappedDek: Buffer;
         dekKeyId: string;
         encryptionContext: Record<string, string>;
+        /** Always null at creation time; set when trip completes. */
+        purgeAfter?: Date | null;
+        tripCompletedAt?: Date | null;
+        legalHold?: boolean;
       };
     }): Promise<TravelerRow>;
 
@@ -59,6 +67,12 @@ export interface TravelerPrismaClient {
     }): Promise<TravelerRow[]>;
 
     count(args: { where: { bookingId: string } }): Promise<number>;
+
+    /** Set tripCompletedAt and derive purgeAfter for all travelers on a booking. */
+    updateMany(args: {
+      where: { bookingId: string };
+      data: { tripCompletedAt: Date; purgeAfter: Date };
+    }): Promise<{ count: number }>;
   };
 }
 
@@ -111,8 +125,30 @@ export class BookingTravelerRepository {
         wrappedDek: wrappedKey.wrappedDek,
         dekKeyId: wrappedKey.dekKeyId,
         encryptionContext: context,
+        // WO-102: purge_after is null at creation — set by setTripCompleted()
+        // once the trip completion date is known. Must NOT default to now+90d.
+        purgeAfter: null,
+        tripCompletedAt: null,
+        legalHold: false,
       },
     });
+  }
+
+  /**
+   * WO-102: Set tripCompletedAt and derive purgeAfter for all travelers on a booking.
+   *
+   * Called by the itinerary service (or the booking status update path) when the
+   * last leg of the trip departs. purge_after = tripCompletedAt + identityDocumentDays.
+   *
+   * This is the ONLY call that sets purge_after — it must never be set at booking
+   * creation time because the trip completion date is not yet known.
+   */
+  async setTripCompleted(bookingId: string, tripCompletedAt: Date, purgeAfter: Date): Promise<number> {
+    const result = await this.db.bookingTraveler.updateMany({
+      where: { bookingId },
+      data: { tripCompletedAt, purgeAfter },
+    });
+    return result.count;
   }
 
   /**

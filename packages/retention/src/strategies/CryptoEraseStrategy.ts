@@ -36,6 +36,7 @@ export class CryptoEraseStrategy implements CategoryPurgeStrategy {
     const { now, batchSize, dryRun, correlationId, maxBatches } = options;
 
     const examined = await this.repo.countExpired(entry.table, now);
+    const skippedLegalHold = await this.repo.countLegalHold(entry.table, now);
 
     if (dryRun) {
       this.logger.info(
@@ -45,11 +46,24 @@ export class CryptoEraseStrategy implements CategoryPurgeStrategy {
           entryId: entry.id,
           table: entry.table,
           examined,
+          skippedLegalHold,
           dryRun: true,
         },
         "purge.dry_run: would crypto-erase subjects",
       );
-      return { examined, purged: 0, keysDestroyed: 0, status: "skipped" };
+      return { examined, purged: 0, keysDestroyed: 0, skippedLegalHold, status: "skipped" };
+    }
+
+    if (skippedLegalHold > 0) {
+      this.logger.warn(
+        {
+          correlationId,
+          category: entry.category,
+          table: entry.table,
+          skippedLegalHold,
+        },
+        "purge.legal_hold: skipping crypto-erasure subjects under legal hold",
+      );
     }
 
     let totalPurged = 0;
@@ -85,7 +99,7 @@ export class CryptoEraseStrategy implements CategoryPurgeStrategy {
       if (candidates.length < batchSize) break;
     }
 
-    return { examined, purged: totalPurged, keysDestroyed: totalKeysDestroyed, status: "success" };
+    return { examined, purged: totalPurged, keysDestroyed: totalKeysDestroyed, skippedLegalHold, status: "success" };
   }
 
   private async eraseCandidate(

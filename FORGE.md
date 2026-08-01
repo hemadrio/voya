@@ -504,3 +504,10 @@
 - **Files:** 9 (+2005/-2)
 - **Duration:** 770ss
 - **Approach:** Implemented two separate k6 load profiles (Profile A: sustained-peak, Profile B: spike-ramp) with all latency and throughput thresholds externalised in tests/load/config/thresholds.json. Disjoint hit/miss cache cohorts use HIT_ / MISS_ key prefixes to guarantee independent latency budget measurement. Profile A uses k6 ramping-arrival-rate and constant-arrival-rate executors for warmup → 300 rps steady → ramp → 600 rps gate phases. Profile B uses ramping-arrival-rate to ramp from 300 to 900 rps in 600 s (10 min) proving the step-scaling policy. generate-report.ts reads k6 JSON output plus CloudWatch metric export, emits JSON + Markdown verdicts per budget and guardrail, performs R9 assertion (DB connections per task ≤5 via RDS Proxy), and exits non-zero on FAIL or MISSING_DATA. Pipeline extended with test:speedscale stage group that runs Profile A, exports CloudWatch p95 metrics, generates report, and archives as 365-day SOC 2 evidence. deploy:staging now depends on test stage (not gate) so no staging promotion without passing the load gate.
+
+## WO-102: User Story: WO-102 - Data Classification Tagging and Automated Retention Purge
+- **Status:** completed
+- **Commit:** `70c1db0`
+- **Files:** 19 (+643/-13)
+- **Duration:** 1308ss
+- **Approach:** Implemented the legal-hold skip layer, skippedLegalHold metric/audit propagation, purge_after write paths in booking repositories, and the complete expand/contract migration (0015) across the retention stack. Built on the existing WO-075/WO-101 foundation: CLASSIFICATION_REGISTER, PurgeOrchestrator, all four strategies, RetentionConfig, and buildPrismaRepository were already scaffolded. WO-102 adds the missing pieces that make the worker production-safe: legal_hold column + partial indexes, countLegalHold repository port, skippedLegalHold threading through StrategyResult → CategoryRunResult → PurgeRunRecord → purge_runs table, purge_after set at booking/traveler row creation, and full unit test coverage of the legal-hold boundary condition.

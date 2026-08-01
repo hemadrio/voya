@@ -26,6 +26,7 @@ const fakeCandidate: ErasureCandidate = {
 function makeRepo(candidates: ErasureCandidate[] = []): PurgeRepositoryPort {
   return {
     countExpired: vi.fn().mockResolvedValue(candidates.length),
+    countLegalHold: vi.fn().mockResolvedValue(0),
     deleteBatch: vi.fn().mockResolvedValue(0),
     fetchErasureCandidates: vi.fn()
       .mockResolvedValueOnce(candidates)

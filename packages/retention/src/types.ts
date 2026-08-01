@@ -93,6 +93,12 @@ export interface PurgeRepositoryPort {
    * Quarantine a row that could not be purged.
    */
   quarantine(entry: QuarantineEntry): Promise<void>;
+
+  /**
+   * Count rows with purge_after due but skipped due to legal_hold=true.
+   * Used for dry-run and live-run metric reporting.
+   */
+  countLegalHold(table: string, now: Date): Promise<number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +125,8 @@ export interface PurgeRunRecord {
   examined: number;
   purged: number;
   keysDestroyed: number;
+  /** Rows skipped due to legal_hold=true. Counts only — no identifiers (BR-13). */
+  skippedLegalHold: number;
   status: "success" | "failure" | "dry_run" | "skipped";
   errorMessage?: string;
   correlationId: string;
@@ -159,6 +167,8 @@ export interface StrategyResult {
   examined: number;
   purged: number;
   keysDestroyed: number;
+  /** Rows skipped because legal_hold=true at purge time. */
+  skippedLegalHold: number;
   status: "success" | "partial" | "skipped";
 }
 
@@ -170,6 +180,8 @@ export interface PurgeMetrics {
   recordExamined(category: string, count: number): void;
   recordPurged(category: string, count: number): void;
   recordKeysDestroyed(category: string, count: number): void;
+  /** Rows skipped due to legal_hold=true. */
+  recordSkippedLegalHold(category: string, count: number): void;
   recordFailure(category: string): void;
   recordDuration(category: string, durationMs: number): void;
   recordRunStart(): void;

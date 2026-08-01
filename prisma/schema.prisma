@@ -253,6 +253,12 @@ model Booking {
   /// A cancelled booking keeps the same horizon (tax/dispute retention).
   purgeAfter     DateTime?          @map("purge_after") @db.Timestamptz
 
+  // WO-102 additions
+  /// Legal hold flag — when true, purge worker skips this row even if purge_after is due.
+  /// Set by compliance/legal on disputed or under-investigation bookings.
+  /// Purge worker records skipped count in metrics; row is NOT deleted until hold is lifted.
+  legalHold      Boolean            @default(false) @map("legal_hold")
+
   @@index([userId])
   @@index([status])
   // WO-077: composite index for booking history list (user_id, created_at DESC)
@@ -479,6 +485,11 @@ model BookingTraveler {
   /// Wall-clock time the associated trip was completed; set by the itinerary service
   /// when the last leg departs. Drives purge_after derivation.
   tripCompletedAt DateTime?         @map("trip_completed_at") @db.Timestamptz
+
+  // WO-102 additions
+  /// Legal hold flag — when true, crypto-erasure worker skips this row.
+  /// Rows on legal hold are counted as skipped in purge metrics.
+  legalHold      Boolean            @default(false) @map("legal_hold")
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
 

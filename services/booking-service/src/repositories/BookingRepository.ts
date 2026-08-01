@@ -11,6 +11,9 @@
  * Injectable: depends only on duck-typed interfaces for testability.
  */
 
+import { deriveBookingPurgeAfter } from "@travel/retention";
+import type { RetentionConfig } from "@travel/contracts/retention";
+
 // ---------------------------------------------------------------------------
 // Injectable Prisma interface — duck-typed for unit testability
 // ---------------------------------------------------------------------------
@@ -34,6 +37,10 @@ export interface BookingRow {
   provenance?: string | null;
   /** WO-039: Expiry timestamp for PENDING bookings (now + 30 min at create time). */
   expiresAt?: Date | null;
+  /** WO-102: Purge date derived as created_at + transactionYears. Null before config injection. */
+  purgeAfter?: Date | null;
+  /** WO-102: Legal hold flag — when true, purge worker skips this row. */
+  legalHold?: boolean;
 }
 
 export interface BookingPrismaClient {
@@ -64,6 +71,10 @@ export interface BookingPrismaClient {
         provenance?: string | null;
         /** WO-039: PENDING expiry timestamp. */
         expiresAt?: Date | null;
+        /** WO-102: Retention purge date derived from created_at + transactionYears. */
+        purgeAfter?: Date | null;
+        /** WO-102: Legal hold — defaults to false at creation. */
+        legalHold?: boolean;
       };
     }): Promise<BookingRow>;
     update(args: {
@@ -90,7 +101,15 @@ export class OwnershipError extends Error {
 // ---------------------------------------------------------------------------
 
 export class BookingRepository {
-  constructor(private readonly db: BookingPrismaClient) {}
+  constructor(
+    private readonly db: BookingPrismaClient,
+    /**
+     * WO-102: When provided, purge_after is derived at booking creation time
+     * using deriveBookingPurgeAfter(createdAt, config). Optional to preserve
+     * backwards compatibility with existing callers that do not pass config.
+     */
+    private readonly retentionConfig?: Pick<RetentionConfig, "transactionYears">,
+  ) {}
 
   /**
    * Fetch a booking that belongs to the given user.
@@ -158,6 +177,15 @@ export class BookingRepository {
   async createBooking(
     input: import("../domain/BookingCreationService.js").CreateBookingInput,
   ): Promise<import("../domain/BookingCreationService.js").CreatedBooking> {
+    // WO-102: Derive purge_after at creation time when RetentionConfig is injected.
+    // purge_after = created_at + transactionYears. We use now() as the creation
+    // timestamp approximation; the DB-side @default(now()) will be within the same
+    // transaction, so the delta is negligible for a 7-year horizon.
+    const now = new Date();
+    const purgeAfter = this.retentionConfig
+      ? deriveBookingPurgeAfter(now, this.retentionConfig)
+      : null;
+
     const row = await this.db.booking.create({
       data: {
         userId: input.userId,
@@ -172,6 +200,9 @@ export class BookingRepository {
         offerSnapshot: input.offerSnapshot as Record<string, unknown>,
         provenance: input.provenance,
         expiresAt: input.expiresAt,
+        // WO-102: Set purge_after and legal_hold at row creation time.
+        purgeAfter,
+        legalHold: false,
       },
     });
 

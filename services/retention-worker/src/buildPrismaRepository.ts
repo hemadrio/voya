@@ -35,31 +35,57 @@ export async function buildPrismaRepository(logger: PurgeLogger): Promise<PurgeR
 
   return {
     async countExpired(table: string, now: Date): Promise<number> {
-      // Parameterized via Prisma — no string interpolation in WHERE values
+      // Parameterized via Prisma — no string interpolation in WHERE values.
+      // Counts only rows NOT under legal hold — legal_hold rows are counted
+      // separately via countLegalHold so metrics reflect the true state.
       const result = await prisma.$queryRaw<Array<{ count: bigint }>>`
         SELECT COUNT(*) AS count
         FROM ${prisma.$raw(`"${table}"`)}
         WHERE purge_after IS NOT NULL
           AND purge_after <= ${now}
+          AND (legal_hold IS NULL OR legal_hold = false)
       `;
       return Number(result[0]?.count ?? 0);
     },
 
+    async countLegalHold(table: string, now: Date): Promise<number> {
+      // Count rows due for purge that are blocked by legal hold.
+      // Tables without a legal_hold column return 0 safely via COALESCE.
+      try {
+        const result = await prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*) AS count
+          FROM ${prisma.$raw(`"${table}"`)}
+          WHERE purge_after IS NOT NULL
+            AND purge_after <= ${now}
+            AND legal_hold = true
+        `;
+        return Number(result[0]?.count ?? 0);
+      } catch {
+        // Table has no legal_hold column (e.g. conversation_messages) — return 0
+        return 0;
+      }
+    },
+
     async deleteBatch(table: string, batchSize: number, now: Date): Promise<number> {
       assertDeletable(table);
+      // FOR UPDATE SKIP LOCKED prevents concurrent runs from processing the
+      // same batch. legal_hold = true rows are never selected for deletion.
       const result = await prisma.$executeRaw`
         DELETE FROM ${prisma.$raw(`"${table}"`)}
         WHERE id IN (
           SELECT id FROM ${prisma.$raw(`"${table}"`)}
           WHERE purge_after IS NOT NULL
             AND purge_after <= ${now}
+            AND (legal_hold IS NULL OR legal_hold = false)
           LIMIT ${batchSize}
+          FOR UPDATE SKIP LOCKED
         )
       `;
       return result;
     },
 
     async fetchErasureCandidates(table: string, batchSize: number, now: Date): Promise<ErasureCandidate[]> {
+      // Exclude legal_hold rows from erasure candidates.
       const rows = await prisma.$queryRaw<Array<{
         id: string;
         subject_id: string;
@@ -72,7 +98,9 @@ export async function buildPrismaRepository(logger: PurgeLogger): Promise<PurgeR
         WHERE purge_after IS NOT NULL
           AND purge_after <= ${now}
           AND wrapped_dek IS NOT NULL
+          AND (legal_hold IS NULL OR legal_hold = false)
         LIMIT ${batchSize}
+        FOR UPDATE SKIP LOCKED
       `;
       return rows.map((r) => ({
         id: r.id,
@@ -125,16 +153,17 @@ export async function buildPrismaRepository(logger: PurgeLogger): Promise<PurgeR
     },
 
     async recordPurgeRun(run: PurgeRunRecord): Promise<void> {
+      // Counts only — no subject identifiers or personal data (BR-13).
       await prisma.$executeRaw`
         INSERT INTO purge_runs (
           category, entry_id, correlation_id,
           started_at, finished_at,
-          examined, purged, keys_destroyed,
+          examined, purged, keys_destroyed, skipped_legal_hold,
           status, error_message, dry_run
         ) VALUES (
           ${run.category}, ${run.entryId}, ${run.correlationId}::uuid,
           ${run.startedAt}, ${run.finishedAt},
-          ${run.examined}, ${run.purged}, ${run.keysDestroyed},
+          ${run.examined}, ${run.purged}, ${run.keysDestroyed}, ${run.skippedLegalHold},
           ${run.status}, ${run.errorMessage ?? null}, ${run.dryRun}
         )
       `;

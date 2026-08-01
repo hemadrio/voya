@@ -11,6 +11,7 @@ const NOW = new Date("2026-01-01T00:00:00Z");
 function makeRepo(overrides: Partial<PurgeRepositoryPort> = {}): PurgeRepositoryPort {
   return {
     countExpired: vi.fn().mockResolvedValue(3),
+    countLegalHold: vi.fn().mockResolvedValue(0),
     deleteBatch: vi.fn().mockResolvedValue(0),
     fetchErasureCandidates: vi.fn(),
     nullifyWrappedDek: vi.fn(),

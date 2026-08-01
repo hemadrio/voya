@@ -33,6 +33,9 @@ export function createPurgeMetrics(): PurgeMetrics {
   const keysDestroyedCounter = meter?.createCounter("purge_keys_destroyed_total", {
     description: "Total DEKs destroyed during crypto-erasure",
   });
+  const skippedLegalHoldCounter = meter?.createCounter("purge_rows_skipped_legal_hold_total", {
+    description: "Total rows skipped because legal_hold=true",
+  });
   const failureCounter = meter?.createCounter("purge_category_failures_total", {
     description: "Number of category-level purge failures",
   });
@@ -57,6 +60,9 @@ export function createPurgeMetrics(): PurgeMetrics {
     recordKeysDestroyed(category, count) {
       keysDestroyedCounter?.add(count, { category });
     },
+    recordSkippedLegalHold(category, count) {
+      skippedLegalHoldCounter?.add(count, { category });
+    },
     recordFailure(category) {
       failureCounter?.add(1, { category });
     },
@@ -80,6 +86,7 @@ export class SpyPurgeMetrics implements PurgeMetrics {
   readonly examined: Array<{ category: string; count: number }> = [];
   readonly purged: Array<{ category: string; count: number }> = [];
   readonly keysDestroyed: Array<{ category: string; count: number }> = [];
+  readonly skippedLegalHolds: Array<{ category: string; count: number }> = [];
   readonly failures: string[] = [];
   readonly durations: Array<{ category: string; durationMs: number }> = [];
   runStarts = 0;
@@ -93,6 +100,9 @@ export class SpyPurgeMetrics implements PurgeMetrics {
   }
   recordKeysDestroyed(category: string, count: number) {
     this.keysDestroyed.push({ category, count });
+  }
+  recordSkippedLegalHold(category: string, count: number) {
+    this.skippedLegalHolds.push({ category, count });
   }
   recordFailure(category: string) {
     this.failures.push(category);

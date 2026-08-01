@@ -46,7 +46,7 @@ export class PseudonymiseActorStrategy implements CategoryPurgeStrategy {
         },
         "purge.dry_run: would pseudonymise actor references",
       );
-      return { examined, purged: 0, keysDestroyed: 0, status: "skipped" };
+      return { examined, purged: 0, keysDestroyed: 0, skippedLegalHold: 0, status: "skipped" };
     }
 
     // Note: actual actor_id list comes from the erasure request subsystem.
@@ -65,6 +65,6 @@ export class PseudonymiseActorStrategy implements CategoryPurgeStrategy {
       "purge.pseudonymise: actor references pseudonymised",
     );
 
-    return { examined, purged: pseudonymised, keysDestroyed: 0, status: "success" };
+    return { examined, purged: pseudonymised, keysDestroyed: 0, skippedLegalHold: 0, status: "success" };
   }
 }

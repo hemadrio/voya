@@ -24,6 +24,7 @@ export class PhysicalDeleteStrategy implements CategoryPurgeStrategy {
     const { now, batchSize, interBatchPauseMs, dryRun, correlationId, maxBatches } = options;
 
     const examined = await this.repo.countExpired(entry.table, now);
+    const skippedLegalHold = await this.repo.countLegalHold(entry.table, now);
 
     if (dryRun) {
       this.logger.info(
@@ -33,17 +34,31 @@ export class PhysicalDeleteStrategy implements CategoryPurgeStrategy {
           entryId: entry.id,
           table: entry.table,
           examined,
+          skippedLegalHold,
           dryRun: true,
         },
         "purge.dry_run: would delete rows",
       );
-      return { examined, purged: 0, keysDestroyed: 0, status: "skipped" };
+      return { examined, purged: 0, keysDestroyed: 0, skippedLegalHold, status: "skipped" };
+    }
+
+    if (skippedLegalHold > 0) {
+      this.logger.warn(
+        {
+          correlationId,
+          category: entry.category,
+          table: entry.table,
+          skippedLegalHold,
+        },
+        "purge.legal_hold: skipping rows under legal hold",
+      );
     }
 
     let totalPurged = 0;
     let batchCount = 0;
 
     while (batchCount < maxBatches) {
+      // deleteBatch excludes legal_hold=true rows (enforced in repository)
       const deleted = await this.repo.deleteBatch(entry.table, batchSize, now);
       totalPurged += deleted;
       batchCount++;
@@ -70,7 +85,7 @@ export class PhysicalDeleteStrategy implements CategoryPurgeStrategy {
       }
     }
 
-    return { examined, purged: totalPurged, keysDestroyed: 0, status: "success" };
+    return { examined, purged: totalPurged, keysDestroyed: 0, skippedLegalHold, status: "success" };
   }
 }
 

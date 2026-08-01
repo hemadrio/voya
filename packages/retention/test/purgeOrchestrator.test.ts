@@ -23,6 +23,7 @@ import type { ClassificationRegister } from "@travel/contracts/retention";
 function makeStubbedRepo(overrides: Partial<PurgeRepositoryPort> = {}): PurgeRepositoryPort {
   return {
     countExpired: vi.fn().mockResolvedValue(0),
+    countLegalHold: vi.fn().mockResolvedValue(0),
     deleteBatch: vi.fn().mockResolvedValue(0),
     fetchErasureCandidates: vi.fn().mockResolvedValue([]),
     nullifyWrappedDek: vi.fn().mockResolvedValue(0),
@@ -52,6 +53,7 @@ function makeStrategy(name: string, result: Partial<StrategyResult> = {}): Categ
       examined: 0,
       purged: 0,
       keysDestroyed: 0,
+      skippedLegalHold: 0,
       status: "success",
       ...result,
     }),

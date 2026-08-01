@@ -16,6 +16,8 @@ import { randomUUID } from "node:crypto";
 export interface BoundaryRow {
   id: string;
   purge_after: Date | null;
+  /** WO-102: When true, the purge worker must skip this row even if purge_after is due. */
+  legal_hold?: boolean;
   /** Expected outcome after a purge run with dryRun=false. */
   expectedOutcome: "purged" | "retained";
   label: string;
@@ -59,6 +61,14 @@ export function generatePhysicalDeleteFixtures(now: Date): BoundaryRow[] {
       purge_after: null,
       expectedOutcome: "retained",
       label: "null: no purge deadline (must retain)",
+    },
+    // WO-102: Legal hold — row is due for purge but must be skipped.
+    {
+      id: randomUUID(),
+      purge_after: past,
+      legal_hold: true,
+      expectedOutcome: "retained",
+      label: "legal_hold: purge_after due but legal_hold=true (must retain)",
     },
   ];
 }
@@ -111,6 +121,18 @@ export function generateCryptoEraseFixtures(now: Date): ErasureRow[] {
       purge_after: past,
       expectedOutcome: "purged",
       label: "already-erased: idempotent (wrapped_dek already null)",
+    },
+    // WO-102: Legal hold — traveler record is due for crypto-erasure but legal_hold=true.
+    {
+      id: randomUUID(),
+      subject_id: randomUUID(),
+      wrapped_dek: fakeWrappedDek,
+      dek_key_id: "kms-key-1",
+      booking_id: randomUUID(),
+      purge_after: past,
+      legal_hold: true,
+      expectedOutcome: "retained",
+      label: "legal_hold: crypto-erase due but legal_hold=true (must retain)",
     },
   ];
 }

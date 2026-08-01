@@ -62,6 +62,7 @@ export interface CategoryRunResult {
   examined: number;
   purged: number;
   keysDestroyed: number;
+  skippedLegalHold: number;
   durationMs: number;
   errorMessage?: string;
 }
@@ -165,6 +166,7 @@ export class PurgeOrchestrator {
             examined: 0,
             purged: 0,
             keysDestroyed: 0,
+            skippedLegalHold: 0,
             durationMs: 0,
           });
           continue;
@@ -185,6 +187,7 @@ export class PurgeOrchestrator {
             examined: 0,
             purged: 0,
             keysDestroyed: 0,
+            skippedLegalHold: 0,
             durationMs: 0,
           });
           continue;
@@ -208,6 +211,7 @@ export class PurgeOrchestrator {
             examined: 0,
             purged: 0,
             keysDestroyed: 0,
+            skippedLegalHold: 0,
             durationMs: 0,
             errorMessage: msg,
           });
@@ -247,6 +251,7 @@ export class PurgeOrchestrator {
             examined: 0,
             purged: 0,
             keysDestroyed: 0,
+            skippedLegalHold: 0,
             durationMs,
             errorMessage,
           });
@@ -262,6 +267,9 @@ export class PurgeOrchestrator {
         if (result.keysDestroyed > 0) {
           this.metrics.recordKeysDestroyed(entry.category, result.keysDestroyed);
         }
+        if (result.skippedLegalHold > 0) {
+          this.metrics.recordSkippedLegalHold(entry.category, result.skippedLegalHold);
+        }
         this.metrics.recordDuration(entry.category, durationMs);
 
         this.logger.info(
@@ -273,6 +281,7 @@ export class PurgeOrchestrator {
             examined: result.examined,
             purged: result.purged,
             keysDestroyed: result.keysDestroyed,
+            skippedLegalHold: result.skippedLegalHold,
             durationMs,
             dryRun,
           },
@@ -280,7 +289,8 @@ export class PurgeOrchestrator {
         );
 
         // Immutable audit record for every purge action
-        if (!dryRun && result.purged > 0) {
+        // Counts only — no subject identifiers or PII (BR-13)
+        if (!dryRun && (result.purged > 0 || result.skippedLegalHold > 0)) {
           const purgeRun: PurgeRunRecord = {
             category: entry.category,
             entryId: entry.id,
@@ -289,6 +299,7 @@ export class PurgeOrchestrator {
             examined: result.examined,
             purged: result.purged,
             keysDestroyed: result.keysDestroyed,
+            skippedLegalHold: result.skippedLegalHold,
             status: categoryStatus === "failure" ? "failure" : categoryStatus === "skipped" ? "skipped" : "success",
             correlationId,
             dryRun: false,
@@ -310,6 +321,7 @@ export class PurgeOrchestrator {
           examined: result.examined,
           purged: result.purged,
           keysDestroyed: result.keysDestroyed,
+          skippedLegalHold: result.skippedLegalHold,
           durationMs,
         });
       }

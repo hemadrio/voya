@@ -84,6 +84,11 @@ class InMemoryPurgeRepository implements PurgeRepositoryPort {
     return rows.filter((r) => r.purge_after !== null && r.purge_after <= now).length;
   }
 
+  async countLegalHold(_table: string, _now: Date): Promise<number> {
+    // In-memory test repository: legal hold tracking not needed — return 0.
+    return 0;
+  }
+
   async deleteBatch(table: string, batchSize: number, now: Date): Promise<number> {
     const map = this.tables.get(table);
     if (!map) return 0;

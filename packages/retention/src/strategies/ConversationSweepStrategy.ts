@@ -40,6 +40,8 @@ export class ConversationSweepStrategy implements CategoryPurgeStrategy {
     const cutoff = new Date(now.getTime() - this.config.conversationDays * 86_400_000);
 
     const examined = await this.repo.countExpired(entry.table, now);
+    // Conversation messages do not have a legal_hold column — always 0
+    const skippedLegalHold = 0;
 
     if (dryRun) {
       this.logger.info(
@@ -54,7 +56,7 @@ export class ConversationSweepStrategy implements CategoryPurgeStrategy {
         },
         "purge.dry_run: would sweep conversation history",
       );
-      return { examined, purged: 0, keysDestroyed: 0, status: "skipped" };
+      return { examined, purged: 0, keysDestroyed: 0, skippedLegalHold, status: "skipped" };
     }
 
     let redisDeleted = 0;
@@ -90,6 +92,6 @@ export class ConversationSweepStrategy implements CategoryPurgeStrategy {
     const totalPurged = redisDeleted + durableDeleted;
     const status = redisError ? "partial" : "success";
 
-    return { examined, purged: totalPurged, keysDestroyed: 0, status };
+    return { examined, purged: totalPurged, keysDestroyed: 0, skippedLegalHold, status };
   }
 }
