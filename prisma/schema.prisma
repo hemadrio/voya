@@ -816,3 +816,50 @@ model Payment {
   @@index([bookingId, createdAt(sort: Desc)], map: "idx_payments_booking_created_at")
   @@map("payments")
 }
+
+// ---------------------------------------------------------------------------
+// Conversation / ConversationMessage — AI assistant session store (WO-057)
+// ---------------------------------------------------------------------------
+// Access constraint: ONLY the ai-service ConversationRepository may query
+// these tables.  No other service repository should reference these models.
+//
+// Two constraints cannot be expressed in Prisma and are in the raw migration:
+//   1. CHECK (exactly one of user_id / guest_session_id is non-null)
+//   2. UNIQUE (conversation_id, idempotency_key) WHERE idempotency_key IS NOT NULL
+
+model Conversation {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  guestSessionId String?  @map("guest_session_id") @db.Text
+  title          String?  @db.Text
+  status         String   @default("active") @db.Text
+  resolvedSlots  Json     @default("{}") @map("resolved_slots") @db.JsonB
+  tokenTotals    Json     @default("{}") @map("token_totals") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  lastActivityAt DateTime @default(now()) @map("last_activity_at") @db.Timestamptz
+
+  messages ConversationMessage[]
+
+  @@index([userId, lastActivityAt(sort: Desc)], map: "idx_conversations_user_activity")
+  @@index([guestSessionId], map: "idx_conversations_guest_session")
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  role           String   @db.Text
+  content        String   @db.Text
+  toolCalls      Json?    @map("tool_calls") @db.JsonB
+  groundingRefs  Json?    @map("grounding_refs") @db.JsonB
+  tokenCount     Int      @default(0) @map("token_count")
+  idempotencyKey String?  @map("idempotency_key") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  // Pagination index — sort by (conversation_id, created_at, id) for stable cursor pagination.
+  @@index([conversationId, createdAt, id], map: "idx_conversation_messages_pagination")
+  @@map("conversation_messages")
+}

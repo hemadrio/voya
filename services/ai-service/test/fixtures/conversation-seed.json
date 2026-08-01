@@ -1,0 +1,213 @@
+{
+  "_comment": "Synthetic fixture data for ConversationRepository tests (WO-057). All emails use .invalid TLD and card numbers are test-range values.",
+  "users": [
+    {
+      "id": "user-fixture-alice",
+      "email": "alice@test.invalid",
+      "role": "traveler"
+    },
+    {
+      "id": "user-fixture-bob",
+      "email": "bob@test.invalid",
+      "role": "traveler"
+    }
+  ],
+  "guestSessions": [
+    {
+      "id": "guest-session-fixture-alpha",
+      "note": "Anonymous guest planning Lisbon trip"
+    }
+  ],
+  "conversations": [
+    {
+      "id": "conv-fixture-alice-001",
+      "userId": "user-fixture-alice",
+      "guestSessionId": null,
+      "title": "Lisbon Summer Trip",
+      "status": "active",
+      "resolvedSlots": {
+        "origin": "LHR",
+        "destination": "LIS",
+        "departDate": "2026-08-15",
+        "returnDate": "2026-08-22",
+        "travellers": 2,
+        "cabin": "economy"
+      },
+      "tokenTotals": {
+        "user": 142,
+        "assistant": 378
+      },
+      "createdAt": "2026-07-01T10:00:00Z",
+      "updatedAt": "2026-07-01T11:30:00Z",
+      "lastActivityAt": "2026-07-01T11:30:00Z"
+    },
+    {
+      "id": "conv-fixture-bob-001",
+      "userId": "user-fixture-bob",
+      "guestSessionId": null,
+      "title": "NYC to Tokyo Business",
+      "status": "active",
+      "resolvedSlots": {
+        "origin": "JFK",
+        "destination": "NRT",
+        "cabin": "business"
+      },
+      "tokenTotals": {
+        "user": 55,
+        "assistant": 190
+      },
+      "createdAt": "2026-07-10T08:00:00Z",
+      "updatedAt": "2026-07-10T08:45:00Z",
+      "lastActivityAt": "2026-07-10T08:45:00Z"
+    },
+    {
+      "id": "conv-fixture-guest-001",
+      "userId": null,
+      "guestSessionId": "guest-session-fixture-alpha",
+      "title": null,
+      "status": "active",
+      "resolvedSlots": {
+        "destination": "BCN"
+      },
+      "tokenTotals": {
+        "user": 20
+      },
+      "createdAt": "2026-07-15T14:00:00Z",
+      "updatedAt": "2026-07-15T14:05:00Z",
+      "lastActivityAt": "2026-07-15T14:05:00Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg-fixture-001",
+      "conversationId": "conv-fixture-alice-001",
+      "role": "user",
+      "content": "I want to fly from London to Lisbon in August for 2 people",
+      "toolCalls": null,
+      "groundingRefs": null,
+      "tokenCount": 18,
+      "idempotencyKey": "idem-alice-001-turn1-user",
+      "createdAt": "2026-07-01T10:00:00Z"
+    },
+    {
+      "id": "msg-fixture-002",
+      "conversationId": "conv-fixture-alice-001",
+      "role": "assistant",
+      "content": "I found several options for your London to Lisbon trip in August. Here are the best results:",
+      "toolCalls": [
+        {
+          "type": "tool_use",
+          "id": "tool-001",
+          "name": "search_flights",
+          "input": {
+            "origin": "LHR",
+            "destination": "LIS",
+            "departureDate": "2026-08-15",
+            "passengers": 2,
+            "cabin": "economy"
+          }
+        }
+      ],
+      "groundingRefs": [
+        {
+          "type": "flight_offer",
+          "offerId": "offer-abc123",
+          "snippet": "TAP Air Portugal LHR→LIS 10:30–13:45, £220pp"
+        }
+      ],
+      "tokenCount": 120,
+      "idempotencyKey": "idem-alice-001-turn1-assistant",
+      "createdAt": "2026-07-01T10:01:30Z"
+    },
+    {
+      "id": "msg-fixture-003",
+      "conversationId": "conv-fixture-alice-001",
+      "role": "user",
+      "content": "Make it a week later",
+      "toolCalls": null,
+      "groundingRefs": null,
+      "tokenCount": 6,
+      "idempotencyKey": "idem-alice-001-turn2-user",
+      "createdAt": "2026-07-01T10:05:00Z"
+    },
+    {
+      "id": "msg-fixture-004",
+      "conversationId": "conv-fixture-alice-001",
+      "role": "assistant",
+      "content": "Updated the departure to 22 August. Here are options for the revised dates:",
+      "toolCalls": [
+        {
+          "type": "tool_use",
+          "id": "tool-002",
+          "name": "search_flights",
+          "input": {
+            "origin": "LHR",
+            "destination": "LIS",
+            "departureDate": "2026-08-22",
+            "passengers": 2,
+            "cabin": "economy"
+          }
+        }
+      ],
+      "groundingRefs": [],
+      "tokenCount": 98,
+      "idempotencyKey": "idem-alice-001-turn2-assistant",
+      "createdAt": "2026-07-01T10:06:00Z"
+    },
+    {
+      "id": "msg-fixture-005",
+      "conversationId": "conv-fixture-bob-001",
+      "role": "user",
+      "content": "Looking for business class flights from JFK to Tokyo",
+      "toolCalls": null,
+      "groundingRefs": null,
+      "tokenCount": 12,
+      "idempotencyKey": "idem-bob-001-turn1-user",
+      "createdAt": "2026-07-10T08:00:00Z"
+    },
+    {
+      "id": "msg-fixture-006",
+      "conversationId": "conv-fixture-bob-001",
+      "role": "assistant",
+      "content": "Found business class options on ANA and JAL for JFK–NRT.",
+      "toolCalls": [],
+      "groundingRefs": [],
+      "tokenCount": 88,
+      "idempotencyKey": "idem-bob-001-turn1-assistant",
+      "createdAt": "2026-07-10T08:01:00Z"
+    },
+    {
+      "id": "msg-fixture-007",
+      "conversationId": "conv-fixture-guest-001",
+      "role": "user",
+      "content": "Hotels in Barcelona please",
+      "toolCalls": null,
+      "groundingRefs": null,
+      "tokenCount": 5,
+      "idempotencyKey": null,
+      "createdAt": "2026-07-15T14:00:00Z"
+    }
+  ],
+  "piiFixtures": [
+    {
+      "description": "Card number pattern — should be redacted",
+      "rawContent": "My Visa card 4111111111111111 for payment",
+      "expectedMasked": "My Visa card [REDACTED_CARD] for payment"
+    },
+    {
+      "description": "Email address — should be redacted",
+      "rawContent": "Email me at traveller@example.invalid for confirmation",
+      "expectedMasked": "Email me at [REDACTED_EMAIL] for confirmation"
+    },
+    {
+      "description": "Amex-style 15-digit card",
+      "rawContent": "Amex 378282246310005 expiry 12/28",
+      "expectedMasked": "Amex [REDACTED_CARD] expiry 12/28"
+    },
+    {
+      "description": "Short digit run — should NOT be redacted",
+      "rawContent": "My zip code is 90210 and budget is 500",
+      "expectedMasked": "My zip code is 90210 and budget is 500"
+    }
+  ]
+}
