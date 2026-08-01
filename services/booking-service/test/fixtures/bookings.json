@@ -38,5 +38,75 @@
     "offerId": "off_amadeus_expired_price_frozen",
     "createdAt": "2024-01-15T13:00:00Z",
     "updatedAt": "2024-01-15T13:00:00Z"
+  },
+  "lifecycle_pending": {
+    "id": "lc_01HXPENDING0001",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "status": "PENDING",
+    "userId": "usr_traveler_lc",
+    "offerId": "off_amadeus_lifecycle_test",
+    "createdAt": "2026-01-15T10:00:00Z",
+    "updatedAt": "2026-01-15T10:00:00Z"
+  },
+  "lifecycle_confirmed": {
+    "id": "lc_01HXCONFIRMED01",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "status": "CONFIRMED",
+    "userId": "usr_traveler_lc",
+    "offerId": "off_amadeus_lifecycle_test",
+    "createdAt": "2026-01-15T10:00:00Z",
+    "updatedAt": "2026-01-15T10:01:00Z"
+  },
+  "lifecycle_completed": {
+    "id": "lc_01HXCOMPLETED01",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "status": "COMPLETED",
+    "userId": "usr_traveler_lc",
+    "offerId": "off_amadeus_lifecycle_test",
+    "createdAt": "2026-01-15T10:00:00Z",
+    "updatedAt": "2026-01-16T10:00:00Z"
+  },
+  "lifecycle_cancelled": {
+    "id": "lc_01HXCANCELLED01",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "status": "CANCELLED",
+    "userId": "usr_traveler_lc",
+    "offerId": "off_amadeus_lifecycle_test",
+    "createdAt": "2026-01-15T10:00:00Z",
+    "updatedAt": "2026-01-15T10:05:00Z"
+  },
+  "lifecycle_expired": {
+    "id": "lc_01HXEXPIRED0001",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "status": "EXPIRED",
+    "userId": "usr_traveler_lc",
+    "offerId": "off_amadeus_lifecycle_test",
+    "createdAt": "2026-01-15T10:00:00Z",
+    "updatedAt": "2026-01-15T10:31:00Z"
+  },
+  "lifecycle_failed": {
+    "id": "lc_01HXFAILED00001",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "status": "FAILED",
+    "userId": "usr_traveler_lc",
+    "offerId": "off_amadeus_lifecycle_test",
+    "createdAt": "2026-01-15T10:00:00Z",
+    "updatedAt": "2026-01-15T10:02:00Z"
+  },
+  "lifecycle_refunded": {
+    "id": "lc_01HXREFUNDED001",
+    "provenance": "AMADEUS",
+    "bookable": true,
+    "status": "REFUNDED",
+    "userId": "usr_traveler_lc",
+    "offerId": "off_amadeus_lifecycle_test",
+    "createdAt": "2026-01-15T10:00:00Z",
+    "updatedAt": "2026-01-15T10:10:00Z"
   }
 }

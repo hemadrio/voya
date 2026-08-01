@@ -18,6 +18,7 @@ export type BookingType = z.infer<typeof BookingTypeSchema>;
 export const BookingStatusSchema = z.enum([
   "PENDING",
   "CONFIRMED",
+  "COMPLETED",
   "CANCELLED",
   "FAILED",
   "REFUNDED",

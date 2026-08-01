@@ -1,53 +1,26 @@
 /**
  * BookingStateMachine — enforces booking lifecycle transitions.
  *
- * A booking may only advance along permitted edges. Any attempted move to a
- * state not reachable from the current state raises a LIFECYCLE_CONFLICT (409)
- * that names the current state and the permitted next states so callers can act
- * on it without guessing the graph.
+ * All state definitions and the permitted transition matrix live in
+ * transitions.ts (WO-040 single source of truth).  This module re-exports
+ * the public API surface so existing callers do not need to change their
+ * import paths.
  *
- * Terminal states (COMPLETED, CANCELLED, FAILED, REFUNDED, EXPIRED) accept no
- * further transitions — a webhook arriving for an already-cancelled booking
- * is rejected here before it can resurrect the record.
+ * New code should prefer importing from BookingLifecycleService.ts (the domain
+ * service that persists the transition) rather than calling assertTransition
+ * directly, since calling assertTransition alone does not write the audit row
+ * or perform the conditional DB update.
  */
 
 import { lifecycleConflict } from "@travel/contracts/errors";
 import type { DomainError } from "@travel/contracts/errors";
+import {
+  isPermittedTransition,
+  PERMITTED_TRANSITIONS,
+} from "./transitions.js";
 
-// ---------------------------------------------------------------------------
-// State vocabulary
-// ---------------------------------------------------------------------------
-
-export type BookingStatus =
-  | "PENDING"
-  | "CONFIRMED"
-  | "COMPLETED"
-  | "CANCELLED"
-  | "FAILED"
-  | "REFUNDED"
-  | "EXPIRED";
-
-// ---------------------------------------------------------------------------
-// Transition graph
-// ---------------------------------------------------------------------------
-
-/**
- * Exhaustive mapping of every status to the set of statuses it may transition
- * into. Terminal states have an empty permitted set.
- */
-export const PERMITTED_TRANSITIONS: Readonly<Record<BookingStatus, ReadonlyArray<BookingStatus>>> = {
-  PENDING: ["CONFIRMED", "FAILED", "CANCELLED", "EXPIRED"],
-  CONFIRMED: ["COMPLETED", "CANCELLED", "REFUNDED"],
-  COMPLETED: [],
-  CANCELLED: [],
-  FAILED: [],
-  REFUNDED: [],
-  EXPIRED: [],
-} as const;
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
+export type { BookingStatus } from "./transitions.js";
+export { PERMITTED_TRANSITIONS, isTerminalStatus as isTerminal } from "./transitions.js";
 
 /**
  * Assert that the transition from `current` to `next` is permitted.
@@ -55,10 +28,11 @@ export const PERMITTED_TRANSITIONS: Readonly<Record<BookingStatus, ReadonlyArray
  * @throws {DomainError} LIFECYCLE_CONFLICT (409) when the transition is
  * forbidden. The message names the current state and the permitted next states.
  */
-export function assertTransition(current: BookingStatus, next: BookingStatus): void {
-  const permitted = PERMITTED_TRANSITIONS[current];
-  if (!permitted.includes(next)) {
-    const permittedList = permitted.length > 0 ? permitted.join(", ") : "none";
+export function assertTransition(current: string, next: string): void {
+  const permitted = PERMITTED_TRANSITIONS[current as keyof typeof PERMITTED_TRANSITIONS];
+  if (!permitted || !(permitted as string[]).includes(next)) {
+    const permittedList =
+      permitted && permitted.length > 0 ? permitted.join(", ") : "none";
     throw lifecycleConflict(
       `Cannot transition booking from ${current} to ${next}. ` +
         `Current state: ${current}. Permitted transitions: [${permittedList}].`,
@@ -71,8 +45,8 @@ export function assertTransition(current: BookingStatus, next: BookingStatus): v
  * forbidden, or null when it is permitted.
  */
 export function checkTransition(
-  current: BookingStatus,
-  next: BookingStatus,
+  current: string,
+  next: string,
 ): DomainError | null {
   try {
     assertTransition(current, next);
@@ -86,11 +60,11 @@ export function checkTransition(
  * Returns the list of states reachable from `current`.
  * An empty array means `current` is a terminal state.
  */
-export function getPermittedTransitions(current: BookingStatus): ReadonlyArray<BookingStatus> {
-  return PERMITTED_TRANSITIONS[current];
+export function getPermittedTransitions(current: string): ReadonlyArray<string> {
+  return PERMITTED_TRANSITIONS[current as keyof typeof PERMITTED_TRANSITIONS] ?? [];
 }
 
 /** Returns true when `status` is a terminal state that accepts no transitions. */
-export function isTerminal(status: BookingStatus): boolean {
-  return PERMITTED_TRANSITIONS[status].length === 0;
+export function isTerminal(status: string): boolean {
+  return !isPermittedTransition || getPermittedTransitions(status).length === 0;
 }

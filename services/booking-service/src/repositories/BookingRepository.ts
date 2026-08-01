@@ -13,6 +13,8 @@
 
 import { deriveBookingPurgeAfter } from "@travel/retention";
 import type { RetentionConfig } from "@travel/contracts/retention";
+import type { AuditTxClient } from "../domain/AuditWriter.js";
+import type { LifecycleRepositoryPort, BookingStatusRow } from "../domain/BookingLifecycleService.js";
 
 // ---------------------------------------------------------------------------
 // Injectable Prisma interface — duck-typed for unit testability
@@ -46,7 +48,7 @@ export interface BookingRow {
 export interface BookingPrismaClient {
   booking: {
     findFirst(args: {
-      where: { id: string; userId: string } | { idempotencyKey: string };
+      where: { id: string; userId: string } | { idempotencyKey: string } | { id: string };
     }): Promise<BookingRow | null>;
     findMany(args: {
       where: { userId: string };
@@ -81,7 +83,26 @@ export interface BookingPrismaClient {
       where: { id: string; userId: string };
       data: Partial<{ status: string; updatedAt: Date }>;
     }): Promise<BookingRow>;
+    /**
+     * WO-040: Conditional update for optimistic concurrency.
+     * WHERE clause includes the expected current status so two concurrent
+     * callers cannot both succeed — the second returns count: 0.
+     */
+    updateMany(args: {
+      where: { id: string; status: string };
+      data: { status: string; updatedAt: Date };
+    }): Promise<{ count: number }>;
   };
+
+  /**
+   * WO-040: Prisma interactive transaction.
+   * Passes a transaction-scoped client to `fn`; rolls back if `fn` throws.
+   * The tx client satisfies both BookingPrismaClient (for status update) and
+   * AuditTxClient (for audit row insert) shapes.
+   */
+  $transaction<T>(
+    fn: (tx: BookingPrismaClient & AuditTxClient) => Promise<T>,
+  ): Promise<T>;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,10 +118,10 @@ export class OwnershipError extends Error {
 }
 
 // ---------------------------------------------------------------------------
-// BookingRepository
+// BookingRepository implements both CRUD and LifecycleRepositoryPort
 // ---------------------------------------------------------------------------
 
-export class BookingRepository {
+export class BookingRepository implements LifecycleRepositoryPort {
   constructor(
     private readonly db: BookingPrismaClient,
     /**
@@ -216,6 +237,64 @@ export class BookingRepository {
       provenance: row.provenance ?? null,
       offerSnapshot: row.offerSnapshot,
     };
+  }
+
+  // WO-040 lifecycle port methods ─────────────────────────────────────────────
+
+  /**
+   * Find a booking by its ID without an ownership predicate.
+   * Used exclusively by BookingLifecycleService for status-transition guards.
+   * Callers performing user-facing reads MUST use findOwnedBookingOrThrow.
+   */
+  async findBookingById(bookingId: string): Promise<BookingStatusRow | null> {
+    const row = await this.db.booking.findFirst({
+      where: { id: bookingId },
+    });
+    if (!row) return null;
+    return { id: row.id, status: row.status };
+  }
+
+  /**
+   * Conditional status update for optimistic concurrency (AC5 WO-040).
+   *
+   * Uses updateMany with WHERE id=$bookingId AND status=$fromStatus.
+   * Returns the number of rows updated:
+   *   1 → success (transition committed)
+   *   0 → lost race; the row's status changed between the findBookingById
+   *       call and this update — the caller must surface this as 409.
+   *
+   * Must be called inside a transaction (tx parameter is the
+   * transaction-scoped client so the update and the audit row are atomic).
+   *
+   * NOTE: `tx` is typed as AuditTxClient for the audit write; the underlying
+   * concrete Prisma tx client also satisfies the booking update shape.
+   * The implementation casts to the full db type so both operations share
+   * the same transaction.
+   */
+  async conditionalStatusUpdate(
+    bookingId: string,
+    fromStatus: string,
+    toStatus: string,
+    tx: AuditTxClient,
+  ): Promise<number> {
+    const dbTx = tx as unknown as BookingPrismaClient;
+    const result = await dbTx.booking.updateMany({
+      where: { id: bookingId, status: fromStatus },
+      data: { status: toStatus, updatedAt: new Date() },
+    });
+    return result.count;
+  }
+
+  /**
+   * Open a Prisma interactive transaction and run `work` inside it (AC6 WO-040).
+   * If `work` throws, the transaction is automatically rolled back.
+   *
+   * The transaction client satisfies BookingPrismaClient (booking.updateMany)
+   * AND AuditTxClient (bookingAuditLog.create) so both operations share the
+   * same connection and commit atomically.
+   */
+  async runInTransaction<T>(work: (tx: AuditTxClient) => Promise<T>): Promise<T> {
+    return this.db.$transaction((tx) => work(tx as unknown as AuditTxClient));
   }
 
   /**
