@@ -644,3 +644,10 @@
 - **Files:** 3 (+204/-19)
 - **Duration:** 1154ss
 - **Approach:** Implemented the complete multi-step checkout wizard as a URL-driven step machine (?step=traveler|extras|review|payment) with sessionStorage-backed draft persistence. All API calls use a stable-per-draft idempotency key. Quote revalidation fires at the review step and gates payment behind explicit price-change acknowledgement. Payment is handled via a render-prop pattern keeping raw card data exclusively in the provider element. Booking creation POSTs the Idempotency-Key header, then polls for asynchronous confirmation with jittered exponential backoff and bounded timeout. A typed ConfirmationSnapshot is persisted just before the draft is cleared so the confirmation page can display dates, total, cancellation deadline, and calendar export without an extra API call.
+
+## WO-069: User Story: WO-069 - Deliver traveler account dashboard and trip management
+- **Status:** completed
+- **Commit:** `e558ceb`
+- **Files:** 21 (+3236/-0)
+- **Duration:** 1179ss
+- **Approach:** Implemented the full authenticated account area as a Next.js App Router route group app/(account)/account/ with server-rendered pages for flash-free first paint. All account API calls are wrapped in lib/api/account.ts using the shared apiClient. Booking tab grouping uses timezone-aware date math (Intl.DateTimeFormat with IANA timezone for DST-correct in-progress detection) in lib/bookings/status.ts. Cancellation uses an idempotency key generated per dialog open and renders refund amounts exclusively from the backend preview endpoint. Modification validates availability and shows backend-sourced price differences. Wishlist uses optimistic removal with useState rollback and toast on failure. Profile uses React Hook Form + Zod with server field-error binding. ICS generation follows RFC 5545 with VALUE=DATE all-day events and 75-octet line folding. No TanStack Query — all mutations use useState/useCallback with explicit rollback patterns.
