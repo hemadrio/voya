@@ -93,16 +93,33 @@ export function buildCreateBookingRequest(
   };
 }
 
+import { Suspense } from "react";
+import { CheckoutWizard } from "../../components/checkout/CheckoutWizard.js";
+
 // ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
 
-export default async function CheckoutPage({ searchParams }: CheckoutPageProps) {
-  // Full checkout form and booking saga wiring in subsequent WOs.
+export default async function CheckoutPage(_props: CheckoutPageProps) {
   return (
-    <main>
-      <h1>Checkout</h1>
-      <p>Checkout page — full implementation in WO-006.</p>
+    <main className="mx-auto max-w-lg px-4 py-8">
+      <h1 className="sr-only">Checkout</h1>
+      {/* CheckoutWizard is a client component — Suspense handles the initial render */}
+      <Suspense fallback={
+        <div
+          className="flex flex-col items-center gap-3 py-16 text-sm text-neutral-500"
+          role="status"
+          aria-live="polite"
+        >
+          <div
+            className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"
+            aria-hidden="true"
+          />
+          Loading checkout…
+        </div>
+      }>
+        <CheckoutWizard />
+      </Suspense>
     </main>
   );
 }
