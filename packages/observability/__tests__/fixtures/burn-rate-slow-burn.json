@@ -1,0 +1,15 @@
+{
+  "scenario": "slow_burn",
+  "description": "Error rate above 3.0% slow-burn threshold but below 7.2% fast-burn threshold (99.5% SLO target). Creates a ticket but does not page.",
+  "sloTarget": 0.995,
+  "windowMinutes": 360,
+  "totalRequests": 10000,
+  "badRequests": 400,
+  "errorRatePct": 4.0,
+  "burnRate": 8.0,
+  "triggersPageAlarm": false,
+  "triggersTicketAlarm": true,
+  "fastBurnThresholdPct": 7.2,
+  "slowBurnThresholdPct": 3.0,
+  "expectedBudgetConsumedFraction": 0.333
+}

@@ -81,3 +81,21 @@ export type {
   SecretValidationResult,
   ValidateOptions,
 } from './secretValidator.js';
+
+export {
+  computeBurnRate,
+  computeErrorBudget,
+  burnRateThreshold,
+  fastBurnRateMultiplier,
+  generateBurnScenario,
+  SystemSLOClock,
+} from './slo/burnRate.js';
+export type {
+  SLOClock,
+  BurnRateInput,
+  BurnRateResult,
+  ErrorBudgetInput,
+  ErrorBudgetResult,
+  BurnScenario,
+  ScenarioMetrics,
+} from './slo/burnRate.js';

@@ -618,6 +618,106 @@ resource "aws_cloudwatch_metric_alarm" "search_latency_p95_by_category_hard" {
 }
 
 # ---------------------------------------------------------------------------
+# SECRET STARTUP VALIDATION FAILURE — zero-tolerance (CRITICAL)
+#
+# Fires when any process fails to validate required secrets at startup.
+# A startup validation failure means a service may be running with stale,
+# missing, or invalid secret values — a security-critical condition.
+# Defined in SLO spec §6, policy A09.
+# ---------------------------------------------------------------------------
+
+resource "aws_cloudwatch_metric_alarm" "secret_startup_validation_failure" {
+  alarm_name          = "CRITICAL-secret-startup-validation-failure"
+  alarm_description   = "Secret startup validation failure detected. A service failed to validate one or more required secrets at startup. The service may be running with stale or missing credentials. Zero-tolerance: any occurrence requires immediate triage. Runbook: ${local.runbook_base_url}/secret-startup-validation-failure.md"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "SecretStartupValidationFailures"
+  namespace           = local.namespace_platform
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = local.platform_page_actions
+  ok_actions          = local.platform_page_actions
+}
+
+# ---------------------------------------------------------------------------
+# SLI FEED NO-DATA ALARMS — feed loss detection (HIGH)
+#
+# Every SLI metric must emit data continuously. A stale or absent feed is
+# NEVER interpreted as compliance — it must raise an alarm.
+# treat_missing_data = "breaching" ensures absence triggers the alarm.
+# Defined in SLO spec §5 (No-Data Policy).
+# ---------------------------------------------------------------------------
+
+# No-data: search SLI feed (SearchResponseP95)
+resource "aws_cloudwatch_metric_alarm" "sli_feed_no_data_search" {
+  alarm_name          = "HIGH-sli-feed-no-data-search"
+  alarm_description   = "No SearchResponseP95 data received in the last 5 minutes. SLI feed loss must not be interpreted as compliance. Verify the search-service ADOT sidecar is running and emitting metrics. Runbook: ${local.runbook_base_url}/sli-feed-no-data.md"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "SearchResponseP95"
+  namespace           = local.namespace_search
+  period              = 300
+  statistic           = "SampleCount"
+  threshold           = 1
+  treat_missing_data  = "breaching"
+  alarm_actions       = local.platform_ticket_actions
+  ok_actions          = local.platform_ticket_actions
+}
+
+# No-data: checkout SLI feed (CheckoutAcknowledgementP95)
+resource "aws_cloudwatch_metric_alarm" "sli_feed_no_data_checkout" {
+  alarm_name          = "HIGH-sli-feed-no-data-checkout"
+  alarm_description   = "No CheckoutAcknowledgementP95 data received in the last 5 minutes. SLI feed loss must not be interpreted as compliance. Verify the checkout-service ADOT sidecar is running and emitting metrics. Runbook: ${local.runbook_base_url}/sli-feed-no-data.md"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "CheckoutAcknowledgementP95"
+  namespace           = local.namespace_checkout
+  period              = 300
+  statistic           = "SampleCount"
+  threshold           = 1
+  treat_missing_data  = "breaching"
+  alarm_actions       = local.platform_ticket_actions
+  ok_actions          = local.platform_ticket_actions
+}
+
+# No-data: assistant SLI feed (AssistantFirstTokenP95)
+resource "aws_cloudwatch_metric_alarm" "sli_feed_no_data_assistant" {
+  alarm_name          = "HIGH-sli-feed-no-data-assistant"
+  alarm_description   = "No AssistantFirstTokenP95 data received in the last 5 minutes. SLI feed loss must not be interpreted as compliance. Verify the assistant-service ADOT sidecar is running and emitting metrics. Runbook: ${local.runbook_base_url}/sli-feed-no-data.md"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "AssistantFirstTokenP95"
+  namespace           = local.namespace_assistant
+  period              = 300
+  statistic           = "SampleCount"
+  threshold           = 1
+  treat_missing_data  = "breaching"
+  alarm_actions       = local.platform_ticket_actions
+  ok_actions          = local.platform_ticket_actions
+}
+
+# No-data: availability SLI feed (ALB RequestCount)
+resource "aws_cloudwatch_metric_alarm" "sli_feed_no_data_availability" {
+  alarm_name          = "HIGH-sli-feed-no-data-availability"
+  alarm_description   = "No RequestCount data from ALB in the last 5 minutes. Availability SLI feed loss must not be interpreted as healthy. Verify the ALB is receiving traffic and metric publishing to CloudWatch is active. Runbook: ${local.runbook_base_url}/sli-feed-no-data.md"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "RequestCount"
+  namespace           = "AWS/ApplicationELB"
+  period              = 300
+  statistic           = "SampleCount"
+  threshold           = 1
+  treat_missing_data  = "breaching"
+  dimensions = {
+    LoadBalancer = var.alb_arn_suffix
+  }
+  alarm_actions = local.platform_ticket_actions
+  ok_actions    = local.platform_ticket_actions
+}
+
+# ---------------------------------------------------------------------------
 # COMPOSITE ALARMS — dampen alarm storms during deployment rollbacks
 #
 # A composite alarm fires only when ALL constituent alarms are in ALARM state

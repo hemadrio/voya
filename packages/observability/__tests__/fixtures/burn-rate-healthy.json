@@ -1,0 +1,15 @@
+{
+  "scenario": "healthy",
+  "description": "Error rate well below SLO budget (0.1% of requests fail, 99.5% SLO target).",
+  "sloTarget": 0.995,
+  "windowMinutes": 60,
+  "totalRequests": 10000,
+  "badRequests": 10,
+  "errorRatePct": 0.1,
+  "burnRate": 0.2,
+  "triggersPageAlarm": false,
+  "triggersTicketAlarm": false,
+  "fastBurnThresholdPct": 7.2,
+  "slowBurnThresholdPct": 3.0,
+  "expectedBudgetConsumedFraction": 0.0014
+}

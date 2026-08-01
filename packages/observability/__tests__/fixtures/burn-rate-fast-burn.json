@@ -1,0 +1,15 @@
+{
+  "scenario": "fast_burn",
+  "description": "Error rate above 7.2% fast-burn threshold (99.5% SLO target). Budget exhausted in under 50 hours at this rate. Pages on-call immediately.",
+  "sloTarget": 0.995,
+  "windowMinutes": 60,
+  "totalRequests": 10000,
+  "badRequests": 850,
+  "errorRatePct": 8.5,
+  "burnRate": 17.0,
+  "triggersPageAlarm": true,
+  "triggersTicketAlarm": true,
+  "fastBurnThresholdPct": 7.2,
+  "slowBurnThresholdPct": 3.0,
+  "expectedBudgetConsumedFraction": 0.0236
+}
