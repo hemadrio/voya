@@ -1,0 +1,73 @@
+{
+  "_note": "All values marked ASSUMPTION — pending sponsor ratification. Re-baseline by editing this file only; no scenario code changes required.",
+
+  "latency_p95_ms": {
+    "_assumption": true,
+    "search_cache_hit": 180,
+    "search_cache_miss": 3000,
+    "checkout_acknowledgement": 5000,
+    "assistant_first_token": 2000,
+    "search_hard_alert_ceiling": 5000
+  },
+
+  "throughput_rps": {
+    "_assumption": true,
+    "sustained_peak": 300,
+    "sustained_gate": 600,
+    "spike_target": 900,
+    "spike_ramp_window_seconds": 600
+  },
+
+  "guardrails": {
+    "_assumption": true,
+    "server_fault_rate_max_pct": 1.0,
+    "checkout_platform_failure_rate_max_pct": 0.5,
+    "notification_delivery_min_pct": 99.0,
+    "notification_delivery_window_seconds": 300,
+    "sqs_backlog_drain_window_seconds": 300
+  },
+
+  "scaling": {
+    "_assumption": true,
+    "search_service_min_tasks": 3,
+    "search_service_max_tasks": 20,
+    "gateway_min_tasks": 4,
+    "gateway_max_tasks": 24,
+    "step_scaling_breach_periods": 2,
+    "step_scaling_period_seconds": 60,
+    "step_scaling_capacity_pct": 100
+  },
+
+  "rds": {
+    "_assumption": true,
+    "max_connections_per_service_task": 5,
+    "proxy_pinning_rate_max_pct": 5.0
+  },
+
+  "scenario_mix_weights": {
+    "_assumption": true,
+    "flight_search_hit": 20,
+    "flight_search_miss": 25,
+    "hotel_search_hit": 15,
+    "hotel_search_miss": 15,
+    "car_search_hit": 5,
+    "car_search_miss": 5,
+    "checkout": 10,
+    "assistant_first_token": 5
+  },
+
+  "profile_a": {
+    "warmup_duration_seconds": 60,
+    "sustained_300_duration_seconds": 300,
+    "ramp_to_gate_duration_seconds": 60,
+    "gate_600_duration_seconds": 600,
+    "cooldown_duration_seconds": 60
+  },
+
+  "profile_b": {
+    "baseline_duration_seconds": 60,
+    "ramp_duration_seconds": 600,
+    "hold_duration_seconds": 300,
+    "cooldown_duration_seconds": 60
+  }
+}

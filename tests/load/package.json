@@ -1,0 +1,24 @@
+{
+  "name": "@travel/load-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Load and spike test profiles with latency gates for the travel platform (WO-098).",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
+  },
+  "scripts": {
+    "smoke:sustained": "k6 run profiles/sustained-peak.ts -e LOAD_ENV=staging --iterations 5 --vus 2",
+    "smoke:spike": "k6 run profiles/spike-ramp.ts -e LOAD_ENV=staging --iterations 5 --vus 2",
+    "run:sustained": "k6 run profiles/sustained-peak.ts --out json=results/sustained-peak.json",
+    "run:spike": "k6 run profiles/spike-ramp.ts --out json=results/spike-ramp.json",
+    "report:sustained": "tsx reporting/generate-report.ts --profile sustained-peak --k6-json results/sustained-peak.json --cw-json results/sustained-peak-cw.json --out-json results/sustained-peak-report.json --out-md results/sustained-peak-report.md",
+    "report:spike": "tsx reporting/generate-report.ts --profile spike-ramp --k6-json results/spike-ramp.json --cw-json results/spike-ramp-cw.json --out-json results/spike-ramp-report.json --out-md results/spike-ramp-report.md",
+    "gate:speedscale": "k6 run profiles/sustained-peak.ts -e LOAD_ENV=$LOAD_ENV --out json=results/gate-run.json && tsx reporting/generate-report.ts --profile sustained-peak --k6-json results/gate-run.json --cw-json results/gate-cw.json --out-json results/gate-report.json --out-md results/gate-report.md"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "tsx": "catalog:"
+  }
+}

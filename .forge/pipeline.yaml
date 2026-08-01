@@ -212,10 +212,69 @@ stage_groups:
             env:
               SMOKE_AUTH_TOKEN: ${{ secrets.SMOKE_AUTH_TOKEN }}
 
+  # ── Test — sustained-peak load gate (speedscale) ─────────────────────────
+  # Profile A (sustained-peak) runs after smoke tests pass, before staging
+  # promotion. Fails the build if any p95 budget or guardrail is breached.
+  # Profile B (spike-ramp) is run on demand, not in this gate.
+  # PR builds skip this stage entirely.
+  - name: test
+    when:
+      event:
+        not_in: [pull_request]
+    depends_on: [gate]
+    secrets:
+      masked:
+        - LOAD_TEST_TOKEN    # Bearer token for load-test synthetic user pool
+    env:
+      LOAD_ENV: staging
+      GW_BASE_URL: ${{ vars.STAGING_GW_BASE_URL }}
+    stages:
+
+      - name: test:speedscale
+        steps:
+          - name: Run sustained-peak load gate (Profile A, 600 rps)
+            # Reads all thresholds from tests/load/config/thresholds.json.
+            # Fails if any p95 budget or guardrail is breached.
+            # All threshold values are ASSUMPTION pending sponsor ratification.
+            run: |
+              k6 run tests/load/profiles/sustained-peak.ts \
+                -e GW_BASE_URL="${{ env.GW_BASE_URL }}" \
+                -e LOAD_TEST_TOKEN="${{ secrets.LOAD_TEST_TOKEN }}" \
+                -e LOAD_ENV="${{ env.LOAD_ENV }}" \
+                --out json=results/gate-run.json
+
+          - name: Export CloudWatch p95 metrics
+            run: |
+              aws cloudwatch get-metric-statistics \
+                --namespace travel/platform \
+                --metric-name SearchCacheHitLatencyP95 \
+                --start-time "$(date -u -d '40 minutes ago' '+%Y-%m-%dT%H:%M:%SZ')" \
+                --end-time "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+                --period 60 \
+                --statistics p95 \
+                --region eu-west-1 \
+                --output json > results/gate-cw.json
+
+          - name: Generate load gate report
+            run: |
+              node --import tsx/esm tests/load/reporting/generate-report.ts \
+                --profile sustained-peak \
+                --k6-json results/gate-run.json \
+                --cw-json results/gate-cw.json \
+                --out-json results/gate-report.json \
+                --out-md results/gate-report.md
+
+          - name: Archive phase-gate evidence
+            uses: forge/upload-artifact@v2
+            with:
+              name: load-gate-evidence-${{ github.sha }}
+              path: results/gate-report.*
+              retention_days: 365
+
   # ── Deploy ────────────────────────────────────────────────────────────────
   # Three environment deploy groups:
   #   deploy:dev        — automatic, runs on every push to main
-  #   deploy:staging    — automatic, runs after gate:smoke:staging passes
+  #   deploy:staging    — automatic, runs after test:speedscale gate passes
   #   deploy:production — manual approval gate (separation of duty)
   #
   # Every deploy step has two preconditions:
@@ -295,7 +354,7 @@ stage_groups:
     when:
       event:
         not_in: [pull_request]
-    depends_on: [gate]
+    depends_on: [test]
     env:
       DEPLOY_ENV: staging
       ECS_CLUSTER: staging-travel-platform

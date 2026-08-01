@@ -1,0 +1,137 @@
+{
+  "_note": "Synthetic search parameters for load testing. Cohorts are disjoint by key-space prefix to ensure independent cache-hit and cache-miss latency measurement. No real traveler identities or PII. Complies with BR-18.",
+
+  "_cache_ttls": {
+    "flights_seconds": 300,
+    "hotels_seconds": 900,
+    "cars_seconds": 1800
+  },
+
+  "_key_space_isolation": "Hit cohort uses prefix 'HIT_' in all identifiers. Miss cohort uses prefix 'MISS_'. The prefixes guarantee the cache cannot warm hit-cohort entries from miss-cohort requests or vice versa.",
+
+  "hit_cohort": {
+    "_note": "Small repeated-parameter set. Requests these parameters more frequently than their respective TTLs to drive cache hits. Assert p95 ≈ 180 ms (ASSUMPTION).",
+
+    "flights": [
+      { "id": "HIT_FL_001", "origin": "LHR", "destination": "JFK", "departureDate": "2026-09-15", "returnDate": "2026-09-22", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "HIT_FL_002", "origin": "CDG", "destination": "MAD", "departureDate": "2026-09-16", "returnDate": "2026-09-20", "adults": 2, "cabinClass": "ECONOMY" },
+      { "id": "HIT_FL_003", "origin": "AMS", "destination": "BCN", "departureDate": "2026-09-17", "returnDate": "2026-09-21", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "HIT_FL_004", "origin": "FRA", "destination": "DXB", "departureDate": "2026-09-18", "returnDate": "2026-09-25", "adults": 2, "cabinClass": "BUSINESS" },
+      { "id": "HIT_FL_005", "origin": "LHR", "destination": "SFO", "departureDate": "2026-09-19", "returnDate": "2026-09-26", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "HIT_FL_006", "origin": "MAN", "destination": "PMI", "departureDate": "2026-09-20", "returnDate": "2026-09-27", "adults": 4, "cabinClass": "ECONOMY" },
+      { "id": "HIT_FL_007", "origin": "EDI", "destination": "DUB", "departureDate": "2026-09-21", "returnDate": "2026-09-24", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "HIT_FL_008", "origin": "GLA", "destination": "LIS", "departureDate": "2026-09-22", "returnDate": "2026-09-29", "adults": 2, "cabinClass": "ECONOMY" },
+      { "id": "HIT_FL_009", "origin": "BHX", "destination": "ALC", "departureDate": "2026-09-23", "returnDate": "2026-09-30", "adults": 2, "cabinClass": "ECONOMY" },
+      { "id": "HIT_FL_010", "origin": "STN", "destination": "FCO", "departureDate": "2026-09-24", "returnDate": "2026-10-01", "adults": 1, "cabinClass": "ECONOMY" }
+    ],
+
+    "hotels": [
+      { "id": "HIT_HT_001", "cityCode": "LON", "checkIn": "2026-09-15", "checkOut": "2026-09-22", "rooms": 1, "adults": 2 },
+      { "id": "HIT_HT_002", "cityCode": "PAR", "checkIn": "2026-09-16", "checkOut": "2026-09-20", "rooms": 1, "adults": 1 },
+      { "id": "HIT_HT_003", "cityCode": "MAD", "checkIn": "2026-09-17", "checkOut": "2026-09-21", "rooms": 2, "adults": 4 },
+      { "id": "HIT_HT_004", "cityCode": "BCN", "checkIn": "2026-09-18", "checkOut": "2026-09-25", "rooms": 1, "adults": 2 },
+      { "id": "HIT_HT_005", "cityCode": "AMS", "checkIn": "2026-09-19", "checkOut": "2026-09-26", "rooms": 1, "adults": 1 }
+    ],
+
+    "cars": [
+      { "id": "HIT_CR_001", "pickupLocation": "LHR", "dropoffLocation": "LHR", "pickupDate": "2026-09-15", "dropoffDate": "2026-09-22", "driverAge": 30 },
+      { "id": "HIT_CR_002", "pickupLocation": "CDG", "dropoffLocation": "CDG", "pickupDate": "2026-09-16", "dropoffDate": "2026-09-20", "driverAge": 35 },
+      { "id": "HIT_CR_003", "pickupLocation": "MAD", "dropoffLocation": "BCN", "pickupDate": "2026-09-17", "dropoffDate": "2026-09-24", "driverAge": 28 }
+    ]
+  },
+
+  "miss_cohort": {
+    "_note": "Large unique-parameter set. Each request uses a unique parameter combination that is not in the hot cache. Guarantees cache misses. Assert p95 ≤ 3000 ms (ASSUMPTION). Key space uses MISS_ prefix — guaranteed disjoint from hit cohort.",
+
+    "flights": [
+      { "id": "MISS_FL_001", "origin": "MISS_A01", "destination": "MISS_B01", "departureDate": "2026-10-01", "returnDate": "2026-10-08", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_002", "origin": "MISS_A02", "destination": "MISS_B02", "departureDate": "2026-10-02", "returnDate": "2026-10-09", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_003", "origin": "MISS_A03", "destination": "MISS_B03", "departureDate": "2026-10-03", "returnDate": "2026-10-10", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_004", "origin": "MISS_A04", "destination": "MISS_B04", "departureDate": "2026-10-04", "returnDate": "2026-10-11", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_005", "origin": "MISS_A05", "destination": "MISS_B05", "departureDate": "2026-10-05", "returnDate": "2026-10-12", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_006", "origin": "MISS_A06", "destination": "MISS_B06", "departureDate": "2026-10-06", "returnDate": "2026-10-13", "adults": 2, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_007", "origin": "MISS_A07", "destination": "MISS_B07", "departureDate": "2026-10-07", "returnDate": "2026-10-14", "adults": 2, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_008", "origin": "MISS_A08", "destination": "MISS_B08", "departureDate": "2026-10-08", "returnDate": "2026-10-15", "adults": 1, "cabinClass": "BUSINESS" },
+      { "id": "MISS_FL_009", "origin": "MISS_A09", "destination": "MISS_B09", "departureDate": "2026-10-09", "returnDate": "2026-10-16", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_010", "origin": "MISS_A10", "destination": "MISS_B10", "departureDate": "2026-10-10", "returnDate": "2026-10-17", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_011", "origin": "MISS_A11", "destination": "MISS_B11", "departureDate": "2026-10-11", "returnDate": "2026-10-18", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_012", "origin": "MISS_A12", "destination": "MISS_B12", "departureDate": "2026-10-12", "returnDate": "2026-10-19", "adults": 2, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_013", "origin": "MISS_A13", "destination": "MISS_B13", "departureDate": "2026-10-13", "returnDate": "2026-10-20", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_014", "origin": "MISS_A14", "destination": "MISS_B14", "departureDate": "2026-10-14", "returnDate": "2026-10-21", "adults": 3, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_015", "origin": "MISS_A15", "destination": "MISS_B15", "departureDate": "2026-10-15", "returnDate": "2026-10-22", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_016", "origin": "MISS_A16", "destination": "MISS_B16", "departureDate": "2026-10-16", "returnDate": "2026-10-23", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_017", "origin": "MISS_A17", "destination": "MISS_B17", "departureDate": "2026-10-17", "returnDate": "2026-10-24", "adults": 2, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_018", "origin": "MISS_A18", "destination": "MISS_B18", "departureDate": "2026-10-18", "returnDate": "2026-10-25", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_019", "origin": "MISS_A19", "destination": "MISS_B19", "departureDate": "2026-10-19", "returnDate": "2026-10-26", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_020", "origin": "MISS_A20", "destination": "MISS_B20", "departureDate": "2026-10-20", "returnDate": "2026-10-27", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_021", "origin": "MISS_A21", "destination": "MISS_B21", "departureDate": "2026-10-21", "returnDate": "2026-10-28", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_022", "origin": "MISS_A22", "destination": "MISS_B22", "departureDate": "2026-10-22", "returnDate": "2026-10-29", "adults": 2, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_023", "origin": "MISS_A23", "destination": "MISS_B23", "departureDate": "2026-10-23", "returnDate": "2026-10-30", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_024", "origin": "MISS_A24", "destination": "MISS_B24", "departureDate": "2026-10-24", "returnDate": "2026-10-31", "adults": 1, "cabinClass": "ECONOMY" },
+      { "id": "MISS_FL_025", "origin": "MISS_A25", "destination": "MISS_B25", "departureDate": "2026-10-25", "returnDate": "2026-11-01", "adults": 1, "cabinClass": "ECONOMY" }
+    ],
+
+    "hotels": [
+      { "id": "MISS_HT_001", "cityCode": "MISS_CITY_01", "checkIn": "2026-10-01", "checkOut": "2026-10-08", "rooms": 1, "adults": 2 },
+      { "id": "MISS_HT_002", "cityCode": "MISS_CITY_02", "checkIn": "2026-10-02", "checkOut": "2026-10-09", "rooms": 1, "adults": 1 },
+      { "id": "MISS_HT_003", "cityCode": "MISS_CITY_03", "checkIn": "2026-10-03", "checkOut": "2026-10-10", "rooms": 1, "adults": 2 },
+      { "id": "MISS_HT_004", "cityCode": "MISS_CITY_04", "checkIn": "2026-10-04", "checkOut": "2026-10-11", "rooms": 2, "adults": 3 },
+      { "id": "MISS_HT_005", "cityCode": "MISS_CITY_05", "checkIn": "2026-10-05", "checkOut": "2026-10-12", "rooms": 1, "adults": 1 },
+      { "id": "MISS_HT_006", "cityCode": "MISS_CITY_06", "checkIn": "2026-10-06", "checkOut": "2026-10-13", "rooms": 1, "adults": 2 },
+      { "id": "MISS_HT_007", "cityCode": "MISS_CITY_07", "checkIn": "2026-10-07", "checkOut": "2026-10-14", "rooms": 1, "adults": 2 },
+      { "id": "MISS_HT_008", "cityCode": "MISS_CITY_08", "checkIn": "2026-10-08", "checkOut": "2026-10-15", "rooms": 1, "adults": 1 },
+      { "id": "MISS_HT_009", "cityCode": "MISS_CITY_09", "checkIn": "2026-10-09", "checkOut": "2026-10-16", "rooms": 1, "adults": 2 },
+      { "id": "MISS_HT_010", "cityCode": "MISS_CITY_10", "checkIn": "2026-10-10", "checkOut": "2026-10-17", "rooms": 1, "adults": 1 },
+      { "id": "MISS_HT_011", "cityCode": "MISS_CITY_11", "checkIn": "2026-10-11", "checkOut": "2026-10-18", "rooms": 1, "adults": 2 },
+      { "id": "MISS_HT_012", "cityCode": "MISS_CITY_12", "checkIn": "2026-10-12", "checkOut": "2026-10-19", "rooms": 1, "adults": 1 },
+      { "id": "MISS_HT_013", "cityCode": "MISS_CITY_13", "checkIn": "2026-10-13", "checkOut": "2026-10-20", "rooms": 2, "adults": 4 },
+      { "id": "MISS_HT_014", "cityCode": "MISS_CITY_14", "checkIn": "2026-10-14", "checkOut": "2026-10-21", "rooms": 1, "adults": 1 },
+      { "id": "MISS_HT_015", "cityCode": "MISS_CITY_15", "checkIn": "2026-10-15", "checkOut": "2026-10-22", "rooms": 1, "adults": 2 }
+    ],
+
+    "cars": [
+      { "id": "MISS_CR_001", "pickupLocation": "MISS_LOC_01", "dropoffLocation": "MISS_LOC_01", "pickupDate": "2026-10-01", "dropoffDate": "2026-10-08", "driverAge": 30 },
+      { "id": "MISS_CR_002", "pickupLocation": "MISS_LOC_02", "dropoffLocation": "MISS_LOC_02", "pickupDate": "2026-10-02", "dropoffDate": "2026-10-09", "driverAge": 32 },
+      { "id": "MISS_CR_003", "pickupLocation": "MISS_LOC_03", "dropoffLocation": "MISS_LOC_03", "pickupDate": "2026-10-03", "dropoffDate": "2026-10-10", "driverAge": 28 },
+      { "id": "MISS_CR_004", "pickupLocation": "MISS_LOC_04", "dropoffLocation": "MISS_LOC_04", "pickupDate": "2026-10-04", "dropoffDate": "2026-10-11", "driverAge": 35 },
+      { "id": "MISS_CR_005", "pickupLocation": "MISS_LOC_05", "dropoffLocation": "MISS_LOC_05", "pickupDate": "2026-10-05", "dropoffDate": "2026-10-12", "driverAge": 40 },
+      { "id": "MISS_CR_006", "pickupLocation": "MISS_LOC_06", "dropoffLocation": "MISS_LOC_06", "pickupDate": "2026-10-06", "dropoffDate": "2026-10-13", "driverAge": 27 },
+      { "id": "MISS_CR_007", "pickupLocation": "MISS_LOC_07", "dropoffLocation": "MISS_LOC_07", "pickupDate": "2026-10-07", "dropoffDate": "2026-10-14", "driverAge": 33 },
+      { "id": "MISS_CR_008", "pickupLocation": "MISS_LOC_08", "dropoffLocation": "MISS_LOC_08", "pickupDate": "2026-10-08", "dropoffDate": "2026-10-15", "driverAge": 29 },
+      { "id": "MISS_CR_009", "pickupLocation": "MISS_LOC_09", "dropoffLocation": "MISS_LOC_09", "pickupDate": "2026-10-09", "dropoffDate": "2026-10-16", "driverAge": 31 },
+      { "id": "MISS_CR_010", "pickupLocation": "MISS_LOC_10", "dropoffLocation": "MISS_LOC_10", "pickupDate": "2026-10-10", "dropoffDate": "2026-10-17", "driverAge": 36 }
+    ]
+  },
+
+  "checkout": {
+    "_note": "Synthetic booking identifiers and Stripe test-mode payments. idempotencyKey is replaced at runtime with VU_ID+iteration to guarantee per-request uniqueness.",
+    "offers": [
+      { "id": "LOAD_OFF_FL_001", "bookingType": "FLIGHT", "offerPrice": 34900, "currency": "GBP", "stripePaymentMethod": "pm_card_visa" },
+      { "id": "LOAD_OFF_HT_001", "bookingType": "HOTEL",  "offerPrice": 89900, "currency": "GBP", "stripePaymentMethod": "pm_card_visa" },
+      { "id": "LOAD_OFF_CR_001", "bookingType": "CAR",    "offerPrice": 15900, "currency": "GBP", "stripePaymentMethod": "pm_card_visa" }
+    ],
+    "passengers": [
+      { "firstName": "Load", "lastName": "TestOne",   "dateOfBirth": "1985-06-15T00:00:00.000Z", "contactEmail": "loadtest1@example.invalid" },
+      { "firstName": "Load", "lastName": "TestTwo",   "dateOfBirth": "1990-03-22T00:00:00.000Z", "contactEmail": "loadtest2@example.invalid" },
+      { "firstName": "Load", "lastName": "TestThree", "dateOfBirth": "1978-11-08T00:00:00.000Z", "contactEmail": "loadtest3@example.invalid" }
+    ]
+  },
+
+  "assistant": {
+    "_note": "Simple intent prompts to measure time-to-first-token without triggering multi-turn flows or exceeding the 8 tool-call / 60k token per-conversation cap.",
+    "prompts": [
+      "Find me the cheapest economy flight from London to New York next month.",
+      "Search for a hotel in Paris for two adults, 3 nights from 15 September.",
+      "I need a car rental at Heathrow for one week from 20 September.",
+      "What flights are available from Manchester to Amsterdam this weekend?",
+      "Show me family hotels in Barcelona for 4 people, 7 nights in October."
+    ]
+  },
+
+  "synthetic_identities": {
+    "_note": "Synthetic bearer tokens for load test VUs. Replace with actual test-tier tokens issued by the auth service before running. These are placeholders.",
+    "token_pool_size": 50,
+    "token_prefix": "lt_synthetic_",
+    "note": "Provision 50 synthetic user accounts in the staging auth service before load run. See runbook."
+  }
+}
