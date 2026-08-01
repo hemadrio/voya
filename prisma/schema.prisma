@@ -248,6 +248,11 @@ model Booking {
   /// NULL means the booking has not yet been validated or the window has closed.
   payableUntil        DateTime? @map("payable_until") @db.Timestamptz
 
+  // WO-053: optional itinerary membership (booking may belong to at most one itinerary)
+  /// UUID of the owning itinerary, null when not grouped.
+  itineraryId   String?   @map("itinerary_id") @db.Uuid
+  itinerary     Itinerary? @relation(fields: [itineraryId], references: [id])
+
   user          User                  @relation(fields: [userId], references: [id])
   auditLogs     BookingAuditLog[]
   travelers     BookingTraveler[]
@@ -283,6 +288,8 @@ model Booking {
   @@index([status, expiresAt], map: "idx_bookings_pending_expiry")
   @@index([travelersMigratedAt], map: "idx_bookings_travelers_migrated_at")
   @@index([purgeAfter], map: "idx_bookings_purge_after")
+  // WO-053: itinerary membership lookup
+  @@index([itineraryId], map: "idx_bookings_itinerary_id")
   @@map("bookings")
 }
 
@@ -517,6 +524,14 @@ model BookingTraveler {
 
 /// A named collection of bookings representing a complete trip.
 /// Created by the traveler or assembled by the AI assistant.
+///
+/// WO-053 additions (additive, backward-compatible):
+///   name        — public-facing trip name (1-120 chars); old rows default to ''.
+///   description — optional free-text description.
+///   startDate   — trip start date; nullable so previous rows stay valid.
+///   endDate     — trip end date; nullable so previous rows stay valid.
+///   version     — optimistic-concurrency counter; incremented on every mutation.
+///   bookings    — reverse relation for member bookings (added via Booking.itineraryId).
 model Itinerary {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
@@ -525,14 +540,29 @@ model Itinerary {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  // WO-053 additions
+  /// Public-facing trip name (1–120 chars). Old rows carry ''.
+  name        String    @default("") @db.VarChar(120)
+  /// Optional free-text description.
+  description String?   @db.Text @map("description")
+  /// First departure date of the trip. Nullable for backward compat.
+  startDate   DateTime? @map("start_date") @db.Timestamptz
+  /// Last return date of the trip. Nullable for backward compat.
+  endDate     DateTime? @map("end_date") @db.Timestamptz
+  /// Optimistic-concurrency version. Incremented atomically on every UPDATE.
+  version     Int       @default(0)
+
   // WO-074: data classification and purge metadata
   classification DataClassification @default(CONFIDENTIAL) @map("classification")
   /// purge_after = created_at + RETENTION_ITINERARY_YEARS years.
   purgeAfter     DateTime?          @map("purge_after") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
+  bookings Booking[]
 
   @@index([userId])
+  // WO-053: history listing index (user_id, created_at DESC)
+  @@index([userId, createdAt(sort: Desc)], map: "idx_itineraries_user_created_at")
   @@index([purgeAfter], map: "idx_itineraries_purge_after")
   @@map("itineraries")
 }

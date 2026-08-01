@@ -1,0 +1,91 @@
+{
+  "description": "Seed fixtures for WO-053 itinerary CRUD tests — two users with mixed-currency, mixed-status bookings and one existing itinerary. All data is synthetic (no real travellers).",
+  "users": [
+    {
+      "id": "usr_maya_seed_001",
+      "email": "maya.itinerary@example-travel-test.invalid",
+      "displayName": "Maya Seed",
+      "role": "traveler"
+    },
+    {
+      "id": "usr_devan_seed_001",
+      "email": "devan.itinerary@example-travel-test.invalid",
+      "displayName": "Devan Seed",
+      "role": "traveler"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "bk_maya_flight_001",
+      "userId": "usr_maya_seed_001",
+      "bookingType": "FLIGHT",
+      "status": "CONFIRMED",
+      "offerId": "off_amadeus_LHR_JFK_seed",
+      "totalPrice": "412.50",
+      "currency": "USD",
+      "description": "Maya's confirmed LHR→JFK flight — USD"
+    },
+    {
+      "id": "bk_maya_hotel_001",
+      "userId": "usr_maya_seed_001",
+      "bookingType": "HOTEL",
+      "status": "CONFIRMED",
+      "offerId": "off_nyc_hotel_seed",
+      "totalPrice": "680.00",
+      "currency": "USD",
+      "description": "Maya's confirmed NYC hotel — USD"
+    },
+    {
+      "id": "bk_maya_car_001",
+      "userId": "usr_maya_seed_001",
+      "bookingType": "CAR",
+      "status": "PENDING",
+      "offerId": "off_nyc_car_seed",
+      "totalPrice": "195.50",
+      "currency": "EUR",
+      "description": "Maya's pending car rental — EUR (tests multi-currency)"
+    },
+    {
+      "id": "bk_maya_flight_002",
+      "userId": "usr_maya_seed_001",
+      "bookingType": "FLIGHT",
+      "status": "CANCELLED",
+      "offerId": "off_amadeus_JFK_LHR_seed",
+      "totalPrice": "389.00",
+      "currency": "GBP",
+      "description": "Maya's cancelled return flight — GBP (cancelled bookings must appear in read model)"
+    },
+    {
+      "id": "bk_devan_flight_001",
+      "userId": "usr_devan_seed_001",
+      "bookingType": "FLIGHT",
+      "status": "CONFIRMED",
+      "offerId": "off_amadeus_LHR_CDG_seed",
+      "totalPrice": "220.00",
+      "currency": "EUR",
+      "description": "Devan's confirmed flight — EUR (tests cross-user 403)"
+    },
+    {
+      "id": "bk_devan_hotel_001",
+      "userId": "usr_devan_seed_001",
+      "bookingType": "HOTEL",
+      "status": "PENDING",
+      "offerId": "off_paris_hotel_seed",
+      "totalPrice": "540.00",
+      "currency": "EUR",
+      "description": "Devan's pending hotel — EUR"
+    }
+  ],
+  "itineraries": [
+    {
+      "id": "itn_maya_existing_001",
+      "userId": "usr_maya_seed_001",
+      "name": "NYC Summer 2026",
+      "description": "Maya's existing itinerary for integration tests",
+      "startDate": "2026-09-01T00:00:00.000Z",
+      "endDate": "2026-09-10T00:00:00.000Z",
+      "memberBookingIds": ["bk_maya_flight_001", "bk_maya_hotel_001"],
+      "description_note": "Two USD bookings → totals should show exactly one USD entry with amount 1092.50"
+    }
+  ]
+}

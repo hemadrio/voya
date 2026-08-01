@@ -3,6 +3,7 @@
  */
 import express from "express";
 import { createBookingRouter } from "./routes/bookings.js";
+import { createItineraryRouter } from "./routes/itineraries.js";
 import { createErrorHandler } from "../../../shared/middleware/errorHandler.js";
 import {
   createRateLimiter,
@@ -13,6 +14,7 @@ import {
 } from "@travel/ratelimit";
 import type { BookingDomain } from "./routes/bookings.js";
 import type { HealthHandlers } from "@travel/observability";
+import type { ItineraryService } from "./domain/ItineraryService.js";
 
 export interface BookingAppOptions {
   /**
@@ -21,6 +23,8 @@ export interface BookingAppOptions {
    */
   floorLimitRedis?: RedisClient;
   healthHandlers?: HealthHandlers;
+  /** WO-053: wired ItineraryService for /itineraries routes. */
+  itineraryService?: ItineraryService;
 }
 
 export function createApp(
@@ -31,7 +35,7 @@ export function createApp(
     healthHandlersOrOptions !== undefined && "liveHandler" in healthHandlersOrOptions
       ? { healthHandlers: healthHandlersOrOptions as HealthHandlers }
       : (healthHandlersOrOptions as BookingAppOptions) ?? {};
-  const { floorLimitRedis, healthHandlers } = options;
+  const { floorLimitRedis, healthHandlers, itineraryService } = options;
 
   const app = express();
   app.use(express.json({ limit: "64kb" }));
@@ -59,6 +63,11 @@ export function createApp(
   }
 
   app.use("/bookings", createBookingRouter(domain));
+
+  // WO-053: /v1/itineraries/** proxied by the gateway to booking-service.
+  // JWT enforcement is applied at the gateway level; all itinerary routes
+  // require the 'traveler' role (not on the guest allow-list).
+  app.use("/itineraries", createItineraryRouter(itineraryService));
 
   if (healthHandlers !== undefined) {
     app.get("/health/live", healthHandlers.liveHandler.bind(healthHandlers));
