@@ -700,3 +700,10 @@
 - **Files:** 13 (+2795/-2)
 - **Duration:** 1147ss
 - **Approach:** Created a complete Playwright E2E infrastructure at the monorepo root with 7 per-journey projects (setup, search, checkout, cancellation, assistant, guest-carryover, accessibility). Network interception helpers in tests/e2e/helpers/network-assertions.ts prove negative claims without UI inspection. Each journey spec models acceptance criteria as explicit assertions. The seed CLI uses fetch() for idempotent staging data creation and includes a BR-18 production guard that checks both URL patterns and SEED_ENV_TAG. axe-core scans run parametrically over all traveler routes in both themes. The pipeline gets three new blocking gates (seed:synthetic, test:e2e, test:accessibility) that must pass before Terraform plan stages.
+
+## WO-104: User Story: WO-104 - Restricted-Field Envelope Encryption and PII Log Redaction
+- **Status:** completed
+- **Commit:** `b0bdb67`
+- **Files:** 10 (+1519/-7)
+- **Duration:** 1032ss
+- **Approach:** Implemented envelope encryption for Restricted traveler identity fields (dateOfBirth, passportReference) using a per-subject AES-256-GCM DEK wrapped by a KMS CMK. Added a subject_data_keys table for the DEK registry with key versioning and cryptographic erasure via destroyed_at. Enforced server-side authorization-gated decryption (traveler + system allowed; support_agent hard-denied with 403 + immutable security audit event). Centralised PII redaction in the shared observability package with wildcard Pino paths covering top-level, nested, and array contexts. Guarded the pipeline with a blocking scan:pii-fixtures stage that rejects real passport patterns, production-restore markers, and suspicious DOBs in committed fixture files.

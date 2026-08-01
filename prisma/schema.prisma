@@ -1048,3 +1048,54 @@ model AssistantCostRecord {
   @@index([conversationId, occurredAt], map: "idx_cost_record_conv_occurred")
   @@map("assistant_cost_record")
 }
+
+// ---------------------------------------------------------------------------
+// SubjectDataKey — per-subject KMS-wrapped DEK registry (WO-104)
+// ---------------------------------------------------------------------------
+
+/// Registry of per-subject data encryption keys for envelope encryption.
+///
+/// One row per (user_id, key_version) pair.  Multiple key versions exist when
+/// key rotation has occurred — each version can decrypt ciphertext written
+/// under it.  Cryptographic erasure is performed by setting destroyed_at:
+/// the KMS Decrypt call is refused for any row with a non-null destroyed_at,
+/// making all ciphertext encrypted under that key permanently unrecoverable
+/// without destroying the CMK itself.
+///
+/// Access:
+///   booking-service role: INSERT, SELECT, UPDATE (to set destroyed_at)
+///   support_agent role:   SELECT (key_version, created_at only — wrapped_key excluded)
+///   purge_worker role:    UPDATE (to set destroyed_at for cryptographic erasure)
+model SubjectDataKey {
+  id           String    @id @default(uuid()) @db.Uuid
+
+  /// Subject identifier — typically the user UUID of the traveler.
+  userId       String    @map("user_id") @db.Uuid
+
+  /// Monotonically increasing version within this subject's key history.
+  /// Version 1 is always the first key generated.
+  keyVersion   Int       @map("key_version")
+
+  /// KMS GenerateDataKey CiphertextBlob — the wrapped DEK.
+  /// Never decryptable without a valid KMS Decrypt call against the CMK.
+  wrappedKey   Bytes     @map("wrapped_key")
+
+  /// ARN/ID of the CMK used to wrap this DEK.
+  /// Required for KMS Decrypt calls (CMK rotation produces different ARNs).
+  dekKeyId     String    @map("dek_key_id") @db.VarChar(2048)
+
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  /// When set: this key has been cryptographically erased.  All ciphertext
+  /// encrypted under this key is permanently unrecoverable.  The booking_travelers
+  /// rows whose wrapped_dek references this key will return a masked placeholder.
+  destroyedAt  DateTime? @map("destroyed_at") @db.Timestamptz
+
+  /// Unique constraint: one active key per (user, version) pair.
+  @@unique([userId, keyVersion], map: "uq_subject_data_keys_user_version")
+  /// Fast erasure lookup: all keys for a user.
+  @@index([userId], map: "idx_subject_data_keys_user_id")
+  /// Purge worker index: find destroyed keys awaiting confirmation.
+  @@index([destroyedAt], map: "idx_subject_data_keys_destroyed_at")
+  @@map("subject_data_keys")
+}

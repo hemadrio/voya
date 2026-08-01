@@ -10,9 +10,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { BookingTravelerRepository } from "../../src/repositories/BookingTravelerRepository.js";
+import { BookingTravelerRepository, DecryptionDeniedError } from "../../src/repositories/BookingTravelerRepository.js";
 import { InMemoryEnvelopeCipher } from "@travel/crypto";
-import type { TravelerRow, TravelerPrismaClient } from "../../src/repositories/BookingTravelerRepository.js";
+import type { TravelerRow, TravelerPrismaClient, CallerContext } from "../../src/repositories/BookingTravelerRepository.js";
+import type { SecurityEventWriter, SecurityEventInput } from "../../src/domain/SecurityEventWriter.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -184,5 +185,114 @@ describe("BookingTravelerRepository", () => {
     expect(b6[0]!.givenName).toBe("Grace");
     expect(b7).toHaveLength(1);
     expect(b7[0]!.givenName).toBe("Henry");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WO-104 AC5: Authorization-gated decryption tests
+// ---------------------------------------------------------------------------
+
+describe("BookingTravelerRepository — authorization-gated decryption (AC5, BR-10)", () => {
+  let cipher: InMemoryEnvelopeCipher;
+  let db: ReturnType<typeof makeMockDb>;
+
+  // Spy-based SecurityEventWriter
+  const writtenEvents: SecurityEventInput[] = [];
+  const mockSecurityWriter: SecurityEventWriter = {
+    write: vi.fn(async (event: SecurityEventInput) => {
+      writtenEvents.push(event);
+    }),
+  };
+
+  beforeEach(async () => {
+    cipher = new InMemoryEnvelopeCipher();
+    db = makeMockDb();
+    writtenEvents.length = 0;
+    vi.clearAllMocks();
+
+    // Seed one traveler for the authorization tests
+    const repo = new BookingTravelerRepository(db as never, cipher, mockSecurityWriter);
+    await repo.create({
+      bookingId: "booking-auth-001",
+      givenName: "Alice",
+      familyName: "Auth",
+      email: null,
+      dateOfBirth: "1990-05-15",
+      passportReference: "AB1234567",
+    });
+  });
+
+  it("traveler role can decrypt own documents (AC5 — allowed path)", async () => {
+    const repo = new BookingTravelerRepository(db as never, cipher, mockSecurityWriter);
+    const caller: CallerContext = { actorId: "user-traveler-001", actorRole: "traveler" };
+
+    const results = await repo.findByBookingId("booking-auth-001", caller);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.dateOfBirth).toBe("1990-05-15");
+    expect(results[0]!.passportReference).toBe("AB1234567");
+    // No security event written for allowed access
+    expect(writtenEvents).toHaveLength(0);
+  });
+
+  it("system role can decrypt documents for supplier submission (AC5 — allowed path)", async () => {
+    const repo = new BookingTravelerRepository(db as never, cipher, mockSecurityWriter);
+    const caller: CallerContext = { actorId: "system", actorRole: "system" };
+
+    const results = await repo.findByBookingId("booking-auth-001", caller);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.passportReference).toBe("AB1234567");
+    expect(writtenEvents).toHaveLength(0);
+  });
+
+  it("support_agent is denied decryption with DecryptionDeniedError (AC5, BR-10)", async () => {
+    const repo = new BookingTravelerRepository(db as never, cipher, mockSecurityWriter);
+    const caller: CallerContext = { actorId: "agent-007", actorRole: "support_agent" };
+
+    await expect(
+      repo.findByBookingId("booking-auth-001", caller),
+    ).rejects.toThrow(DecryptionDeniedError);
+  });
+
+  it("support_agent denial writes a DENY security audit event (AC5)", async () => {
+    const repo = new BookingTravelerRepository(db as never, cipher, mockSecurityWriter);
+    const caller: CallerContext = { actorId: "agent-007", actorRole: "support_agent" };
+
+    await repo.findByBookingId("booking-auth-001", caller).catch(() => {});
+
+    expect(writtenEvents).toHaveLength(1);
+    const event = writtenEvents[0]!;
+    expect(event.actorId).toBe("agent-007");
+    expect(event.actorRole).toBe("support_agent");
+    expect(event.decision).toBe("DENY");
+    expect(event.operation).toBe("DECRYPT_IDENTITY_DOCUMENTS");
+    expect(event.resourceId).toBe("booking-auth-001");
+  });
+
+  it("DecryptionDeniedError carries correct httpStatus, actorRole, and resourceId", async () => {
+    const repo = new BookingTravelerRepository(db as never, cipher, mockSecurityWriter);
+    const caller: CallerContext = { actorId: "agent-007", actorRole: "support_agent" };
+
+    let caught: DecryptionDeniedError | undefined;
+    try {
+      await repo.findByBookingId("booking-auth-001", caller);
+    } catch (err) {
+      if (err instanceof DecryptionDeniedError) caught = err;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught!.httpStatus).toBe(403);
+    expect(caught!.actorRole).toBe("support_agent");
+    expect(caught!.resourceId).toBe("booking-auth-001");
+  });
+
+  it("findByBookingId() without caller context still decrypts (backward compatibility)", async () => {
+    const repo = new BookingTravelerRepository(db as never, cipher);
+
+    // No caller — no authorization check (legacy call path)
+    const results = await repo.findByBookingId("booking-auth-001");
+    expect(results).toHaveLength(1);
+    expect(results[0]!.dateOfBirth).toBe("1990-05-15");
   });
 });

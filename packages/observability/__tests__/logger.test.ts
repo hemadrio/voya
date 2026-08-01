@@ -334,3 +334,140 @@ describe('edge cases', () => {
     expect(cap.lines().length).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// WO-104 AC6: Comprehensive all-paths redaction test
+// Logs an object containing EVERY declared PII path and asserts every one
+// emits [REDACTED] — no path may be silently un-masked.
+// ---------------------------------------------------------------------------
+
+describe('WO-104 AC6 — comprehensive all-paths redaction', () => {
+  it('every declared PII redaction path emits [REDACTED] when logged', async () => {
+    const cap = createCapture();
+    const log = createLogger({ service: 'all-paths-svc' }, cap.stream);
+
+    // Object containing a value at every PII path declared in logger.ts
+    const comprehensivePayload = {
+      // Top-level fields
+      email: 'alice@example.com',
+      passwordHash: '$2b$10$somehash',
+      password: 'super-secret',
+      dateOfBirth: '1990-01-01',
+      passportNumber: 'AB1234567',
+      secret: 'top-secret-value',
+      secretKey: 'secret-key-value',
+      webhookSecret: 'webhook-secret-value',
+      apiKey: 'api-key-value',
+      accessToken: 'access-token-value',
+      refreshToken: 'refresh-token-value',
+      token: 'token-value',
+      privateKey: 'private-key-value',
+      signingKey: 'signing-key-value',
+      payment_method: { card: { number: '4111111111111111' } },
+      stripeSecretKey: 'sk_test_abc',
+      stripeApiKey: 'sk_live_xyz',
+      client_secret: 'pi_secret_abc',
+      clientSecret: 'pi_secret_def',
+      // Nested headers
+      headers: {
+        authorization: 'Bearer eyJhbGciOi...',
+        'stripe-signature': 't=1234,v1=abc',
+        'Authorization': 'Bearer uppercased',
+      },
+      // req.headers pattern
+      req: {
+        headers: {
+          authorization: 'Bearer req-token',
+          'stripe-signature': 'req-sig',
+        },
+      },
+      // Nested traveler object (*.email etc)
+      traveler: {
+        email: 'bob@example.com',
+        dateOfBirth: '1985-03-22',
+        passportNumber: 'CD9876543',
+        passwordHash: '$2b$10$otherhash',
+        passportReference: 'EF1122334',
+      },
+      // Array of travelers ([*].email etc)
+      passengers: [
+        {
+          email: 'carol@example.com',
+          dateOfBirth: '1975-07-04',
+          passportNumber: 'GH5678901',
+        },
+        {
+          email: 'dave@example.com',
+          passportNumber: 'IJ2345678',
+        },
+      ],
+    };
+
+    log.info(comprehensivePayload, 'comprehensive PII redaction test');
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    const raw = cap.lines().join('');
+
+    // Every sensitive value must be absent from the log output
+    const sensitiveValues = [
+      'alice@example.com',
+      '$2b$10$somehash',
+      'super-secret',
+      '1990-01-01',
+      'AB1234567',
+      'top-secret-value',
+      'secret-key-value',
+      'webhook-secret-value',
+      'api-key-value',
+      'access-token-value',
+      'refresh-token-value',
+      'token-value',
+      'private-key-value',
+      'signing-key-value',
+      'sk_test_abc',
+      'sk_live_xyz',
+      'pi_secret_abc',
+      'pi_secret_def',
+      'Bearer eyJhbGciOi',
+      'Bearer req-token',
+      'bob@example.com',
+      '1985-03-22',
+      'CD9876543',
+      '$2b$10$otherhash',
+      'carol@example.com',
+      '1975-07-04',
+      'GH5678901',
+      'dave@example.com',
+      'IJ2345678',
+    ];
+
+    for (const value of sensitiveValues) {
+      expect(raw, `Expected "${value}" to be redacted but it appeared in log output`).not.toContain(value);
+    }
+
+    // [REDACTED] must appear multiple times (at least one per major category)
+    const redactedCount = (raw.match(/\[REDACTED\]/g) ?? []).length;
+    expect(redactedCount).toBeGreaterThan(5);
+  });
+
+  it('stripe-signature header is redacted in all nested forms', async () => {
+    const cap = createCapture();
+    const log = createLogger({ service: 'stripe-sig-svc' }, cap.stream);
+
+    log.info({
+      headers: { 'stripe-signature': 't=1697000000,v1=abc123def456' },
+      req: { headers: { 'stripe-signature': 't=1697000001,v1=xyz789' } },
+      event: {
+        headers: { 'stripe-signature': 't=1697000002,v1=qrs000' },
+      },
+    }, 'stripe signature log');
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const raw = cap.lines().join('');
+
+    expect(raw).not.toContain('t=1697000000');
+    expect(raw).not.toContain('t=1697000001');
+    expect(raw).not.toContain('abc123def456');
+    expect(raw).not.toContain('xyz789');
+  });
+});

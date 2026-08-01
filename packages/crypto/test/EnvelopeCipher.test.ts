@@ -128,6 +128,69 @@ describe("InMemoryEnvelopeCipher", () => {
     );
   });
 
+  it("auth-tag tampering is detected and decryption fails (AC10)", async () => {
+    const cipher = new InMemoryEnvelopeCipher();
+    const plaintext = Buffer.from("1990-06-15", "utf8");
+
+    const { wrappedKey, encryptedFields } = await cipher.encryptForSubject(CONTEXT, {
+      dateOfBirth: plaintext,
+    });
+
+    const original = encryptedFields["dateOfBirth"]!;
+    // Corrupt the last byte of the ciphertext (which contains the auth tag)
+    const tampered = Buffer.from(original.ciphertext);
+    tampered[tampered.length - 1] ^= 0xff;
+
+    const tamperedFields = {
+      dateOfBirth: { ciphertext: tampered, iv: original.iv },
+    };
+
+    // AES-GCM auth-tag verification must reject tampered ciphertext
+    await expect(
+      cipher.decryptForSubject(CONTEXT, wrappedKey, tamperedFields),
+    ).rejects.toThrow();
+  });
+
+  it("key version isolation: encrypting for s1 cannot decrypt for s2 (wrong wrapped key)", async () => {
+    const cipher = new InMemoryEnvelopeCipher();
+
+    const ctx1: EncryptionContext = { subjectId: "s1-key-version", bookingId: "b1" };
+    const ctx2: EncryptionContext = { subjectId: "s2-key-version", bookingId: "b2" };
+
+    const { wrappedKey: key1, encryptedFields: fields1 } = await cipher.encryptForSubject(ctx1, {
+      dateOfBirth: Buffer.from("1991-01-01", "utf8"),
+    });
+
+    const { encryptedFields: fields2 } = await cipher.encryptForSubject(ctx2, {
+      dateOfBirth: Buffer.from("1992-02-02", "utf8"),
+    });
+
+    // Using key from subject 1 to decrypt ciphertext from subject 2 must fail —
+    // the IV-based AES-GCM verification catches the DEK mismatch as an auth-tag error
+    await expect(
+      cipher.decryptForSubject(ctx2, key1, fields2),
+    ).rejects.toThrow();
+
+    // But using correct key/ciphertext pair succeeds
+    const correct = await cipher.decryptForSubject(ctx1, key1, fields1 as never);
+    expect(correct["dateOfBirth"]!.toString("utf8")).toBe("1991-01-01");
+  });
+
+  it("destroyed-key tombstone: decrypt throws with descriptive message (AC10)", async () => {
+    const cipher = new InMemoryEnvelopeCipher();
+    const context: EncryptionContext = { subjectId: "erasure-subject", bookingId: "b-erase" };
+
+    const { wrappedKey, encryptedFields } = await cipher.encryptForSubject(context, {
+      passportReference: Buffer.from("XY9999999", "utf8"),
+    });
+
+    cipher.destroySubjectKey(context.subjectId);
+
+    await expect(
+      cipher.decryptForSubject(context, wrappedKey, encryptedFields as never),
+    ).rejects.toThrow(/destroyed/i);
+  });
+
   it("plaintext is never present in ciphertext output", async () => {
     const cipher = new InMemoryEnvelopeCipher();
     const plaintext = "PASSPORT-XYZ-SENSITIVE";

@@ -5,8 +5,9 @@
  *   - Accept plaintext traveler input (from the booking domain service)
  *   - Encrypt restricted fields (dateOfBirth, passportReference) via
  *     the injected EnvelopeCipher before persisting
- *   - Provide a decrypted read path for the booking owner
+ *   - Provide a decrypted read path for the booking owner (traveler + system roles)
  *   - Provide a redacted read path for support_agent
+ *   - Deny support_agent decryption with 403 + security audit event (AC5, BR-10)
  *
  * Injectable: depends only on duck-typed interfaces so this module can be
  * unit-tested without a real Prisma client or KMS connection.
@@ -14,6 +15,17 @@
 
 import type { EnvelopeCipher } from "@travel/crypto";
 import type { CreateBookingTravelerInput, BookingTraveler } from "@travel/contracts";
+import type { SecurityEventWriter } from "../domain/SecurityEventWriter.js";
+
+// ---------------------------------------------------------------------------
+// Caller identity context — injected at the request boundary
+// ---------------------------------------------------------------------------
+
+/** Minimum identity context required to authorize decryption. */
+export interface CallerContext {
+  actorId: string;
+  actorRole: "traveler" | "support_agent" | "system";
+}
 
 // ---------------------------------------------------------------------------
 // Injectable persistence interface
@@ -80,10 +92,14 @@ export interface TravelerPrismaClient {
 // BookingTravelerRepository
 // ---------------------------------------------------------------------------
 
+/** Roles permitted to decrypt Restricted identity documents. */
+const DECRYPT_ENTITLEMENTS = new Set<CallerContext["actorRole"]>(["traveler", "system"]);
+
 export class BookingTravelerRepository {
   constructor(
     private readonly db: TravelerPrismaClient,
     private readonly cipher: EnvelopeCipher,
+    private readonly securityEventWriter?: SecurityEventWriter,
   ) {}
 
   /**
@@ -153,9 +169,38 @@ export class BookingTravelerRepository {
 
   /**
    * Read and decrypt all travelers for a booking.
-   * Only the booking service (owning service) may call this.
+   *
+   * Authorization-gated: support_agent is denied with a 403-equivalent error
+   * and a security audit event (AC5, BR-10). Only traveler (owner) and system
+   * roles are entitled to see plaintext identity documents.
+   *
+   * @throws DecryptionDeniedError for support_agent callers
    */
-  async findByBookingId(bookingId: string): Promise<BookingTraveler[]> {
+  async findByBookingId(
+    bookingId: string,
+    caller?: CallerContext,
+  ): Promise<BookingTraveler[]> {
+    // AC5: Enforce decryption authorization server-side before any DB read
+    if (caller && !DECRYPT_ENTITLEMENTS.has(caller.actorRole)) {
+      // Write security audit event — failure here must bubble up (compliance)
+      if (this.securityEventWriter) {
+        await this.securityEventWriter.write({
+          actorId: caller.actorId,
+          actorRole: caller.actorRole,
+          resourceType: "booking_travelers",
+          resourceId: bookingId,
+          operation: "DECRYPT_IDENTITY_DOCUMENTS",
+          decision: "DENY",
+          reason: `Role '${caller.actorRole}' is not entitled to decrypt identity documents (BR-10)`,
+        });
+      }
+      throw new DecryptionDeniedError(
+        `Role '${caller.actorRole}' is not authorized to decrypt identity documents`,
+        caller.actorRole,
+        bookingId,
+      );
+    }
+
     const rows = await this.db.bookingTraveler.findMany({ where: { bookingId } });
 
     const results: BookingTraveler[] = [];
@@ -243,5 +288,30 @@ export class BookingTravelerRepository {
       email: row.email,
       createdAt: row.createdAt,
     }));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// DecryptionDeniedError — AC5: role-based 403 for identity documents
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when a caller without decryption entitlement attempts to read
+ * plaintext identity documents.  The HTTP layer maps this to 403.
+ *
+ * The securityEventWriter.write() call MUST have succeeded before this
+ * is thrown (or the write error will propagate instead), ensuring every
+ * denial has an immutable audit record.
+ */
+export class DecryptionDeniedError extends Error {
+  readonly name = "DecryptionDeniedError";
+  readonly httpStatus = 403;
+
+  constructor(
+    message: string,
+    readonly actorRole: string,
+    readonly resourceId: string,
+  ) {
+    super(message);
   }
 }
