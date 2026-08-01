@@ -100,6 +100,8 @@ export class PrismaAuditWriter implements AuditWriter {
         occurredAt,
         prevHash,
         entryHash,
+        // WO-041: optional reason column (nullable; omitted by system events)
+        reason: event.reason ?? null,
       },
     });
 

@@ -351,10 +351,16 @@ model BookingAuditLog {
   /// IPv4/IPv6 of the actor's originating request.
   actorIp       String?  @map("actor_ip") @db.VarChar(64)
 
+  // WO-041 additions
+  /// Human-readable reason for the state transition (e.g. "CANCELLATION_REQUESTED").
+  /// NULL for system-initiated events where no explicit reason is provided.
+  reason        String?  @map("reason") @db.VarChar(512)
+
   booking Booking @relation(fields: [bookingId], references: [id])
 
   @@index([resourceId, occurredAt], map: "idx_audit_resource_occurred")
   @@index([actorId, occurredAt], map: "idx_booking_audit_actor_occurred")
+  @@index([bookingId, occurredAt(sort: Desc)], map: "booking_audit_log_booking_occurred")
   @@map("booking_audit_log")
 }
 

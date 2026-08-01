@@ -3,3 +3,5 @@ export type { BookingAuditPreImage, AuthAuditPreImage } from "./canonicalize.js"
 export type { AuditWriter, AuditTxClient, AuditAppendResult } from "./AuditWriter.js";
 export { PrismaAuditWriter, verifyChain } from "./PrismaAuditWriter.js";
 export type { ChainEntry, ChainBreak } from "./PrismaAuditWriter.js";
+export { deriveActorSurrogate, pseudonymiseAuditActor } from "./pseudonymise.js";
+export type { PseudonymiseTxClient, PseudonymiseResult } from "./pseudonymise.js";

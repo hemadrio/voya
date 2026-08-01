@@ -88,6 +88,8 @@ export const AuditEventInputSchema = z.object({
   correlationId: z.string().max(128).optional(),
   /** Wall-clock time of the event; defaults to Date.now() if omitted. */
   occurredAt: z.date().optional(),
+  /** Human-readable reason for the event (WO-041). NULL for system-initiated events. */
+  reason: z.string().max(512).optional(),
 });
 export type AuditEventInput = z.infer<typeof AuditEventInputSchema>;
 

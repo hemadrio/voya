@@ -22,6 +22,7 @@ interface StoredRow {
   occurredAt: Date;
   prevHash: string;
   entryHash: string;
+  reason: string | null;
 }
 
 function makeClient(): { client: AuditTxClient; rows: StoredRow[] } {
@@ -41,7 +42,8 @@ function makeClient(): { client: AuditTxClient; rows: StoredRow[] } {
       },
       async create(args) {
         const id = `booking-audit-${++seq}`;
-        rows.push({ ...(args.data as Omit<StoredRow, "id">), id } as StoredRow);
+        const data = args.data as Omit<StoredRow, "id">;
+        rows.push({ ...data, reason: data.reason ?? null, id } as StoredRow);
         return { id };
       },
     },
@@ -56,7 +58,8 @@ function makeClient(): { client: AuditTxClient; rows: StoredRow[] } {
       },
       async create(args) {
         const id = `auth-audit-${++seq}`;
-        rows.push({ ...(args.data as Omit<StoredRow, "id">), id } as StoredRow);
+        const data = args.data as Omit<StoredRow, "id">;
+        rows.push({ ...data, reason: data.reason ?? null, id } as StoredRow);
         return { id };
       },
     },
@@ -271,6 +274,37 @@ describe("PrismaAuditWriter", () => {
     });
 
     expect(rows[0]!.correlationId).toBeNull();
+  });
+
+  // --- WO-041: reason column ---
+
+  it("stores provided reason on the audit row", async () => {
+    const { client, rows } = makeClient();
+
+    await writer.append(client, {
+      actorId: "user-123",
+      actorRole: "traveler",
+      action: "BOOKING_CANCELLED",
+      resourceType: "booking",
+      resourceId: "booking-abc",
+      reason: "CANCELLATION_REQUESTED",
+    });
+
+    expect(rows[0]!.reason).toBe("CANCELLATION_REQUESTED");
+  });
+
+  it("stores null reason when omitted (system-initiated event)", async () => {
+    const { client, rows } = makeClient();
+
+    await writer.append(client, {
+      actorId: "system",
+      actorRole: "system",
+      action: "BOOKING_EXPIRED",
+      resourceType: "booking",
+      resourceId: "booking-xyz",
+    });
+
+    expect(rows[0]!.reason).toBeNull();
   });
 
   it("entries for different resourceIds have independent chains", async () => {

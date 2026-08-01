@@ -588,3 +588,10 @@
 - **Files:** 18 (+1937/-7)
 - **Duration:** 711ss
 - **Approach:** Extended the existing .forge/pipeline.yaml scan stage group by replacing the single scan:sast lint step with six independent parallel stages (scan:sonarqube, scan:snyk, scan:gitleaks, scan:semgrep, scan:grype, scan:artifact-guard). No inter-dependencies between the stages causes Forge to execute all six concurrently. The push stage was replaced with two sequential sub-stages: push:ecr (ECR with IMMUTABLE tag mutability and scan-on-push) and push:sign (cosign KMS signing). All deploy stages already contained cosign verify preconditions from WO-084. Added five supporting files: .gitleaks.toml custom ruleset, .semgrep.yml OWASP rules, sonar-project.properties, security/waivers.yaml, and tools/ci/verify-signature.sh. Implemented two CLI tools (artifact-guard.ts, waiver-check.ts) with full unit test coverage and YAML test fixtures. Added the ECR Terraform module and Phase 0 evidence documentation.
+
+## WO-041: User Story: WO-041 - Append-only immutable booking audit writer
+- **Status:** completed
+- **Commit:** `a32c78d`
+- **Files:** 10 (+842/-2)
+- **Duration:** 686ss
+- **Approach:** Extended the existing packages/audit infrastructure (AuditWriter port + PrismaAuditWriter with hash chain, installed by WO-072/WO-101) with the WO-041-specific gaps: (1) additive migration 0016 adding the reason column, booking_occurred index, and a SECURITY DEFINER PostgreSQL function for GDPR pseudonymisation; (2) reason field wired into Zod schema and PrismaAuditWriter.append(); (3) TypeScript pseudonymise.ts module exposing deriveActorSurrogate (SHA-256(salt+actorId)) and pseudonymiseAuditActor that calls the DB stored procedure; (4) committed audit fixtures covering all six BookingActions; (5) full unit and integration test suites.
