@@ -1,0 +1,36 @@
+{
+  "version": "1",
+  "id": "sc-003",
+  "description": "Happy path: car rental search",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "I need a car rental in Rome from June 1st to June 7th",
+      "stubbedToolResponses": {
+        "search_cars:0": {
+          "ok": true,
+          "data": [
+            { "id": "CAR001", "price": 320, "currency": "EUR", "provenance": "EUROPCAR", "bookable": true, "title": "Economy Car", "description": "Fiat 500 or similar" },
+            { "id": "CAR002", "price": 420, "currency": "EUR", "provenance": "EUROPCAR", "bookable": true, "title": "Compact SUV", "description": "VW Tiguan or similar" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_cars" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"pickUpLocation\":\"Rome Fiumicino\",\"dropOffLocation\":\"Rome Fiumicino\",\"pickUpDate\":\"2024-06-01\",\"dropOffDate\":\"2024-06-07\"}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 105, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Here are some car rental options available for your trip to Rome." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 160, "outputTokens": 18 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_cars"],
+        "grounding": { "minPassRate": 1.0, "allOfferCardsTraceable": true }
+      }
+    }
+  ]
+}

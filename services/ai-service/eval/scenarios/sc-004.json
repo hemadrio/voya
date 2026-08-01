@@ -1,0 +1,62 @@
+{
+  "version": "1",
+  "id": "sc-004",
+  "description": "Multi-turn planning: flight then hotel in separate turns",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Find flights from NYC to Tokyo in July",
+      "stubbedToolResponses": {
+        "search_flights:0": {
+          "ok": true,
+          "data": [
+            { "id": "FL010", "price": 1200, "currency": "USD", "provenance": "AMADEUS", "bookable": true, "title": "JFK → NRT Economy", "description": "14h direct" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"JFK\",\"destination\":\"NRT\",\"departureDate\":\"2024-07-10\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 120, "outputTokens": 12 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "I found some flight options for your trip to Tokyo." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 180, "outputTokens": 20 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_flights"],
+        "grounding": { "minPassRate": 1.0 }
+      }
+    },
+    {
+      "userContent": "Now find hotels in Tokyo for 5 nights",
+      "stubbedToolResponses": {
+        "search_hotels:0": {
+          "ok": true,
+          "data": [
+            { "id": "HT010", "price": 180, "currency": "USD", "provenance": "RAPIDAPI_HOTEL", "bookable": true, "title": "Shinjuku Capsule Hotel", "description": "Modern capsule, central Shinjuku" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc002", "toolName": "search_hotels" },
+          { "type": "tool_call_delta", "toolCallId": "tc002", "toolInputDelta": "{\"destination\":\"Tokyo\",\"checkIn\":\"2024-07-10\",\"checkOut\":\"2024-07-15\",\"guests\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc002" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 200, "outputTokens": 12 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Here are hotel options in Tokyo for your stay." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 250, "outputTokens": 18 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_hotels"],
+        "grounding": { "minPassRate": 1.0 }
+      }
+    }
+  ]
+}

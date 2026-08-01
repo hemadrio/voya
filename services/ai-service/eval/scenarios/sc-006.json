@@ -1,0 +1,22 @@
+{
+  "version": "1",
+  "id": "sc-006",
+  "description": "Ambiguous input requiring clarification — no tool call",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "I want to go somewhere warm",
+      "stubbedToolResponses": {},
+      "scriptedModelTranscript": [
+        [
+          { "type": "text_delta", "textDelta": "I'd love to help you find a warm destination! Could you tell me where you'd be departing from, your travel dates, and roughly how long you'd like to go for?" },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 85, "outputTokens": 30 } }
+        ]
+      ],
+      "expectations": {
+        "tools": [],
+        "grounding": { "minPassRate": 1.0 }
+      }
+    }
+  ]
+}

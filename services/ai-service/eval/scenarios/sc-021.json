@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "id": "sc-021",
+  "description": "Car rental zero results — graceful empty response",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Find cars in a town that doesn't have any rental services",
+      "stubbedToolResponses": {
+        "search_cars:0": {
+          "ok": true,
+          "data": []
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_cars" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"pickUpLocation\":\"Obscure Village\",\"dropOffLocation\":\"Obscure Village\",\"pickUpDate\":\"2024-07-01\",\"dropOffDate\":\"2024-07-05\"}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 105, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "No car rental options were found for that location. You might want to try a nearby larger town or airport." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 155, "outputTokens": 25 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_cars"],
+        "grounding": { "minPassRate": 1.0 }
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "id": "sc-007",
+  "description": "Zero results from flight search — graceful fallback response",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Find flights from LAX to a small island with no commercial airport",
+      "stubbedToolResponses": {
+        "search_flights:0": {
+          "ok": true,
+          "data": []
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"LAX\",\"destination\":\"PMI\",\"departureDate\":\"2024-06-01\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 110, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Unfortunately I was unable to find any available flights for that route at this time. You may want to try a nearby major airport or different dates." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 160, "outputTokens": 30 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_flights"],
+        "grounding": { "minPassRate": 1.0, "allOfferCardsTraceable": true }
+      }
+    }
+  ]
+}

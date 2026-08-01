@@ -1,0 +1,37 @@
+{
+  "version": "1",
+  "id": "sc-002",
+  "description": "Happy path: hotel search with offer cards",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Find hotels in Paris for 3 nights in May",
+      "stubbedToolResponses": {
+        "search_hotels:0": {
+          "ok": true,
+          "data": [
+            { "id": "HT001", "price": 189, "currency": "EUR", "provenance": "RAPIDAPI_HOTEL", "bookable": true, "title": "Hotel de la Paix", "description": "4-star, Montmartre" },
+            { "id": "HT002", "price": 245, "currency": "EUR", "provenance": "RAPIDAPI_HOTEL", "bookable": true, "title": "Le Marais Boutique", "description": "Boutique hotel, central location" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_hotels" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"destination\":\"Paris\",\"checkIn\":\"2024-05-10\",\"checkOut\":\"2024-05-13\",\"guests\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 110, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Here are some hotel options in Paris for your stay." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 170, "outputTokens": 18 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_hotels"],
+        "grounding": { "minPassRate": 1.0, "allOfferCardsTraceable": true },
+        "cost": { "maxTokensIn": 500, "maxTokensOut": 200 }
+      }
+    }
+  ]
+}

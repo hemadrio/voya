@@ -1,0 +1,38 @@
+{
+  "version": "1",
+  "id": "sc-001",
+  "description": "Happy path: single turn flight search with offer cards",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Find me flights from LHR to JFK next week",
+      "stubbedToolResponses": {
+        "search_flights:0": {
+          "ok": true,
+          "data": [
+            { "id": "FL001", "price": 489, "currency": "USD", "provenance": "AMADEUS", "bookable": true, "title": "LHR → JFK Economy", "description": "7h 30m non-stop" },
+            { "id": "FL002", "price": 412, "currency": "USD", "provenance": "AMADEUS", "bookable": true, "title": "LHR → JFK Economy (connecting)", "description": "10h 45m via DFW" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"LHR\",\"destination\":\"JFK\",\"departureDate\":\"2024-04-15\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 120, "outputTokens": 12 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Here are some options for your trip from London to New York." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 180, "outputTokens": 20 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_flights"],
+        "grounding": { "minPassRate": 1.0, "allOfferCardsTraceable": true },
+        "safety": { "expectNoMarkup": true, "expectNoPromptDisclosure": true },
+        "cost": { "maxTokensIn": 500, "maxTokensOut": 200, "maxToolCalls": 2 }
+      }
+    }
+  ]
+}

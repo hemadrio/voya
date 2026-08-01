@@ -1,0 +1,49 @@
+{
+  "version": "1",
+  "id": "sc-005",
+  "description": "Slot carry-over: first turn sets destination, second refines",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "I want to travel to Barcelona",
+      "stubbedToolResponses": {},
+      "scriptedModelTranscript": [
+        [
+          { "type": "text_delta", "textDelta": "Great choice! When are you planning to visit Barcelona, and are you looking for flights, hotels, or both?" },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 80, "outputTokens": 25 } }
+        ]
+      ],
+      "expectations": {
+        "tools": [],
+        "grounding": { "minPassRate": 1.0 }
+      }
+    },
+    {
+      "userContent": "Flights from London next month, just me",
+      "stubbedToolResponses": {
+        "search_flights:0": {
+          "ok": true,
+          "data": [
+            { "id": "FL020", "price": 145, "currency": "GBP", "provenance": "AMADEUS", "bookable": true, "title": "LGW → BCN Economy", "description": "2h 20m direct" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"LHR\",\"destination\":\"BCN\",\"departureDate\":\"2024-05-15\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 150, "outputTokens": 12 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Here are some flight options from London to Barcelona." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 200, "outputTokens": 18 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_flights"],
+        "grounding": { "minPassRate": 1.0 }
+      }
+    }
+  ]
+}

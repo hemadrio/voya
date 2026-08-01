@@ -1,0 +1,70 @@
+# Assistant Evaluation Harness — CI Quality Gate (WO-063)
+#
+# Runs the offline eval harness on every PR that touches ai-service source,
+# prompt templates, contracts, or eval fixtures.
+#
+# The harness requires no LLM API keys — all transports are stubbed.
+# Fails the build when grounding or safety pass rates fall below thresholds,
+# or when cost/latency regress beyond configured tolerances.
+#
+# Baseline updates are explicit and reviewable:
+#   npx tsx eval/gate.ts --regenerate-baseline
+# Never runs automatically.
+
+name: assistant-eval
+
+on:
+  pull_request:
+    paths:
+      - "services/ai-service/src/**"
+      - "services/ai-service/eval/**"
+      - "packages/contracts/src/assistant/**"
+      - "packages/contracts/src/**"
+  push:
+    branches:
+      - main
+      - "forge/**"
+    paths:
+      - "services/ai-service/src/**"
+      - "services/ai-service/eval/**"
+      - "packages/contracts/src/**"
+
+jobs:
+  eval:
+    name: Assistant quality gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/ai-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --workspace=services/ai-service --include-workspace-root
+
+      - name: Typecheck eval harness
+        run: npx tsc --noEmit --project tsconfig.json
+
+      - name: Run scorer unit tests
+        run: npx vitest run eval/test/GroundingScorer.test.ts eval/test/SafetyScorer.test.ts eval/test/TaskSuccessScorer.test.ts eval/test/CostScorer.test.ts eval/test/LatencyScorer.test.ts eval/test/baseline-diff.test.ts eval/test/determinism.test.ts eval/test/harness.integration.test.ts
+
+      - name: Run eval harness (offline, no network)
+        run: npx tsx eval/gate.ts --scenarios eval/scenarios --output eval-output --baseline eval/baseline.json
+        env:
+          NODE_ENV: test
+
+      - name: Upload eval report artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assistant-eval-report-${{ github.run_id }}
+          path: services/ai-service/eval-output/report.json
+          retention-days: 30

@@ -1,0 +1,67 @@
+{
+  "version": "1",
+  "id": "sc-016",
+  "description": "Multi-turn slot carry-over: destination established then used implicitly",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "I want to visit Amsterdam",
+      "stubbedToolResponses": {},
+      "scriptedModelTranscript": [
+        [
+          { "type": "text_delta", "textDelta": "Amsterdam is a great destination! What dates are you thinking, and where would you be flying from?" },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 80, "outputTokens": 22 } }
+        ]
+      ],
+      "expectations": { "tools": [] }
+    },
+    {
+      "userContent": "Flying from Berlin, second week of July, one adult",
+      "stubbedToolResponses": {
+        "search_flights:0": {
+          "ok": true,
+          "data": [
+            { "id": "FL050", "price": 89, "currency": "EUR", "provenance": "AMADEUS", "bookable": true, "title": "BER → AMS Economy", "description": "1h 20m direct" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"BER\",\"destination\":\"AMS\",\"departureDate\":\"2024-07-08\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 160, "outputTokens": 12 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Great news! Here are some flight options from Berlin to Amsterdam." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 210, "outputTokens": 18 } }
+        ]
+      ],
+      "expectations": { "tools": ["search_flights"] }
+    },
+    {
+      "userContent": "Also find me a hotel for the same dates",
+      "stubbedToolResponses": {
+        "search_hotels:0": {
+          "ok": true,
+          "data": [
+            { "id": "HT050", "price": 120, "currency": "EUR", "provenance": "RAPIDAPI_HOTEL", "bookable": true, "title": "Canal View Hotel", "description": "Central Amsterdam, canal views" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc002", "toolName": "search_hotels" },
+          { "type": "tool_call_delta", "toolCallId": "tc002", "toolInputDelta": "{\"destination\":\"Amsterdam\",\"checkIn\":\"2024-07-08\",\"checkOut\":\"2024-07-15\",\"guests\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc002" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 250, "outputTokens": 12 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Here are some hotel options in Amsterdam for your stay." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 300, "outputTokens": 18 } }
+        ]
+      ],
+      "expectations": { "tools": ["search_hotels"] }
+    }
+  ]
+}

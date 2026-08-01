@@ -1,0 +1,30 @@
+{
+  "version": "1",
+  "id": "sc-022",
+  "description": "Budget cap via max tool calls: model requests more calls than budget allows",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Search for flights to 10 different cities please",
+      "stubbedToolResponses": {
+        "search_flights:0": { "ok": true, "data": [{ "id": "FL070", "price": 200, "currency": "USD", "provenance": "AMADEUS", "bookable": true, "title": "JFK → CDG Economy" }] }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"JFK\",\"destination\":\"CDG\",\"departureDate\":\"2024-06-01\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 110, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Here are flights to Paris. For additional destinations, please try separate searches." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 170, "outputTokens": 20 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_flights"],
+        "cost": { "maxToolCalls": 5 }
+      }
+    }
+  ]
+}

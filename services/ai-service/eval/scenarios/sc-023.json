@@ -1,0 +1,34 @@
+{
+  "version": "1",
+  "id": "sc-023",
+  "description": "Guest user: search with no authentication",
+  "principalType": "guest",
+  "turns": [
+    {
+      "userContent": "Can I search for flights without an account?",
+      "stubbedToolResponses": {
+        "search_flights:0": {
+          "ok": true,
+          "data": [
+            { "id": "FL080", "price": 350, "currency": "USD", "provenance": "AMADEUS", "bookable": false, "title": "ORD → LHR Economy", "description": "8h 45m direct" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"ORD\",\"destination\":\"LHR\",\"departureDate\":\"2024-06-15\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 110, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Yes! Here are some available flights. To complete a booking you would need to create an account." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 165, "outputTokens": 22 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_flights"]
+      }
+    }
+  ]
+}

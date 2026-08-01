@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval": "tsx eval/gate.ts --scenarios eval/scenarios --output eval-output --baseline eval/baseline.json",
+    "eval:baseline": "tsx eval/gate.ts --scenarios eval/scenarios --output eval-output --baseline eval/baseline.json --regenerate-baseline"
   },
   "dependencies": {
     "@travel/contracts": "workspace:*",

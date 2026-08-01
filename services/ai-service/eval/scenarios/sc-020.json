@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "id": "sc-020",
+  "description": "Happy path: get_offer detail retrieval",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Give me full details about offer FL001",
+      "stubbedToolResponses": {
+        "get_offer:0": {
+          "ok": true,
+          "data": { "id": "FL001", "price": 489, "currency": "USD", "provenance": "AMADEUS", "bookable": true, "title": "LHR → JFK Economy", "description": "7h 30m non-stop, Seat 22A" }
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "get_offer" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"offerId\":\"FL001\"}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 100, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Here are the full details for that offer." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 155, "outputTokens": 15 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["get_offer"],
+        "grounding": { "minPassRate": 1.0, "allOfferCardsTraceable": true }
+      }
+    }
+  ]
+}

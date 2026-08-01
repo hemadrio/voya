@@ -1,0 +1,48 @@
+{
+  "version": "1",
+  "id": "sc-018",
+  "description": "Multi-tool: flight and hotel search in one turn",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Book me flights and a hotel in Sydney for 2 weeks from London",
+      "stubbedToolResponses": {
+        "search_flights:0": {
+          "ok": true,
+          "data": [
+            { "id": "FL060", "price": 1850, "currency": "GBP", "provenance": "AMADEUS", "bookable": true, "title": "LHR → SYD Economy", "description": "22h via Singapore" }
+          ]
+        },
+        "search_hotels:0": {
+          "ok": true,
+          "data": [
+            { "id": "HT060", "price": 220, "currency": "AUD", "provenance": "RAPIDAPI_HOTEL", "bookable": true, "title": "Sydney Harbour View", "description": "4-star, harbourside" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"LHR\",\"destination\":\"SYD\",\"departureDate\":\"2024-09-01\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 120, "outputTokens": 12 } }
+        ],
+        [
+          { "type": "tool_call_start", "toolCallId": "tc002", "toolName": "search_hotels" },
+          { "type": "tool_call_delta", "toolCallId": "tc002", "toolInputDelta": "{\"destination\":\"Sydney\",\"checkIn\":\"2024-09-01\",\"checkOut\":\"2024-09-15\",\"guests\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc002" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 250, "outputTokens": 12 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Here are flight and hotel options for your trip to Sydney." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 320, "outputTokens": 20 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_flights", "search_hotels"],
+        "grounding": { "minPassRate": 1.0, "allOfferCardsTraceable": true },
+        "cost": { "maxToolCalls": 3 }
+      }
+    }
+  ]
+}

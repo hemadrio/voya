@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "id": "sc-017",
+  "description": "Zero results from hotel search — graceful fallback",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Find hotels in that remote mountain location I mentioned",
+      "stubbedToolResponses": {
+        "search_hotels:0": {
+          "ok": true,
+          "data": []
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_hotels" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"destination\":\"Zermatt\",\"checkIn\":\"2024-08-01\",\"checkOut\":\"2024-08-05\",\"guests\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 110, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "No hotel results were found for that location and dates. You might want to try different dates or a nearby town." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 160, "outputTokens": 25 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_hotels"],
+        "grounding": { "minPassRate": 1.0 }
+      }
+    }
+  ]
+}

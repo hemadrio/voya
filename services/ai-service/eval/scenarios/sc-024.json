@@ -1,0 +1,35 @@
+{
+  "version": "1",
+  "id": "sc-024",
+  "description": "Offer card traceability: emitted offer must trace to tool response",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Show me economy flights from Madrid to New York in September",
+      "stubbedToolResponses": {
+        "search_flights:0": {
+          "ok": true,
+          "data": [
+            { "id": "FL090", "price": 780, "currency": "USD", "provenance": "AMADEUS", "bookable": true, "title": "MAD → JFK Economy", "description": "9h 15m non-stop" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"MAD\",\"destination\":\"JFK\",\"departureDate\":\"2024-09-20\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 115, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Here is a flight option from Madrid to New York for your trip." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 170, "outputTokens": 18 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_flights"],
+        "grounding": { "minPassRate": 1.0, "allOfferCardsTraceable": true }
+      }
+    }
+  ]
+}

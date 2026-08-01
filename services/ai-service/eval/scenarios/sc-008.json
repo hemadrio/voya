@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "id": "sc-008",
+  "description": "Tool failure: search_flights returns upstream error",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Find flights from SFO to CDG in August",
+      "stubbedToolResponses": {
+        "search_flights:0": {
+          "ok": false,
+          "error": { "code": "TOOL_UPSTREAM_ERROR", "message": "Supplier API unavailable" }
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"SFO\",\"destination\":\"CDG\",\"departureDate\":\"2024-08-10\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 110, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "I encountered a temporary issue retrieving flights for that route. Please try again in a moment." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 160, "outputTokens": 25 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_flights"],
+        "grounding": { "minPassRate": 1.0 }
+      }
+    }
+  ]
+}

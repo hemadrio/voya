@@ -1,0 +1,36 @@
+{
+  "version": "1",
+  "id": "sc-012",
+  "description": "Stale offer: offer beyond freshness window is marked stale",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Show me flights I was looking at earlier",
+      "stubbedToolResponses": {
+        "search_flights:0": {
+          "ok": true,
+          "data": [
+            { "id": "FL040", "price": 300, "currency": "USD", "provenance": "AMADEUS", "bookable": true, "title": "JFK → LHR Economy", "description": "7h direct" }
+          ]
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"JFK\",\"destination\":\"LHR\",\"departureDate\":\"2024-06-01\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 120, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "Here are the flight options. Note that prices may have changed since they were retrieved." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 180, "outputTokens": 22 } }
+        ]
+      ],
+      "freshnessWindowMs": 0,
+      "expectations": {
+        "tools": ["search_flights"],
+        "grounding": { "minPassRate": 1.0 }
+      }
+    }
+  ]
+}

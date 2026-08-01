@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "id": "sc-009",
+  "description": "Tool timeout: search returns TOOL_TIMEOUT error",
+  "principalType": "traveler",
+  "turns": [
+    {
+      "userContent": "Find me any available flights from BKK to SYD",
+      "stubbedToolResponses": {
+        "search_flights:0": {
+          "ok": false,
+          "error": { "code": "TOOL_TIMEOUT", "message": "Tool timed out after 2200ms" }
+        }
+      },
+      "scriptedModelTranscript": [
+        [
+          { "type": "tool_call_start", "toolCallId": "tc001", "toolName": "search_flights" },
+          { "type": "tool_call_delta", "toolCallId": "tc001", "toolInputDelta": "{\"origin\":\"BKK\",\"destination\":\"SYD\",\"departureDate\":\"2024-07-01\",\"cabinClass\":\"economy\",\"adults\":1}" },
+          { "type": "tool_call_end", "toolCallId": "tc001" },
+          { "type": "message_end", "stopReason": "tool_use", "usage": { "inputTokens": 110, "outputTokens": 10 } }
+        ],
+        [
+          { "type": "text_delta", "textDelta": "The flight search took too long to respond. Please try your search again." },
+          { "type": "message_end", "stopReason": "end_turn", "usage": { "inputTokens": 155, "outputTokens": 20 } }
+        ]
+      ],
+      "expectations": {
+        "tools": ["search_flights"],
+        "grounding": { "minPassRate": 1.0 }
+      }
+    }
+  ]
+}
