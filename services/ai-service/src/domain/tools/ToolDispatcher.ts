@@ -116,7 +116,7 @@ export class ToolDispatcher {
    *   8. Map 5xx / non-JSON → TOOL_UPSTREAM_ERROR.
    *   9. Return { ok: true, tool, data }.
    */
-  dispatch(name: string, rawInput: unknown, ctx: ToolContext): Promise<DispatchResult> {
+  dispatch(name: string, rawInput: unknown, ctx: ToolContext, parentSignal?: AbortSignal): Promise<DispatchResult> {
     const reference = this.getReference(ctx);
 
     return this.tracer.startActiveSpan("assistant.tool.dispatch", async (span: SpanLike) => {
@@ -194,13 +194,16 @@ export class ToolDispatcher {
           );
         }
 
-        // Step 5: AbortController timeout + resolver call
+        // Step 5: AbortController timeout + resolver call.
+        // If a parentSignal is supplied, abort the tool controller when it fires.
         const controller = new AbortController();
         let timedOut = false;
         const timer = setTimeout(() => {
           timedOut = true;
           controller.abort();
         }, this.timeoutMs);
+        const parentAbortListener = () => controller.abort();
+        parentSignal?.addEventListener("abort", parentAbortListener);
 
         let data: unknown;
         try {
@@ -208,8 +211,10 @@ export class ToolDispatcher {
             signal: controller.signal,
           });
           clearTimeout(timer);
+          parentSignal?.removeEventListener("abort", parentAbortListener);
         } catch (err) {
           clearTimeout(timer);
+          parentSignal?.removeEventListener("abort", parentAbortListener);
           if (timedOut || controller.signal.aborted) {
             return fail("TOOL_TIMEOUT", `Tool "${descriptor.name}" timed out after ${this.timeoutMs}ms.`);
           }
