@@ -56,6 +56,8 @@ that covers it. One alarm maps to exactly one primary runbook; cross-references 
 | `HIGH-funnel-emission-failed` | [telemetry-verification.md](telemetry-verification.md) | Funnel store write failures |
 | `HIGH-funnel-events-dropped` | [telemetry-verification.md](telemetry-verification.md) | Funnel buffer overflow / dropped events |
 | `HIGH-latency-degradation-composite` | [availability-error-budget-burn.md](availability-error-budget-burn.md) | Composite latency degradation |
+| `HIGH-domain-events-dlq-depth` | [dlq-redrive.md](dlq-redrive.md) | Domain-events DLQ has ≥1 message |
+| `HIGH-domain-events-queue-depth` | [notification-queue-backlog.md](notification-queue-backlog.md) | Domain-events FIFO queue depth > 100; consumer autoscaling trigger |
 | `HIGH-notification-queue-depth` | [notification-queue-backlog.md](notification-queue-backlog.md) | SQS queue depth high |
 | `HIGH-notification-queue-oldest-message` | [notification-queue-backlog.md](notification-queue-backlog.md) | SQS oldest message age |
 | `HIGH-purge-run-failure-compliance` | [purge-run-failure.md](purge-run-failure.md) | Retention purge job failure |
