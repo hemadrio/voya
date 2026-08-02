@@ -1,0 +1,11 @@
+{
+  "eventId": "a1b2c3d4-e5f6-4000-8000-abcdef012345",
+  "eventType": "booking.confirmed",
+  "occurredAt": "2027-01-15T10:00:00.000Z",
+  "correlationId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+  "schemaVersion": 1,
+  "userId": "b2c3d4e5-f6a7-4000-8000-bcdef0123456",
+  "payload": {
+    "bookingId": "d3e4f5a6-b7c8-4000-8000-cdef01234567"
+  }
+}

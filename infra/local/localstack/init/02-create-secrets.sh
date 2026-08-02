@@ -51,5 +51,18 @@ create_secret "dev/travel-platform/redis-auth-token" '"LOCAL_DEV_NO_AUTH"'
 # Anthropic (placeholder)
 create_secret "dev/travel-platform/anthropic-key" '"LOCAL_DEV_ANTHROPIC_KEY"'
 
+# Queue driver configuration (WO-051 — @travel/queue)
+# QUEUE_DRIVER=rabbitmq routes to the local RabbitMQ container.
+# RABBITMQ_URL uses the docker-compose service DNS name (rabbitmq:5672).
+create_secret "dev/travel-platform/queue-driver" '"rabbitmq"'
+create_secret "dev/travel-platform/rabbitmq-url" '"amqp://guest:guest@rabbitmq:5672/"'
+
+# SQS queue URLs for the domain-events queue (used when QUEUE_DRIVER=sqs).
+# Points to LocalStack edge port; consumers set AWS_ENDPOINT_URL=http://localstack:4566.
+create_secret "dev/travel-platform/sqs-domain-events-queue-url" \
+  '"http://localhost:4566/000000000000/travel-domain-events.fifo"'
+create_secret "dev/travel-platform/sqs-dlq-url" \
+  '"http://localhost:4566/000000000000/travel-domain-events-dlq.fifo"'
+
 echo "[localstack-init] Secrets Manager entries created."
 ${AWS_CMD} secretsmanager list-secrets --region "${REGION}" --query 'SecretList[].Name'
