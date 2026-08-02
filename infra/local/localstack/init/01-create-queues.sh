@@ -46,5 +46,25 @@ ${AWS_CMD} sqs create-queue \
   --attributes FifoQueue=true,ContentBasedDeduplication=true \
   --region "${REGION}" || echo "[localstack-init] travel-payment-dlq.fifo already exists"
 
+# Domain-events queue (WO-051) — @travel/queue SqsAdapter target.
+# ContentBasedDeduplication=false: producers supply explicit MessageDeduplicationId
+# (the domain event UUID) matching the production FIFO queue configuration.
+${AWS_CMD} sqs create-queue \
+  --queue-name travel-domain-events-dlq.fifo \
+  --attributes "FifoQueue=true,ContentBasedDeduplication=false,MessageRetentionPeriod=1209600" \
+  --region "${REGION}" || echo "[localstack-init] travel-domain-events-dlq.fifo already exists"
+
+DLQ_ARN=$(${AWS_CMD} sqs get-queue-attributes \
+  --queue-url "http://localhost:4566/000000000000/travel-domain-events-dlq.fifo" \
+  --attribute-names QueueArn \
+  --region "${REGION}" \
+  --query Attributes.QueueArn \
+  --output text)
+
+${AWS_CMD} sqs create-queue \
+  --queue-name travel-domain-events.fifo \
+  --attributes "FifoQueue=true,ContentBasedDeduplication=false,MessageRetentionPeriod=345600,VisibilityTimeout=300,ReceiveMessageWaitTimeSeconds=20,RedrivePolicy={\"deadLetterTargetArn\":\"${DLQ_ARN}\",\"maxReceiveCount\":\"5\"}" \
+  --region "${REGION}" || echo "[localstack-init] travel-domain-events.fifo already exists"
+
 echo "[localstack-init] SQS queues created."
 ${AWS_CMD} sqs list-queues --region "${REGION}"

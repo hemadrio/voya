@@ -20,4 +20,12 @@ export const REQUIRED_SECRETS: ReadonlyArray<SecretDescriptor> = [
       'PostgreSQL connection string via RDS Proxy for the booking schema.',
     minLength: 20,
   },
+  {
+    envVar: 'QUEUE_DRIVER',
+    description:
+      'Queue adapter driver to use. Must be "rabbitmq" (local Docker Compose) or "sqs" (production). ' +
+      'Controls which @travel/queue adapter is instantiated at startup. ' +
+      'Missing or unknown value causes a non-zero exit before accepting traffic.',
+    minLength: 3,
+  },
 ];

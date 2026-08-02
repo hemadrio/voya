@@ -173,9 +173,12 @@ services:
   # Emulates AWS SQS, SES, and Secrets Manager on a single edge port.
   # Start with: docker compose --profile aws up -d
   # The init scripts in infra/local/localstack/init/ create:
+  #   - travel-domain-events.fifo (FIFO domain-events queue, WO-051 @travel/queue)
+  #   - travel-domain-events-dlq.fifo (dead-letter FIFO, maxReceiveCount=5)
   #   - travel-notification.fifo (FIFO queue)
   #   - travel-notification-dlq.fifo (dead-letter FIFO)
-  #   - Secrets Manager entries with development-only placeholder values.
+  #   - Secrets Manager entries with development-only placeholder values,
+  #     including queue-driver, rabbitmq-url, sqs-domain-events-queue-url, sqs-dlq-url.
   # AWS_ENDPOINT_URL=http://localhost:4566 in service environment to redirect calls.
   localstack:
     image: localstack/localstack:3.5.0
